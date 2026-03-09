@@ -1,0 +1,94 @@
+{
+  "name": "@synapse-sap/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for the Synapse Agent Protocol (SAP v2) on Solana",
+  "license": "MIT",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js",
+      "types": "./dist/types/index.d.ts"
+    },
+    "./agent": {
+      "import": "./dist/esm/modules/agent.js",
+      "require": "./dist/cjs/modules/agent.js",
+      "types": "./dist/types/modules/agent.d.ts"
+    },
+    "./feedback": {
+      "import": "./dist/esm/modules/feedback.js",
+      "require": "./dist/cjs/modules/feedback.js",
+      "types": "./dist/types/modules/feedback.d.ts"
+    },
+    "./indexing": {
+      "import": "./dist/esm/modules/indexing.js",
+      "require": "./dist/cjs/modules/indexing.js",
+      "types": "./dist/types/modules/indexing.d.ts"
+    },
+    "./tools": {
+      "import": "./dist/esm/modules/tools.js",
+      "require": "./dist/cjs/modules/tools.js",
+      "types": "./dist/types/modules/tools.d.ts"
+    },
+    "./vault": {
+      "import": "./dist/esm/modules/vault.js",
+      "require": "./dist/cjs/modules/vault.js",
+      "types": "./dist/types/modules/vault.d.ts"
+    },
+    "./escrow": {
+      "import": "./dist/esm/modules/escrow.js",
+      "require": "./dist/cjs/modules/escrow.js",
+      "types": "./dist/types/modules/escrow.d.ts"
+    },
+    "./attestation": {
+      "import": "./dist/esm/modules/attestation.js",
+      "require": "./dist/cjs/modules/attestation.js",
+      "types": "./dist/types/modules/attestation.d.ts"
+    },
+    "./ledger": {
+      "import": "./dist/esm/modules/ledger.js",
+      "require": "./dist/cjs/modules/ledger.js",
+      "types": "./dist/types/modules/ledger.d.ts"
+    },
+    "./pda": {
+      "import": "./dist/esm/pda.js",
+      "require": "./dist/cjs/pda.js",
+      "types": "./dist/types/pda.d.ts"
+    },
+    "./types": {
+      "import": "./dist/esm/types.js",
+      "require": "./dist/cjs/types.js",
+      "types": "./dist/types/types.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "yarn build:cjs && yarn build:esm && yarn build:types",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:types": "tsc -p tsconfig.json --emitDeclarationOnly",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "yarn clean && yarn build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@solana/web3.js": "^1.98.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  },
+  "peerDependencies": {
+    "@coral-xyz/anchor": ">=0.30.0",
+    "@solana/web3.js": ">=1.90.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

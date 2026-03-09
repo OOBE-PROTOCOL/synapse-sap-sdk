@@ -1,0 +1,21 @@
+# Source (included via "files" in package.json, but blacklist extras)
+src/**/*.test.ts
+src/**/*.spec.ts
+
+# Config
+tsconfig*.json
+.eslintrc*
+.prettierrc*
+.editorconfig
+.gitignore
+.github/
+
+# Dev
+coverage/
+.nyc_output/
+.turbo/
+*.log
+
+# IDE
+.vscode/
+.idea/
