@@ -1,9 +1,14 @@
 /**
  * @module tools
- * @description Tool schema registry + session checkpoints.
+ * @description Tool schema registry and session checkpoints for the
+ * Solana Agent Protocol.
  *
  * Covers: publish, inscribe schema, update, deactivate/reactivate,
- * close, report invocations, session checkpoints.
+ * close, report invocations, and session checkpoint management.
+ *
+ * @category Modules
+ * @since v0.1.0
+ * @packageDocumentation
  */
 
 import { SystemProgram, type PublicKey, type TransactionSignature } from "@solana/web3.js";
@@ -23,10 +28,41 @@ import type {
 } from "../types";
 import { sha256, hashToArray } from "../utils";
 
+/**
+ * @name ToolsModule
+ * @description Manages tool descriptors and session checkpoints for the
+ *   Solana Agent Protocol. Provides methods to publish, update, deactivate,
+ *   reactivate, close, and fetch tool descriptors, as well as inscribe
+ *   JSON schemas into TX logs and manage session checkpoints.
+ *
+ * @category Modules
+ * @since v0.1.0
+ * @extends BaseModule
+ *
+ * @example
+ * ```ts
+ * const sap = new SapClient(provider);
+ * // Publish a tool by name (auto-hashes)
+ * const sig = await sap.tools.publishByName(
+ *   "getWeather", "mcp-v1", "Fetch weather",
+ *   '{"type":"object"}', '{"type":"object"}',
+ *   0, 1, 2, 1, false,
+ * );
+ * ```
+ */
 export class ToolsModule extends BaseModule {
   // ── PDA helpers ──────────────────────────────────────
 
-  /** Derive the ToolDescriptor PDA. */
+  /**
+   * @name deriveTool
+   * @description Derive the `ToolDescriptor` PDA for a given agent and tool name.
+   *   The tool name is SHA-256 hashed internally.
+   * @param agentPda - The agent account PDA.
+   * @param toolName - The human-readable tool name.
+   * @returns A tuple of `[PublicKey, bump]` for the tool PDA.
+   * @see {@link deriveTool} from `pda/` module for the underlying derivation.
+   * @since v0.1.0
+   */
   deriveTool(
     agentPda: PublicKey,
     toolName: string,
@@ -36,7 +72,14 @@ export class ToolsModule extends BaseModule {
 
   // ── Instructions ─────────────────────────────────────
 
-  /** Publish a new tool descriptor for an agent. */
+  /**
+   * @name publish
+   * @description Publish a new tool descriptor for an agent using pre-computed
+   *   hashes. For auto-hashing, prefer {@link publishByName}.
+   * @param args - Tool publication parameters (name, hashes, HTTP method, category, params, etc.).
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async publish(args: PublishToolArgs): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(this.walletPubkey);
     const [toolPda] = deriveTool(agentPda, new Uint8Array(args.toolNameHash));
@@ -67,7 +110,21 @@ export class ToolsModule extends BaseModule {
   }
 
   /**
-   * Convenience: publish a tool using string names (auto-hashes).
+   * @name publishByName
+   * @description Convenience method to publish a tool using string names.
+   *   All string arguments are automatically SHA-256 hashed.
+   * @param toolName - Human-readable tool name.
+   * @param protocolId - Protocol identifier (e.g. `"mcp-v1"`).
+   * @param description - Tool description text.
+   * @param inputSchema - JSON schema string for input validation.
+   * @param outputSchema - JSON schema string for output validation.
+   * @param httpMethod - Numeric HTTP method enum value.
+   * @param category - Numeric tool category enum value.
+   * @param paramsCount - Total number of parameters.
+   * @param requiredParams - Number of required parameters.
+   * @param isCompound - Whether the tool is a compound (multi-step) tool.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
    */
   async publishByName(
     toolName: string,
@@ -96,7 +153,15 @@ export class ToolsModule extends BaseModule {
     });
   }
 
-  /** Inscribe full JSON schema into TX logs (zero rent). */
+  /**
+   * @name inscribeSchema
+   * @description Inscribe a full JSON schema into the transaction log (zero rent).
+   *   The schema is stored as TX log data, not as PDA account data.
+   * @param toolName - The human-readable tool name.
+   * @param args - Schema inscription parameters (type, data, hash, compression).
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async inscribeSchema(
     toolName: string,
     args: InscribeToolSchemaArgs,
@@ -119,7 +184,15 @@ export class ToolsModule extends BaseModule {
       .rpc();
   }
 
-  /** Update a tool's schema hashes and bump version. */
+  /**
+   * @name update
+   * @description Update a tool’s schema hashes and bump its version.
+   *   All fields are optional — only non-null values are written.
+   * @param toolName - The human-readable tool name.
+   * @param args - Partial update parameters (hashes, method, category, params).
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async update(
     toolName: string,
     args: UpdateToolArgs,
@@ -145,7 +218,14 @@ export class ToolsModule extends BaseModule {
       .rpc();
   }
 
-  /** Deactivate a tool (still discoverable but marked unavailable). */
+  /**
+   * @name deactivate
+   * @description Deactivate a tool. The tool remains discoverable but is
+   *   marked as unavailable.
+   * @param toolName - The human-readable tool name.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async deactivate(toolName: string): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(this.walletPubkey);
     const [toolPda] = this.deriveTool(agentPda, toolName);
@@ -160,7 +240,13 @@ export class ToolsModule extends BaseModule {
       .rpc();
   }
 
-  /** Reactivate a previously deactivated tool. */
+  /**
+   * @name reactivate
+   * @description Reactivate a previously deactivated tool.
+   * @param toolName - The human-readable tool name.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async reactivate(toolName: string): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(this.walletPubkey);
     const [toolPda] = this.deriveTool(agentPda, toolName);
@@ -175,7 +261,13 @@ export class ToolsModule extends BaseModule {
       .rpc();
   }
 
-  /** Close a tool PDA (rent returned to wallet). */
+  /**
+   * @name close
+   * @description Close a tool PDA and reclaim rent to the owner wallet.
+   * @param toolName - The human-readable tool name.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async close(toolName: string): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(this.walletPubkey);
     const [toolPda] = this.deriveTool(agentPda, toolName);
@@ -192,7 +284,15 @@ export class ToolsModule extends BaseModule {
       .rpc();
   }
 
-  /** Report tool invocation count. */
+  /**
+   * @name reportInvocations
+   * @description Report tool invocation count. Updates the on-chain counter
+   *   for analytics and discovery ranking.
+   * @param toolName - The human-readable tool name.
+   * @param invocations - The number of invocations to report.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async reportInvocations(
     toolName: string,
     invocations: number | bigint,
@@ -212,7 +312,15 @@ export class ToolsModule extends BaseModule {
 
   // ── Checkpoints ──────────────────────────────────────
 
-  /** Create a checkpoint snapshot of the current session state. */
+  /**
+   * @name createCheckpoint
+   * @description Create a checkpoint snapshot of the current session state.
+   *   Checkpoints are indexed by session PDA and checkpoint index.
+   * @param sessionPda - The session ledger PDA.
+   * @param checkpointIndex - The zero-based checkpoint index.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async createCheckpoint(
     sessionPda: PublicKey,
     checkpointIndex: number,
@@ -230,7 +338,14 @@ export class ToolsModule extends BaseModule {
       .rpc();
   }
 
-  /** Close a checkpoint PDA (rent returned). */
+  /**
+   * @name closeCheckpoint
+   * @description Close a checkpoint PDA and reclaim rent.
+   * @param sessionPda - The session ledger PDA.
+   * @param checkpointIndex - The zero-based checkpoint index.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async closeCheckpoint(
     sessionPda: PublicKey,
     checkpointIndex: number,
@@ -249,19 +364,43 @@ export class ToolsModule extends BaseModule {
 
   // ── Fetchers ─────────────────────────────────────────
 
-  /** Fetch a tool descriptor. */
+  /**
+   * @name fetch
+   * @description Fetch a deserialized `ToolDescriptor` account.
+   * @param agentPda - The agent account PDA.
+   * @param toolName - The human-readable tool name.
+   * @returns {Promise<ToolDescriptorData>} The tool descriptor data.
+   * @throws Will throw if the tool descriptor does not exist.
+   * @since v0.1.0
+   */
   async fetch(agentPda: PublicKey, toolName: string): Promise<ToolDescriptorData> {
     const [pda] = this.deriveTool(agentPda, toolName);
     return this.fetchAccount<ToolDescriptorData>("toolDescriptor", pda);
   }
 
-  /** Fetch a tool descriptor, or `null`. */
+  /**
+   * @name fetchNullable
+   * @description Fetch a deserialized `ToolDescriptor` account, or `null`
+   *   if it does not exist on-chain.
+   * @param agentPda - The agent account PDA.
+   * @param toolName - The human-readable tool name.
+   * @returns {Promise<ToolDescriptorData | null>} The tool data or `null`.
+   * @since v0.1.0
+   */
   async fetchNullable(agentPda: PublicKey, toolName: string): Promise<ToolDescriptorData | null> {
     const [pda] = this.deriveTool(agentPda, toolName);
     return this.fetchAccountNullable<ToolDescriptorData>("toolDescriptor", pda);
   }
 
-  /** Fetch a checkpoint by session PDA and index. */
+  /**
+   * @name fetchCheckpoint
+   * @description Fetch a deserialized `SessionCheckpoint` account by session PDA and index.
+   * @param sessionPda - The session ledger PDA.
+   * @param checkpointIndex - The zero-based checkpoint index.
+   * @returns {Promise<SessionCheckpointData>} The checkpoint data.
+   * @throws Will throw if the checkpoint does not exist.
+   * @since v0.1.0
+   */
   async fetchCheckpoint(
     sessionPda: PublicKey,
     checkpointIndex: number,

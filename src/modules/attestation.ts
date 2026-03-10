@@ -1,6 +1,14 @@
 /**
  * @module attestation
- * @description Web of trust — create, revoke, close attestations.
+ * @description Web-of-trust attestations — create, revoke, and close
+ *   on-chain attestations that vouch for agent trustworthiness.
+ *
+ * Attestations are signed endorsements from one wallet to an agent,
+ * forming a composable trust graph on Solana.
+ *
+ * @category Modules
+ * @since v0.1.0
+ * @packageDocumentation
  */
 
 import { SystemProgram, type PublicKey, type TransactionSignature } from "@solana/web3.js";
@@ -8,10 +16,39 @@ import { BaseModule } from "./base";
 import { deriveAgent, deriveAttestation, deriveGlobalRegistry } from "../pda";
 import type { AgentAttestationData, CreateAttestationArgs } from "../types";
 
+/**
+ * @name AttestationModule
+ * @description Manages on-chain attestations for the Solana Agent Protocol.
+ *   Provides methods to create, revoke, close, and fetch attestation PDAs
+ *   that form the web-of-trust layer.
+ *
+ * @category Modules
+ * @since v0.1.0
+ * @extends BaseModule
+ *
+ * @example
+ * ```ts
+ * const sap = new SapClient(provider);
+ * // Create an attestation for an agent
+ * const sig = await sap.attestation.create(agentWallet, {
+ *   attestationType: { identity: {} },
+ *   metadataHash: [...],
+ *   expiresAt: null,
+ * });
+ * ```
+ */
 export class AttestationModule extends BaseModule {
   // ── PDA helpers ──────────────────────────────────────
 
-  /** Derive the AgentAttestation PDA. */
+  /**
+   * @name deriveAttestation
+   * @description Derive the `AgentAttestation` PDA for a given agent and attester.
+   * @param agentPda - The agent account PDA to attest.
+   * @param attester - The attester wallet. Defaults to the connected wallet.
+   * @returns A tuple of `[PublicKey, bump]` for the attestation PDA.
+   * @see {@link deriveAttestation} from `pda/` module for the underlying derivation.
+   * @since v0.1.0
+   */
   deriveAttestation(
     agentPda: PublicKey,
     attester?: PublicKey,
@@ -21,7 +58,15 @@ export class AttestationModule extends BaseModule {
 
   // ── Instructions ─────────────────────────────────────
 
-  /** Create an attestation vouching for an agent. */
+  /**
+   * @name create
+   * @description Create an on-chain attestation vouching for an agent.
+   *   The connected wallet becomes the attester.
+   * @param agentWallet - The wallet that owns the target agent.
+   * @param args - Attestation parameters (type, metadata hash, optional expiry).
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async create(
     agentWallet: PublicKey,
     args: CreateAttestationArgs,
@@ -42,7 +87,14 @@ export class AttestationModule extends BaseModule {
       .rpc();
   }
 
-  /** Revoke a previously issued attestation (only original attester). */
+  /**
+   * @name revoke
+   * @description Revoke a previously issued attestation. Only the original
+   *   attester may revoke.
+   * @param agentWallet - The wallet of the attested agent.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async revoke(agentWallet: PublicKey): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(agentWallet);
     const [attestPda] = this.deriveAttestation(agentPda);
@@ -56,7 +108,13 @@ export class AttestationModule extends BaseModule {
       .rpc();
   }
 
-  /** Close a revoked attestation PDA (rent returned to attester). */
+  /**
+   * @name close
+   * @description Close a revoked attestation PDA and reclaim rent to the attester.
+   * @param agentWallet - The wallet of the attested agent.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async close(agentWallet: PublicKey): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(agentWallet);
     const [attestPda] = this.deriveAttestation(agentPda);
@@ -74,7 +132,15 @@ export class AttestationModule extends BaseModule {
 
   // ── Fetchers ─────────────────────────────────────────
 
-  /** Fetch an attestation. */
+  /**
+   * @name fetch
+   * @description Fetch a deserialized `AgentAttestation` account.
+   * @param agentPda - The agent account PDA.
+   * @param attester - The attester wallet. Defaults to the connected wallet.
+   * @returns {Promise<AgentAttestationData>} The attestation account data.
+   * @throws Will throw if the attestation account does not exist.
+   * @since v0.1.0
+   */
   async fetch(
     agentPda: PublicKey,
     attester?: PublicKey,
@@ -83,7 +149,15 @@ export class AttestationModule extends BaseModule {
     return this.fetchAccount<AgentAttestationData>("agentAttestation", pda);
   }
 
-  /** Fetch an attestation, or `null`. */
+  /**
+   * @name fetchNullable
+   * @description Fetch a deserialized `AgentAttestation` account, or `null`
+   *   if it does not exist on-chain.
+   * @param agentPda - The agent account PDA.
+   * @param attester - The attester wallet. Defaults to the connected wallet.
+   * @returns {Promise<AgentAttestationData | null>} The attestation data or `null`.
+   * @since v0.1.0
+   */
   async fetchNullable(
     agentPda: PublicKey,
     attester?: PublicKey,

@@ -1,7 +1,14 @@
 /**
  * @module indexing
- * @description Scalable discovery — capability indexes, protocol indexes,
- * and tool category indexes.
+ * @description Scalable discovery layer — capability indexes, protocol indexes,
+ * and tool category indexes for the Solana Agent Protocol.
+ *
+ * Indexes are shared PDA-based registries that map agents and tools to
+ * discovery dimensions, enabling efficient on-chain lookups.
+ *
+ * @category Modules
+ * @since v0.1.0
+ * @packageDocumentation
  */
 
 import { SystemProgram, type PublicKey, type TransactionSignature } from "@solana/web3.js";
@@ -20,10 +27,36 @@ import type {
 } from "../types";
 import { sha256, hashToArray } from "../utils";
 
+/**
+ * @name IndexingModule
+ * @description Manages on-chain discovery indexes for the Solana Agent Protocol.
+ *   Provides methods to create, populate, prune, close, and fetch capability
+ *   indexes, protocol indexes, and tool category indexes.
+ *
+ * @category Modules
+ * @since v0.1.0
+ * @extends BaseModule
+ *
+ * @example
+ * ```ts
+ * const sap = new SapClient(provider);
+ * // Create a capability index and add your agent
+ * await sap.indexing.initCapabilityIndex("text-generation");
+ * // Query agents by capability
+ * const idx = await sap.indexing.fetchCapabilityIndex("text-generation");
+ * ```
+ */
 export class IndexingModule extends BaseModule {
   // ── Helpers ──────────────────────────────────────────
 
-  /** Hash a capability or protocol ID string for PDA seed. */
+  /**
+   * @name hash
+   * @description Hash a capability or protocol ID string for use as a PDA seed.
+   *   Uses SHA-256 internally.
+   * @param id - The capability or protocol identifier string.
+   * @returns {Uint8Array} The 32-byte SHA-256 hash.
+   * @since v0.1.0
+   */
   hash(id: string): Uint8Array {
     return sha256(id);
   }
@@ -31,7 +64,12 @@ export class IndexingModule extends BaseModule {
   // ── Capability Index ─────────────────────────────────
 
   /**
-   * Create a new capability index and add the caller's agent.
+   * @name initCapabilityIndex
+   * @description Create a new capability index and register the caller’s agent.
+   *   The capability ID is hashed to derive the PDA.
+   * @param capabilityId - Human-readable capability identifier (e.g. `"text-generation"`).
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
    */
   async initCapabilityIndex(
     capabilityId: string,
@@ -53,7 +91,13 @@ export class IndexingModule extends BaseModule {
       .rpc();
   }
 
-  /** Add the caller's agent to an existing capability index. */
+  /**
+   * @name addToCapabilityIndex
+   * @description Add the caller’s agent to an existing capability index.
+   * @param capabilityId - The capability identifier string.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async addToCapabilityIndex(
     capabilityId: string,
   ): Promise<TransactionSignature> {
@@ -71,7 +115,13 @@ export class IndexingModule extends BaseModule {
       .rpc();
   }
 
-  /** Remove the caller's agent from a capability index. */
+  /**
+   * @name removeFromCapabilityIndex
+   * @description Remove the caller’s agent from a capability index.
+   * @param capabilityId - The capability identifier string.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async removeFromCapabilityIndex(
     capabilityId: string,
   ): Promise<TransactionSignature> {
@@ -89,7 +139,13 @@ export class IndexingModule extends BaseModule {
       .rpc();
   }
 
-  /** Close an empty capability index PDA. */
+  /**
+   * @name closeCapabilityIndex
+   * @description Close an empty capability index PDA and reclaim rent.
+   * @param capabilityId - The capability identifier string.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async closeCapabilityIndex(
     capabilityId: string,
   ): Promise<TransactionSignature> {
@@ -109,7 +165,14 @@ export class IndexingModule extends BaseModule {
 
   // ── Protocol Index ───────────────────────────────────
 
-  /** Create a new protocol index and add the caller's agent. */
+  /**
+   * @name initProtocolIndex
+   * @description Create a new protocol index and register the caller’s agent.
+   *   The protocol ID is hashed to derive the PDA.
+   * @param protocolId - Human-readable protocol identifier (e.g. `"mcp-v1"`).
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async initProtocolIndex(
     protocolId: string,
   ): Promise<TransactionSignature> {
@@ -130,7 +193,13 @@ export class IndexingModule extends BaseModule {
       .rpc();
   }
 
-  /** Add the caller's agent to an existing protocol index. */
+  /**
+   * @name addToProtocolIndex
+   * @description Add the caller’s agent to an existing protocol index.
+   * @param protocolId - The protocol identifier string.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async addToProtocolIndex(
     protocolId: string,
   ): Promise<TransactionSignature> {
@@ -148,7 +217,13 @@ export class IndexingModule extends BaseModule {
       .rpc();
   }
 
-  /** Remove the caller's agent from a protocol index. */
+  /**
+   * @name removeFromProtocolIndex
+   * @description Remove the caller’s agent from a protocol index.
+   * @param protocolId - The protocol identifier string.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async removeFromProtocolIndex(
     protocolId: string,
   ): Promise<TransactionSignature> {
@@ -166,7 +241,13 @@ export class IndexingModule extends BaseModule {
       .rpc();
   }
 
-  /** Close an empty protocol index PDA. */
+  /**
+   * @name closeProtocolIndex
+   * @description Close an empty protocol index PDA and reclaim rent.
+   * @param protocolId - The protocol identifier string.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async closeProtocolIndex(
     protocolId: string,
   ): Promise<TransactionSignature> {
@@ -186,7 +267,13 @@ export class IndexingModule extends BaseModule {
 
   // ── Tool Category Index ──────────────────────────────
 
-  /** Create a new tool category index. */
+  /**
+   * @name initToolCategoryIndex
+   * @description Create a new tool category index PDA.
+   * @param category - Numeric tool category enum value.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async initToolCategoryIndex(
     category: number,
   ): Promise<TransactionSignature> {
@@ -202,7 +289,14 @@ export class IndexingModule extends BaseModule {
       .rpc();
   }
 
-  /** Add a tool to its matching category index. */
+  /**
+   * @name addToToolCategory
+   * @description Add a tool to its matching category index.
+   * @param category - Numeric tool category enum value.
+   * @param toolPda - The tool descriptor PDA to add.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async addToToolCategory(
     category: number,
     toolPda: PublicKey,
@@ -221,7 +315,14 @@ export class IndexingModule extends BaseModule {
       .rpc();
   }
 
-  /** Remove a tool from a category index. */
+  /**
+   * @name removeFromToolCategory
+   * @description Remove a tool from a category index.
+   * @param category - Numeric tool category enum value.
+   * @param toolPda - The tool descriptor PDA to remove.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async removeFromToolCategory(
     category: number,
     toolPda: PublicKey,
@@ -240,7 +341,13 @@ export class IndexingModule extends BaseModule {
       .rpc();
   }
 
-  /** Close an empty tool category index PDA. */
+  /**
+   * @name closeToolCategoryIndex
+   * @description Close an empty tool category index PDA and reclaim rent.
+   * @param category - Numeric tool category enum value.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async closeToolCategoryIndex(
     category: number,
   ): Promise<TransactionSignature> {
@@ -257,37 +364,79 @@ export class IndexingModule extends BaseModule {
 
   // ── Fetchers ─────────────────────────────────────────
 
-  /** Fetch a capability index by capability ID string. */
+  /**
+   * @name fetchCapabilityIndex
+   * @description Fetch a deserialized `CapabilityIndex` account by capability ID.
+   * @param capabilityId - The capability identifier string.
+   * @returns {Promise<CapabilityIndexData>} The capability index data.
+   * @throws Will throw if the capability index does not exist.
+   * @since v0.1.0
+   */
   async fetchCapabilityIndex(capabilityId: string): Promise<CapabilityIndexData> {
     const [pda] = deriveCapabilityIndex(this.hash(capabilityId));
     return this.fetchAccount<CapabilityIndexData>("capabilityIndex", pda);
   }
 
-  /** Fetch a capability index, or `null`. */
+  /**
+   * @name fetchCapabilityIndexNullable
+   * @description Fetch a deserialized `CapabilityIndex` account, or `null`
+   *   if it does not exist on-chain.
+   * @param capabilityId - The capability identifier string.
+   * @returns {Promise<CapabilityIndexData | null>} The capability index data or `null`.
+   * @since v0.1.0
+   */
   async fetchCapabilityIndexNullable(capabilityId: string): Promise<CapabilityIndexData | null> {
     const [pda] = deriveCapabilityIndex(this.hash(capabilityId));
     return this.fetchAccountNullable<CapabilityIndexData>("capabilityIndex", pda);
   }
 
-  /** Fetch a protocol index by protocol ID string. */
+  /**
+   * @name fetchProtocolIndex
+   * @description Fetch a deserialized `ProtocolIndex` account by protocol ID.
+   * @param protocolId - The protocol identifier string.
+   * @returns {Promise<ProtocolIndexData>} The protocol index data.
+   * @throws Will throw if the protocol index does not exist.
+   * @since v0.1.0
+   */
   async fetchProtocolIndex(protocolId: string): Promise<ProtocolIndexData> {
     const [pda] = deriveProtocolIndex(this.hash(protocolId));
     return this.fetchAccount<ProtocolIndexData>("protocolIndex", pda);
   }
 
-  /** Fetch a protocol index, or `null`. */
+  /**
+   * @name fetchProtocolIndexNullable
+   * @description Fetch a deserialized `ProtocolIndex` account, or `null`
+   *   if it does not exist on-chain.
+   * @param protocolId - The protocol identifier string.
+   * @returns {Promise<ProtocolIndexData | null>} The protocol index data or `null`.
+   * @since v0.1.0
+   */
   async fetchProtocolIndexNullable(protocolId: string): Promise<ProtocolIndexData | null> {
     const [pda] = deriveProtocolIndex(this.hash(protocolId));
     return this.fetchAccountNullable<ProtocolIndexData>("protocolIndex", pda);
   }
 
-  /** Fetch a tool category index by category number. */
+  /**
+   * @name fetchToolCategoryIndex
+   * @description Fetch a deserialized `ToolCategoryIndex` account by category number.
+   * @param category - Numeric tool category enum value.
+   * @returns {Promise<ToolCategoryIndexData>} The tool category index data.
+   * @throws Will throw if the tool category index does not exist.
+   * @since v0.1.0
+   */
   async fetchToolCategoryIndex(category: number): Promise<ToolCategoryIndexData> {
     const [pda] = deriveToolCategoryIndex(category);
     return this.fetchAccount<ToolCategoryIndexData>("toolCategoryIndex", pda);
   }
 
-  /** Fetch a tool category index, or `null`. */
+  /**
+   * @name fetchToolCategoryIndexNullable
+   * @description Fetch a deserialized `ToolCategoryIndex` account, or `null`
+   *   if it does not exist on-chain.
+   * @param category - Numeric tool category enum value.
+   * @returns {Promise<ToolCategoryIndexData | null>} The tool category index data or `null`.
+   * @since v0.1.0
+   */
   async fetchToolCategoryIndexNullable(category: number): Promise<ToolCategoryIndexData | null> {
     const [pda] = deriveToolCategoryIndex(category);
     return this.fetchAccountNullable<ToolCategoryIndexData>("toolCategoryIndex", pda);

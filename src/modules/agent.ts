@@ -1,9 +1,13 @@
 /**
  * @module agent
- * @description Agent lifecycle operations.
+ * @description Agent lifecycle operations for the Solana Agent Protocol.
  *
  * Covers: register, update, deactivate, reactivate, close,
  * report calls, update reputation metrics, and account fetching.
+ *
+ * @category Modules
+ * @since v0.1.0
+ * @packageDocumentation
  */
 
 import { SystemProgram, type PublicKey, type TransactionSignature } from "@solana/web3.js";
@@ -16,22 +20,68 @@ import type {
   UpdateAgentArgs,
 } from "../types";
 
+/**
+ * @name AgentModule
+ * @description Manages the full agent lifecycle on the Solana Agent Protocol.
+ *   Provides methods to register, update, deactivate, reactivate, and close
+ *   agent identities, as well as self-report call metrics and reputation data.
+ *
+ * @category Modules
+ * @since v0.1.0
+ * @extends BaseModule
+ *
+ * @example
+ * ```ts
+ * const sap = new SapClient(provider);
+ * // Register a new agent
+ * const sig = await sap.agent.register({
+ *   name: "my-agent",
+ *   description: "An example agent",
+ *   capabilities: [0, 1],
+ *   pricing: { free: {} },
+ *   protocols: [0],
+ * });
+ * // Fetch agent data
+ * const data = await sap.agent.fetch();
+ * ```
+ */
 export class AgentModule extends BaseModule {
   // ── PDA helpers ──────────────────────────────────────
 
-  /** Derive the AgentAccount PDA for a wallet. */
+  /**
+   * @name deriveAgent
+   * @description Derive the `AgentAccount` PDA for a wallet.
+   * @param wallet - The wallet public key. Defaults to the connected wallet.
+   * @returns A tuple of `[PublicKey, bump]` for the agent PDA.
+   * @see {@link deriveAgent} from `pda/` module for the underlying derivation.
+   * @since v0.1.0
+   */
   deriveAgent(wallet?: PublicKey): readonly [PublicKey, number] {
     return deriveAgent(wallet ?? this.walletPubkey);
   }
 
-  /** Derive the AgentStats PDA for an agent. */
+  /**
+   * @name deriveStats
+   * @description Derive the `AgentStats` PDA for a given agent.
+   * @param agentPda - The agent account PDA.
+   * @returns A tuple of `[PublicKey, bump]` for the stats PDA.
+   * @see {@link deriveAgentStats} from `pda/` module for the underlying derivation.
+   * @since v0.1.0
+   */
   deriveStats(agentPda: PublicKey): readonly [PublicKey, number] {
     return deriveAgentStats(agentPda);
   }
 
   // ── Instructions ─────────────────────────────────────
 
-  /** Register a new agent identity onchain. */
+  /**
+   * @name register
+   * @description Register a new agent identity on-chain. Creates the
+   *   `AgentAccount`, `AgentStats`, and updates the `GlobalRegistry`.
+   * @param args - Registration parameters (name, description, capabilities, pricing, protocols, etc.).
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async register(args: RegisterAgentArgs): Promise<TransactionSignature> {
     const [agentPda] = this.deriveAgent();
     const [statsPda] = this.deriveStats(agentPda);
@@ -58,7 +108,14 @@ export class AgentModule extends BaseModule {
       .rpc();
   }
 
-  /** Update an existing agent's metadata. */
+  /**
+   * @name update
+   * @description Update an existing agent's metadata fields. All fields
+   *   are optional — only non-null values are written.
+   * @param args - Partial update parameters.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async update(args: UpdateAgentArgs): Promise<TransactionSignature> {
     const [agentPda] = this.deriveAgent();
 
@@ -81,7 +138,13 @@ export class AgentModule extends BaseModule {
       .rpc();
   }
 
-  /** Deactivate an agent (sets `is_active = false`). */
+  /**
+   * @name deactivate
+   * @description Deactivate an agent, setting `is_active = false`.
+   *   The agent remains on-chain but is excluded from active discovery.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async deactivate(): Promise<TransactionSignature> {
     const [agentPda] = this.deriveAgent();
     const [statsPda] = this.deriveStats(agentPda);
@@ -96,7 +159,13 @@ export class AgentModule extends BaseModule {
       .rpc();
   }
 
-  /** Reactivate a previously deactivated agent. */
+  /**
+   * @name reactivate
+   * @description Reactivate a previously deactivated agent, restoring
+   *   it to active status.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async reactivate(): Promise<TransactionSignature> {
     const [agentPda] = this.deriveAgent();
     const [statsPda] = this.deriveStats(agentPda);
@@ -111,7 +180,13 @@ export class AgentModule extends BaseModule {
       .rpc();
   }
 
-  /** Close an agent PDA (rent returned to wallet). */
+  /**
+   * @name close
+   * @description Close an agent PDA and its associated stats PDA.
+   *   Rent is returned to the owner wallet.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async close(): Promise<TransactionSignature> {
     const [agentPda] = this.deriveAgent();
     const [statsPda] = this.deriveStats(agentPda);
@@ -129,7 +204,14 @@ export class AgentModule extends BaseModule {
       .rpc();
   }
 
-  /** Self-report call metrics (does not affect reputation). */
+  /**
+   * @name reportCalls
+   * @description Self-report call metrics for the agent. This updates the
+   *   `AgentStats` counter but does not affect on-chain reputation.
+   * @param callsServed - The number of calls to report.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async reportCalls(callsServed: number | bigint): Promise<TransactionSignature> {
     const [agentPda] = this.deriveAgent();
     const [statsPda] = this.deriveStats(agentPda);
@@ -144,7 +226,15 @@ export class AgentModule extends BaseModule {
       .rpc();
   }
 
-  /** Update self-reported latency & uptime (does not affect reputation). */
+  /**
+   * @name updateReputation
+   * @description Update self-reported latency and uptime metrics.
+   *   These are informational and do not affect on-chain reputation scoring.
+   * @param avgLatencyMs - Average response latency in milliseconds.
+   * @param uptimePercent - Uptime percentage (0–100).
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async updateReputation(
     avgLatencyMs: number,
     uptimePercent: number,
@@ -162,32 +252,67 @@ export class AgentModule extends BaseModule {
 
   // ── Fetchers ─────────────────────────────────────────
 
-  /** Fetch the AgentAccount data for a wallet. */
+  /**
+   * @name fetch
+   * @description Fetch the deserialized `AgentAccount` data for a wallet.
+   * @param wallet - The wallet public key. Defaults to the connected wallet.
+   * @returns {Promise<AgentAccountData>} The agent account data.
+   * @throws Will throw if the agent account does not exist.
+   * @since v0.1.0
+   */
   async fetch(wallet?: PublicKey): Promise<AgentAccountData> {
     const [pda] = this.deriveAgent(wallet ?? this.walletPubkey);
     return this.fetchAccount<AgentAccountData>("agentAccount", pda);
   }
 
-  /** Fetch the AgentAccount data, or `null` if it doesn't exist. */
+  /**
+   * @name fetchNullable
+   * @description Fetch the deserialized `AgentAccount` data, or `null`
+   *   if the account doesn't exist on-chain.
+   * @param wallet - The wallet public key. Defaults to the connected wallet.
+   * @returns {Promise<AgentAccountData | null>} The agent data or `null`.
+   * @since v0.1.0
+   */
   async fetchNullable(wallet?: PublicKey): Promise<AgentAccountData | null> {
     const [pda] = this.deriveAgent(wallet ?? this.walletPubkey);
     return this.fetchAccountNullable<AgentAccountData>("agentAccount", pda);
   }
 
-  /** Fetch the AgentStats data for an agent. */
+  /**
+   * @name fetchStats
+   * @description Fetch the deserialized `AgentStats` data for an agent.
+   * @param agentPda - The agent account PDA.
+   * @returns {Promise<AgentStatsData>} The agent stats data.
+   * @throws Will throw if the stats account does not exist.
+   * @since v0.1.0
+   */
   async fetchStats(agentPda: PublicKey): Promise<AgentStatsData> {
     const [pda] = this.deriveStats(agentPda);
     return this.fetchAccount<AgentStatsData>("agentStats", pda);
   }
 
-  /** Fetch the AgentStats data, or `null`. */
+  /**
+   * @name fetchStatsNullable
+   * @description Fetch the deserialized `AgentStats` data, or `null`
+   *   if the account doesn't exist on-chain.
+   * @param agentPda - The agent account PDA.
+   * @returns {Promise<AgentStatsData | null>} The stats data or `null`.
+   * @since v0.1.0
+   */
   async fetchStatsNullable(agentPda: PublicKey): Promise<AgentStatsData | null> {
     const [pda] = this.deriveStats(agentPda);
     return this.fetchAccountNullable<AgentStatsData>("agentStats", pda);
   }
 
-  /** Fetch the GlobalRegistry singleton. */
-  async fetchGlobalRegistry(): Promise<import("../types.js").GlobalRegistryData> {
+  /**
+   * @name fetchGlobalRegistry
+   * @description Fetch the `GlobalRegistry` singleton account that tracks
+   *   aggregate protocol statistics.
+   * @returns {Promise<GlobalRegistryData>} The global registry data.
+   * @throws Will throw if the registry has not been initialized.
+   * @since v0.1.0
+   */
+  async fetchGlobalRegistry(): Promise<import("../types").GlobalRegistryData> {
     const [pda] = deriveGlobalRegistry();
     return this.fetchAccount("globalRegistry", pda);
   }

@@ -53,19 +53,91 @@
       "types": "./dist/types/modules/ledger.d.ts"
     },
     "./pda": {
-      "import": "./dist/esm/pda.js",
-      "require": "./dist/cjs/pda.js",
-      "types": "./dist/types/pda.d.ts"
+      "import": "./dist/esm/pda/index.js",
+      "require": "./dist/cjs/pda/index.js",
+      "types": "./dist/types/pda/index.d.ts"
     },
     "./types": {
-      "import": "./dist/esm/types.js",
-      "require": "./dist/cjs/types.js",
-      "types": "./dist/types/types.d.ts"
+      "import": "./dist/esm/types/index.js",
+      "require": "./dist/cjs/types/index.js",
+      "types": "./dist/types/types/index.d.ts"
+    },
+    "./plugin": {
+      "import": "./dist/esm/plugin/index.js",
+      "require": "./dist/cjs/plugin/index.js",
+      "types": "./dist/types/plugin/index.d.ts"
+    },
+    "./plugin/schemas": {
+      "import": "./dist/esm/plugin/schemas.js",
+      "require": "./dist/cjs/plugin/schemas.js",
+      "types": "./dist/types/plugin/schemas.d.ts"
+    },
+    "./registries": {
+      "import": "./dist/esm/registries/index.js",
+      "require": "./dist/cjs/registries/index.js",
+      "types": "./dist/types/registries/index.d.ts"
+    },
+    "./registries/discovery": {
+      "import": "./dist/esm/registries/discovery.js",
+      "require": "./dist/cjs/registries/discovery.js",
+      "types": "./dist/types/registries/discovery.d.ts"
+    },
+    "./registries/x402": {
+      "import": "./dist/esm/registries/x402.js",
+      "require": "./dist/cjs/registries/x402.js",
+      "types": "./dist/types/registries/x402.d.ts"
+    },
+    "./registries/session": {
+      "import": "./dist/esm/registries/session.js",
+      "require": "./dist/cjs/registries/session.js",
+      "types": "./dist/types/registries/session.d.ts"
+    },
+    "./registries/builder": {
+      "import": "./dist/esm/registries/builder.js",
+      "require": "./dist/cjs/registries/builder.js",
+      "types": "./dist/types/registries/builder.d.ts"
+    },
+    "./idl": {
+      "import": "./dist/esm/idl/index.js",
+      "require": "./dist/cjs/idl/index.js",
+      "types": "./dist/types/idl/index.d.ts"
+    },
+    "./constants": {
+      "import": "./dist/esm/constants/index.js",
+      "require": "./dist/cjs/constants/index.js",
+      "types": "./dist/types/constants/index.d.ts"
+    },
+    "./core": {
+      "import": "./dist/esm/core/index.js",
+      "require": "./dist/cjs/core/index.js",
+      "types": "./dist/types/core/index.d.ts"
+    },
+    "./errors": {
+      "import": "./dist/esm/errors/index.js",
+      "require": "./dist/cjs/errors/index.js",
+      "types": "./dist/types/errors/index.d.ts"
+    },
+    "./utils": {
+      "import": "./dist/esm/utils/index.js",
+      "require": "./dist/cjs/utils/index.js",
+      "types": "./dist/types/utils/index.d.ts"
+    },
+    "./events": {
+      "import": "./dist/esm/events/index.js",
+      "require": "./dist/cjs/events/index.js",
+      "types": "./dist/types/events/index.d.ts"
+    },
+    "./postgres": {
+      "import": "./dist/esm/postgres/index.js",
+      "require": "./dist/cjs/postgres/index.js",
+      "types": "./dist/types/postgres/index.d.ts"
     }
   },
   "files": [
     "dist",
     "src",
+    "src/idl",
+    "src/postgres",
     "README.md"
   ],
   "scripts": {
@@ -74,6 +146,7 @@
     "build:esm": "tsc -p tsconfig.esm.json",
     "build:types": "tsc -p tsconfig.json --emitDeclarationOnly",
     "clean": "rm -rf dist",
+    "sync-idl": "cp ../target/idl/synapse_agent_sap.json src/idl/synapse_agent_sap.json && echo 'IDL synced'",
     "prepublishOnly": "yarn clean && yarn build",
     "typecheck": "tsc --noEmit"
   },
@@ -82,11 +155,22 @@
     "@solana/web3.js": "^1.98.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "zod": "^4.3.6"
   },
   "peerDependencies": {
     "@coral-xyz/anchor": ">=0.30.0",
-    "@solana/web3.js": ">=1.90.0"
+    "@solana/web3.js": ">=1.90.0",
+    "zod": ">=3.20.0",
+    "pg": ">=8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "zod": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=18"

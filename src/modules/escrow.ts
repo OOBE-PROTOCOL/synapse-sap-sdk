@@ -1,9 +1,14 @@
 /**
  * @module escrow
  * @description x402 escrow settlement layer — create, deposit,
- * settle, withdraw, batch settle, close.
+ * settle, withdraw, batch settle, and close escrow accounts.
  *
- * Supports both SOL and SPL token escrows via remaining accounts.
+ * Supports both SOL and SPL token escrows. SPL operations require
+ * passing additional `AccountMeta[]` via the `splAccounts` parameter.
+ *
+ * @category Modules
+ * @since v0.1.0
+ * @packageDocumentation
  */
 
 import {
@@ -25,10 +30,43 @@ import type {
   Settlement,
 } from "../types";
 
+/**
+ * @name EscrowModule
+ * @description Manages x402-compatible escrow accounts for agent micropayments.
+ *   Provides methods to create, fund, settle, withdraw, batch-settle, close,
+ *   and fetch escrow PDAs on the Solana Agent Protocol.
+ *
+ * @category Modules
+ * @since v0.1.0
+ * @extends BaseModule
+ *
+ * @example
+ * ```ts
+ * const sap = new SapClient(provider);
+ * // Create a SOL escrow for an agent
+ * const sig = await sap.escrow.create(agentWallet, {
+ *   pricePerCall: new BN(1_000_000),
+ *   maxCalls: new BN(100),
+ *   initialDeposit: new BN(100_000_000),
+ *   expiresAt: null,
+ *   volumeCurve: null,
+ *   tokenMint: null,
+ *   tokenDecimals: null,
+ * });
+ * ```
+ */
 export class EscrowModule extends BaseModule {
   // ── PDA helpers ──────────────────────────────────────
 
-  /** Derive the EscrowAccount PDA. */
+  /**
+   * @name deriveEscrow
+   * @description Derive the `EscrowAccount` PDA for a given agent and depositor.
+   * @param agentPda - The agent account PDA.
+   * @param depositor - The depositor wallet. Defaults to the connected wallet.
+   * @returns A tuple of `[PublicKey, bump]` for the escrow PDA.
+   * @see {@link deriveEscrow} from `pda/` module for the underlying derivation.
+   * @since v0.1.0
+   */
   deriveEscrow(
     agentPda: PublicKey,
     depositor?: PublicKey,
@@ -39,13 +77,19 @@ export class EscrowModule extends BaseModule {
   // ── Instructions ─────────────────────────────────────
 
   /**
-   * Create a new escrow for agent micropayments.
+   * @name create
+   * @description Create a new escrow for agent micropayments.
    *
-   * For SOL escrow: pass `tokenMint: null` and leave `splAccounts` empty.
-   * For SPL escrow: pass `tokenMint`, `tokenDecimals`, and `splAccounts`.
+   *   For **SOL escrow**: pass `tokenMint: null` and leave `splAccounts` empty.
+   *   For **SPL escrow**: pass `tokenMint`, `tokenDecimals`, and provide
+   *   `splAccounts` with `[depositorAta, escrowAta, tokenMint, tokenProgram]`.
    *
-   * @param agentWallet — the wallet of the agent to pay.
-   * @param splAccounts — remaining accounts for SPL: [depositorAta, escrowAta, tokenMint, tokenProgram].
+   * @param agentWallet - The wallet of the agent to pay.
+   * @param args - Escrow creation parameters (price, max calls, deposit, expiry, volume curve, token info).
+   * @param splAccounts - Remaining accounts for SPL token transfers:
+   *   `[depositorAta, escrowAta, tokenMint, tokenProgram]`. Defaults to `[]`.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
    */
   async create(
     agentWallet: PublicKey,
@@ -78,8 +122,13 @@ export class EscrowModule extends BaseModule {
   }
 
   /**
-   * Deposit additional funds into an existing escrow.
-   * @param splAccounts — remaining accounts for SPL transfers.
+   * @name deposit
+   * @description Deposit additional funds into an existing escrow.
+   * @param agentWallet - The wallet of the agent associated with the escrow.
+   * @param amount - The amount to deposit (lamports for SOL, smallest unit for SPL).
+   * @param splAccounts - Remaining accounts for SPL token transfers. Defaults to `[]`.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
    */
   async deposit(
     agentWallet: PublicKey,
@@ -101,9 +150,15 @@ export class EscrowModule extends BaseModule {
   }
 
   /**
-   * Agent settles calls — claims funds from escrow.
-   * Must be called by the agent owner wallet.
-   * @param splAccounts — remaining accounts for SPL transfers.
+   * @name settle
+   * @description Agent settles calls — claims earned funds from the escrow.
+   *   Must be called by the agent owner wallet.
+   * @param depositorWallet - The wallet of the client who funded the escrow.
+   * @param callsToSettle - Number of calls to settle payment for.
+   * @param serviceHash - A 32-byte SHA-256 hash identifying the service rendered.
+   * @param splAccounts - Remaining accounts for SPL token transfers. Defaults to `[]`.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
    */
   async settle(
     depositorWallet: PublicKey,
@@ -129,8 +184,13 @@ export class EscrowModule extends BaseModule {
   }
 
   /**
-   * Client withdraws funds from their escrow.
-   * @param splAccounts — remaining accounts for SPL transfers.
+   * @name withdraw
+   * @description Client withdraws un-settled funds from their escrow.
+   * @param agentWallet - The wallet of the agent associated with the escrow.
+   * @param amount - The amount to withdraw (lamports for SOL, smallest unit for SPL).
+   * @param splAccounts - Remaining accounts for SPL token transfers. Defaults to `[]`.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
    */
   async withdraw(
     agentWallet: PublicKey,
@@ -151,7 +211,13 @@ export class EscrowModule extends BaseModule {
       .rpc();
   }
 
-  /** Close an empty escrow PDA (balance must be 0). */
+  /**
+   * @name close
+   * @description Close an empty escrow PDA (balance must be 0) and reclaim rent.
+   * @param agentWallet - The wallet of the agent associated with the escrow.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
+   */
   async close(agentWallet: PublicKey): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(agentWallet);
     const [escrowPda] = this.deriveEscrow(agentPda);
@@ -166,9 +232,14 @@ export class EscrowModule extends BaseModule {
   }
 
   /**
-   * Batch settlement — process up to 10 settlements in one TX.
-   * Must be called by the agent owner wallet.
-   * @param splAccounts — remaining accounts for SPL transfers.
+   * @name settleBatch
+   * @description Batch settlement — process up to 10 settlements in a single
+   *   transaction. Must be called by the agent owner wallet.
+   * @param depositorWallet - The wallet of the client who funded the escrow.
+   * @param settlements - Array of settlement entries (up to 10).
+   * @param splAccounts - Remaining accounts for SPL token transfers. Defaults to `[]`.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v0.1.0
    */
   async settleBatch(
     depositorWallet: PublicKey,
@@ -194,19 +265,43 @@ export class EscrowModule extends BaseModule {
 
   // ── Fetchers ─────────────────────────────────────────
 
-  /** Fetch an escrow account. */
+  /**
+   * @name fetch
+   * @description Fetch a deserialized `EscrowAccount`.
+   * @param agentPda - The agent account PDA.
+   * @param depositor - The depositor wallet. Defaults to the connected wallet.
+   * @returns {Promise<EscrowAccountData>} The escrow account data.
+   * @throws Will throw if the escrow account does not exist.
+   * @since v0.1.0
+   */
   async fetch(agentPda: PublicKey, depositor?: PublicKey): Promise<EscrowAccountData> {
     const [pda] = this.deriveEscrow(agentPda, depositor);
     return this.fetchAccount<EscrowAccountData>("escrowAccount", pda);
   }
 
-  /** Fetch an escrow account, or `null`. */
+  /**
+   * @name fetchNullable
+   * @description Fetch a deserialized `EscrowAccount`, or `null` if it
+   *   does not exist on-chain.
+   * @param agentPda - The agent account PDA.
+   * @param depositor - The depositor wallet. Defaults to the connected wallet.
+   * @returns {Promise<EscrowAccountData | null>} The escrow data or `null`.
+   * @since v0.1.0
+   */
   async fetchNullable(agentPda: PublicKey, depositor?: PublicKey): Promise<EscrowAccountData | null> {
     const [pda] = this.deriveEscrow(agentPda, depositor);
     return this.fetchAccountNullable<EscrowAccountData>("escrowAccount", pda);
   }
 
-  /** Fetch an escrow by PDA directly. */
+  /**
+   * @name fetchByPda
+   * @description Fetch an escrow account by its PDA address directly,
+   *   bypassing PDA derivation.
+   * @param escrowPda - The escrow PDA public key.
+   * @returns {Promise<EscrowAccountData>} The escrow account data.
+   * @throws Will throw if the escrow account does not exist.
+   * @since v0.1.0
+   */
   async fetchByPda(escrowPda: PublicKey): Promise<EscrowAccountData> {
     return this.fetchAccount<EscrowAccountData>("escrowAccount", escrowPda);
   }
