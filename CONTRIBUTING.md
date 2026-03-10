@@ -1,4 +1,4 @@
-# Contributing to @synapse-sap/sdk
+# Contributing to @oobe-protocol-labs/synapse-sap-sdk
 
 Thank you for your interest in contributing! This guide will help you get started.
 
@@ -27,7 +27,7 @@ Be respectful, constructive, and inclusive.
 |------|---------|
 | Node.js | ≥ 18 |
 | Yarn | ≥ 1.22 |
-| TypeScript | ≥ 5.5 |
+| TypeScript | ≥ 5.7 |
 | Solana CLI | ≥ 1.18 |
 | Anchor | ≥ 0.32 |
 
@@ -35,7 +35,7 @@ Be respectful, constructive, and inclusive.
 
 ```bash
 # Clone the repository
-git clone https://github.com/synapse-labs/synapse-sap-sdk.git
+git clone https://github.com/OOBE-PROTOCOL/synapse-sap-sdk.git
 cd synapse-sap-sdk
 
 # Install dependencies
@@ -53,16 +53,64 @@ yarn build
 ```
 synapse-sap-sdk/
 ├── src/
-│   ├── client.ts          # SapClient entry point
-│   ├── constants.ts       # Program ID, seeds, limits
-│   ├── events.ts          # Event parser + typed events
-│   ├── index.ts           # Barrel exports
-│   ├── pda.ts             # PDA derivation functions
-│   ├── types.ts           # All interfaces, enums, DTOs
-│   ├── utils.ts           # sha256, hashToArray, assert
-│   └── modules/
-│       ├── base.ts        # Abstract BaseModule
-│       ├── agent.ts       # Agent lifecycle
+│   ├── index.ts               # Barrel exports (everything)
+│   ├── core/
+│   │   ├── client.ts          # SapClient — main entry point
+│   │   ├── connection.ts      # SapConnection — RPC factory
+│   │   └── index.ts
+│   ├── modules/
+│   │   ├── base.ts            # Abstract BaseModule
+│   │   ├── agent.ts           # Agent lifecycle
+│   │   ├── attestation.ts     # Web-of-trust attestations
+│   │   ├── escrow.ts          # x402 micropayments
+│   │   ├── feedback.ts        # Reputation feedback
+│   │   ├── indexing.ts        # Discovery indexes
+│   │   ├── ledger.ts          # MemoryLedger (ring buffer)
+│   │   ├── tools.ts           # Tool registry + checkpoints
+│   │   ├── vault.ts           # Encrypted memory vault
+│   │   └── index.ts
+│   ├── registries/
+│   │   ├── discovery.ts       # Agent/tool discovery
+│   │   ├── x402.ts            # x402 payment lifecycle
+│   │   ├── session.ts         # Unified session manager
+│   │   ├── builder.ts         # Fluent AgentBuilder
+│   │   └── index.ts
+│   ├── plugin/
+│   │   ├── index.ts           # SAPPlugin (52 tools)
+│   │   ├── protocols.ts       # Protocol method definitions
+│   │   └── schemas.ts         # Zod validation schemas
+│   ├── postgres/
+│   │   ├── adapter.ts         # SapPostgres database adapter
+│   │   ├── sync.ts            # SapSyncEngine (periodic + WS)
+│   │   ├── schema.sql         # 22-table DDL
+│   │   ├── serializers.ts     # On-chain → SQL serializers
+│   │   ├── types.ts           # Row types, config
+│   │   └── index.ts
+│   ├── constants/
+│   │   ├── programs.ts        # Program IDs per cluster
+│   │   ├── seeds.ts           # PDA seed prefixes (20)
+│   │   ├── limits.ts          # Size limits, enum values
+│   │   └── index.ts
+│   ├── pda/
+│   │   └── index.ts           # 17 derive*() functions
+│   ├── events/
+│   │   └── index.ts           # EventParser + 45 event types
+│   ├── errors/
+│   │   └── index.ts           # 6 error classes
+│   ├── types/
+│   │   ├── accounts.ts        # 22 account interfaces
+│   │   ├── common.ts          # Shared structs
+│   │   ├── enums.ts           # 5 enum types
+│   │   ├── instructions.ts    # 11 instruction arg DTOs
+│   │   └── index.ts
+│   ├── utils/
+│   │   ├── hash.ts            # sha256, hashToArray
+│   │   ├── validation.ts      # assert helper
+│   │   ├── serialization.ts   # Account serialization
+│   │   └── index.ts
+│   └── idl/
+│       ├── index.ts           # IDL re-exports
+│       └── synapse_agent_sap.json
 │       ├── attestation.ts # Web-of-trust attestations
 │       ├── escrow.ts      # x402 micropayments
 │       ├── feedback.ts    # Reputation feedback
@@ -71,8 +119,10 @@ synapse-sap-sdk/
 │       ├── tools.ts       # Tool registry + checkpoints
 │       └── vault.ts       # Encrypted memory vault
 ├── dist/                  # Build output (CJS + ESM + d.ts)
+├── docs/                  # SDK documentation (11 guides)
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md
+├── SKILL.md               # Complete technical reference
 ├── LICENSE
 └── README.md
 ```
@@ -98,21 +148,29 @@ yarn clean              # Remove dist/
 
 1. Create `src/modules/<name>.ts` extending `BaseModule`.
 2. Export from `src/modules/index.ts`.
-3. Add lazy accessor in `src/client.ts`.
+3. Add lazy accessor in `src/core/client.ts`.
 4. Export types from `src/index.ts`.
 5. Add subpath export in `package.json` `"exports"` field.
 6. Update `CHANGELOG.md`.
 
 ### Adding a New PDA
 
-1. Add the seed constant to `SEEDS` in `src/constants.ts`.
-2. Add the `derive*()` function in `src/pda.ts`.
+1. Add the seed constant to `SEEDS` in `src/constants/seeds.ts`.
+2. Add the `derive*()` function in `src/pda/index.ts`.
 3. Export from `src/index.ts`.
 
 ### Adding a New Account Type
 
-1. Add the interface to `src/types.ts`.
-2. Export from `src/index.ts`.
+1. Add the interface to `src/types/accounts.ts`.
+2. Export from `src/types/index.ts` and `src/index.ts`.
+
+### Adding a New Registry
+
+1. Create `src/registries/<name>.ts`.
+2. Export from `src/registries/index.ts`.
+3. Add lazy accessor in `src/core/client.ts`.
+4. Add subpath export in `package.json`.
+5. Update `SKILL.md` and `CHANGELOG.md`.
 
 ## Pull Request Process
 
@@ -241,4 +299,4 @@ BREAKING CHANGE: initVault() is now createVault() for clarity.
 
 ## Questions?
 
-Open an issue or reach out on [Discord](https://discord.gg/synapse-labs).
+Open an issue or reach out on [Discord](https://discord.gg/oobe-protocol).
