@@ -1,6 +1,15 @@
 /**
  * @module modules
- * @description Barrel export for all domain modules.
+ * @description Barrel export for all domain modules of the `@synapse-sap/sdk`.
+ *
+ * Re-exports every module class so consumers can import from a single entry point:
+ * ```ts
+ * import { AgentModule, VaultModule } from "@synapse-sap/sdk/modules";
+ * ```
+ *
+ * @category Modules
+ * @since v0.1.0
+ * @packageDocumentation
  */
 
 export { AgentModule } from "./agent";
