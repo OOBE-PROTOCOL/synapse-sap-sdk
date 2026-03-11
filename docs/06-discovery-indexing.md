@@ -312,7 +312,7 @@ Indexes use deterministic PDAs derived from hashed identifiers. All derivation i
 
 ```
 Seeds: ["sap_cap_idx", SHA256(capabilityId)]
-Program: SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL
+Program: SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ
 ```
 
 ```typescript
@@ -327,7 +327,7 @@ const [capIdxPda, bump] = deriveCapabilityIndex(capHash);
 
 ```
 Seeds: ["sap_proto_idx", SHA256(protocolId)]
-Program: SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL
+Program: SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ
 ```
 
 ```typescript
@@ -341,7 +341,7 @@ const [protoIdxPda] = deriveProtocolIndex(protoHash);
 
 ```
 Seeds: ["sap_tool_cat", u32le(categoryNum)]
-Program: SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL
+Program: SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ
 ```
 
 ```typescript

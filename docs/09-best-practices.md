@@ -381,7 +381,7 @@ Use `SapConnection.localnet()` with a running `solana-test-validator`:
 ```bash
 # Terminal 1 — start local validator with SAP program
 solana-test-validator \
-  --bpf-program SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL \
+  --bpf-program SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ \
   ./target/deploy/synapse_agent_sap.so \
   --reset
 ```
