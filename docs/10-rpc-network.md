@@ -150,7 +150,7 @@ const conn = new SapConnection({
 const conn = SapConnection.devnet();
 ```
 
-- Program ID: `SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL`
+- Program ID: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`
 - SOL is free via `conn.airdrop(pubkey, amount)`
 - Public RPC is rate-limited (~40 req/s shared across all users)
 - Data resets periodically
@@ -163,7 +163,7 @@ const conn = SapConnection.devnet();
 const conn = SapConnection.mainnet("https://synapse.oobeprotocol.ai");
 ```
 
-- Program ID: `SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL`
+- Program ID: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`
 - Real SOL — all transactions cost fees
 - Use a dedicated RPC provider (see recommendations below)
 - Always use `"confirmed"` or `"finalized"` commitment
@@ -176,7 +176,7 @@ const conn = SapConnection.mainnet("https://synapse.oobeprotocol.ai");
 const conn = SapConnection.localnet();
 ```
 
-- Program ID: `SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL` (unless overridden)
+- Program ID: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ` (unless overridden)
 - Requires a running `solana-test-validator`
 - Unlimited SOL via airdrop
 - Zero network latency
@@ -184,7 +184,7 @@ const conn = SapConnection.localnet();
 ```bash
 # Start local validator with SAP program loaded
 solana-test-validator \
-  --bpf-program SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL \
+  --bpf-program SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ \
   ./target/deploy/synapse_agent_sap.so \
   --reset
 ```

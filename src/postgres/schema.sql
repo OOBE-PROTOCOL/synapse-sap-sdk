@@ -2,7 +2,7 @@
 --  SAP v2 — PostgreSQL Schema
 --  Mirrors all 22 on-chain account types as relational tables.
 --
---  Program ID: SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL
+--  Program ID: SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ
 --  Generated from: synapse_agent_sap IDL (72 instructions, 22 accounts)
 --
 --  Usage:

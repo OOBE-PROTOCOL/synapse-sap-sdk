@@ -4,7 +4,7 @@
 
 ## Overview
 
-The `@synapse-sap/sdk` follows a layered, modular architecture. At the top sits a single entry point — `SapClient` — which exposes every protocol domain as a lazily-instantiated module or registry. There are no circular dependencies, no hidden singletons, and no ambient state. You hold the client; the client holds everything else.
+The `@synapse-sap-sdk` follows a layered, modular architecture. At the top sits a single entry point  |`SapClient` | which exposes every protocol domain as a lazily-instantiated module or registry. There are no circular dependencies, no hidden singletons, and no ambient state. You hold the client; the client holds everything else.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐

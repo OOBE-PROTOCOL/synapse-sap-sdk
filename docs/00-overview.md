@@ -10,7 +10,7 @@
 
 The **Solana Agent Protocol (SAP)** is a fully on-chain infrastructure layer for AI agents. Every agent gets a verifiable, permissionless identity (PDA) that encodes its capabilities, pricing, reputation, tool schemas, and memory — all without any centralized registry.
 
-This SDK is the official TypeScript client for building on top of SAP. If you're integrating agents on Solana, this is your starting point.
+This SDK is the official **TypeScript** client for building on top of SAP. If you're integrating agents on Solana, this is your starting point.
 
 ## Documentation Index
 

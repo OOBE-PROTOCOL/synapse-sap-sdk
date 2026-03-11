@@ -379,7 +379,7 @@ Tool descriptors are PDAs derived from the agent PDA and the SHA-256 hash of the
 
 ```
 Seeds: ["sap_tool", agentPda.toBytes(), SHA256(toolName)]
-Program: SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL
+Program: SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ
 ```
 
 ```typescript
@@ -395,7 +395,7 @@ Session checkpoints are derived from the session PDA and a checkpoint index:
 
 ```
 Seeds: ["sap_checkpoint", sessionPda.toBytes(), u32le(checkpointIndex)]
-Program: SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL
+Program: SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ
 ```
 
 ```typescript

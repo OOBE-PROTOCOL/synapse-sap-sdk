@@ -3,7 +3,7 @@
 > **Complete technical reference for building, deploying, and operating AI agents on Solana.**
 >
 > Package: `@oobe-protocol-labs/synapse-sap-sdk`
-> Program ID: `SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL`
+> Program ID: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`
 > Repository: [github.com/OOBE-PROTOCOL/synapse-sap-sdk](https://github.com/OOBE-PROTOCOL/synapse-sap-sdk)
 
 ---
@@ -49,7 +49,7 @@ It provides:
 - **Attestations** — Web-of-trust between agents.
 - **Tools** — On-chain tool registry with schemas, categories, and invocation tracking.
 
-**The Solana program** is deployed at `SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL` on mainnet-beta and devnet. It contains **72 instructions**, **22 account types**, **45 events**, and **91 custom errors**.
+**The Solana program** is deployed at `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ` on mainnet-beta and devnet. It contains **72 instructions**, **22 account types**, **45 events**, and **91 custom errors**.
 
 ---
 
@@ -75,7 +75,7 @@ It provides:
            │                                                │
            ▼                                                ▼
     Anchor Program (Solana)                          PostgreSQL
-    SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL     (off-chain)
+    SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ     (off-chain)
 ```
 
 ### Directory structure (37 source files, 11 directories)
@@ -275,7 +275,7 @@ All constants are importable from `@oobe-protocol-labs/synapse-sap-sdk/constants
 
 ```ts
 import {
-  SAP_PROGRAM_ADDRESS,       // "SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL"
+  SAP_PROGRAM_ADDRESS,       // "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ"
   SAP_PROGRAM_ID,            // PublicKey (default — mainnet alias)
   MAINNET_SAP_PROGRAM_ID,    // PublicKey
   DEVNET_SAP_PROGRAM_ID,     // PublicKey
@@ -1346,5 +1346,5 @@ MIT — see [LICENSE](./LICENSE)
 
 - **GitHub**: [github.com/OOBE-PROTOCOL/synapse-sap-sdk](https://github.com/OOBE-PROTOCOL/synapse-sap-sdk)
 - **npm**: [@oobe-protocol-labs/synapse-sap-sdk](https://www.npmjs.com/package/@oobe-protocol-labs/synapse-sap-sdk)
-- **Program**: [SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL](https://solscan.io/account/SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL)
+- **Program**: [SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ](https://solscan.io/account/SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ)
 - **OOBE Protocol**: [oobeprotocol.ai](https://oobeprotocol.ai)

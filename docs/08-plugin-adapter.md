@@ -311,7 +311,7 @@ The `SAPPluginConfig` interface accepts:
 | Property | Type | Required | Default |
 |----------|------|----------|---------|
 | `provider` | `AnchorProvider` | Yes | — |
-| `programId` | `PublicKey` | No | `SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL` |
+| `programId` | `PublicKey` | No | `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ` |
 
 ---
 

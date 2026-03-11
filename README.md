@@ -748,7 +748,7 @@ import {
 
 ```typescript
 import {
-  SAP_PROGRAM_ADDRESS,       // "SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL"
+  SAP_PROGRAM_ADDRESS,       // "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ"
   SAP_PROGRAM_ID,            // PublicKey (= devnet for now)
   MAINNET_SAP_PROGRAM_ID,    // PublicKey
   DEVNET_SAP_PROGRAM_ID,     // PublicKey

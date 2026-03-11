@@ -28,7 +28,7 @@ import { PublicKey } from "@solana/web3.js";
  * @see {@link SAP_PROGRAM_ID}
  */
 export const SAP_PROGRAM_ADDRESS =
-  "SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL";
+  "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ";
 
 // ═══════════════════════════════════════════════════════════════════
 //  Per-Network PublicKeys
