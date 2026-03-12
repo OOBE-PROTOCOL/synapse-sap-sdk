@@ -27,7 +27,7 @@ The `@synapse-sap-sdk` follows a layered, modular architecture. At the top sits 
 │  pda/  ·  constants/  ·  types/  ·  utils/  ·  errors/  ·  idl/ │
 ├──────────────────────────────────────────────────────────────────┤
 │              Anchor Program (on-chain)                           │
-│         SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL             │
+│         SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ             │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -198,7 +198,7 @@ Every SDK operation follows the same pipeline:
   Solana RPC           →  sendTransaction → on-chain program execution
       │
       ▼
-  Program (on-chain)  →  SAPTU7aUXk2AaAdktexae1iuxXpokxzNDBAYYhaVyQL
+  Program (on-chain)  →  SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ
       │
       ▼
   PDA state mutated   →  AgentAccount, AgentStats, GlobalRegistry updated
