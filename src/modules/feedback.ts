@@ -18,7 +18,7 @@ import type { FeedbackAccountData, GiveFeedbackArgs, UpdateFeedbackArgs } from "
 
 /**
  * @name FeedbackModule
- * @description Manages on-chain feedback entries for the Solana Agent Protocol.
+ * @description Manages on-chain feedback entries for the Synapse Agent Protocol.
  *   Provides methods to give, update, revoke, close, and fetch feedback PDAs
  *   that form the trustless reputation layer.
  *

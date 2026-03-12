@@ -1148,7 +1148,7 @@ export function createSAPPlugin(config: SAPPluginConfig): SynapsePlugin {
   return {
     meta: {
       id: "sap",
-      name: "SAP v2 — Solana Agent Protocol",
+      name: "SAP v2 — Synapse Agent Protocol",
       version: SAP_PLUGIN_VERSION,
       description:
         "On-chain agent identity, reputation, tool registry, encrypted memory vault, x402 escrow, attestation, discovery indexes, and unified memory ledger on Solana",
