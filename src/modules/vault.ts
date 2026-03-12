@@ -32,7 +32,7 @@ import type {
 
 /**
  * @name VaultModule
- * @description Manages encrypted memory vaults for the Solana Agent Protocol.
+ * @description Manages encrypted memory vaults for the Synapse Agent Protocol.
  *   Provides methods to initialise vaults, open/close sessions, inscribe
  *   encrypted data, manage delegates (hot wallets), rotate nonces, and
  *   fetch all related account types.

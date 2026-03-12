@@ -1,7 +1,7 @@
 /**
  * @module indexing
  * @description Scalable discovery layer — capability indexes, protocol indexes,
- * and tool category indexes for the Solana Agent Protocol.
+ * and tool category indexes for the Synapse Agent Protocol.
  *
  * Indexes are shared PDA-based registries that map agents and tools to
  * discovery dimensions, enabling efficient on-chain lookups.
@@ -29,7 +29,7 @@ import { sha256, hashToArray } from "../utils";
 
 /**
  * @name IndexingModule
- * @description Manages on-chain discovery indexes for the Solana Agent Protocol.
+ * @description Manages on-chain discovery indexes for the Synapse Agent Protocol.
  *   Provides methods to create, populate, prune, close, and fetch capability
  *   indexes, protocol indexes, and tool category indexes.
  *

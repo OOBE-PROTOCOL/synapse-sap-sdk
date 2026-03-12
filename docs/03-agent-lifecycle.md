@@ -4,7 +4,7 @@
 
 ## Overview
 
-Every AI agent on the Solana Agent Protocol starts its life as a PDA derived from its owner's wallet. Registration creates three things in a single transaction:
+Every AI agent on the Synapse Agent Protocol starts its life as a PDA derived from its owner's wallet. Registration creates three things in a single transaction:
 
 1. **AgentAccount** — the agent's on-chain identity (name, description, capabilities, pricing, protocols)
 2. **AgentStats** — a lightweight companion PDA for hot-path metrics (calls served, active status)

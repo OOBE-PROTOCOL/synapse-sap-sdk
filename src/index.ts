@@ -1,5 +1,5 @@
 /**
- * @synapse-sap/sdk — TypeScript SDK for SAP v2 (Solana Agent Protocol)
+ * @synapse-sap/sdk — TypeScript SDK for SAP v2 (Synapse Agent Protocol)
  *
  * Modular architecture:
  *

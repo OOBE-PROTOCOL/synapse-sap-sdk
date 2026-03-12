@@ -34,7 +34,7 @@ import type {
  * @name EscrowModule
  * @description Manages x402-compatible escrow accounts for agent micropayments.
  *   Provides methods to create, fund, settle, withdraw, batch-settle, close,
- *   and fetch escrow PDAs on the Solana Agent Protocol.
+ *   and fetch escrow PDAs on the Synapse Agent Protocol.
  *
  * @category Modules
  * @since v0.1.0

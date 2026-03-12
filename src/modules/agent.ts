@@ -1,6 +1,6 @@
 /**
  * @module agent
- * @description Agent lifecycle operations for the Solana Agent Protocol.
+ * @description Agent lifecycle operations for the Synapse Agent Protocol.
  *
  * Covers: register, update, deactivate, reactivate, close,
  * report calls, update reputation metrics, and account fetching.
@@ -22,7 +22,7 @@ import type {
 
 /**
  * @name AgentModule
- * @description Manages the full agent lifecycle on the Solana Agent Protocol.
+ * @description Manages the full agent lifecycle on the Synapse Agent Protocol.
  *   Provides methods to register, update, deactivate, reactivate, and close
  *   agent identities, as well as self-report call metrics and reputation data.
  *

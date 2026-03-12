@@ -1,7 +1,7 @@
 /**
  * @module tools
  * @description Tool schema registry and session checkpoints for the
- * Solana Agent Protocol.
+ * Synapse Agent Protocol.
  *
  * Covers: publish, inscribe schema, update, deactivate/reactivate,
  * close, report invocations, and session checkpoint management.
@@ -31,7 +31,7 @@ import { sha256, hashToArray } from "../utils";
 /**
  * @name ToolsModule
  * @description Manages tool descriptors and session checkpoints for the
- *   Solana Agent Protocol. Provides methods to publish, update, deactivate,
+ *   Synapse Agent Protocol. Provides methods to publish, update, deactivate,
  *   reactivate, close, and fetch tool descriptors, as well as inscribe
  *   JSON schemas into TX logs and manage session checkpoints.
  *

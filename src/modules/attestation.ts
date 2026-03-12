@@ -18,7 +18,7 @@ import type { AgentAttestationData, CreateAttestationArgs } from "../types";
 
 /**
  * @name AttestationModule
- * @description Manages on-chain attestations for the Solana Agent Protocol.
+ * @description Manages on-chain attestations for the Synapse Agent Protocol.
  *   Provides methods to create, revoke, close, and fetch attestation PDAs
  *   that form the web-of-trust layer.
  *
