@@ -77,7 +77,7 @@ const plugin = createSAPPlugin({ provider });
 console.log(plugin.meta);
 // {
 //   id:          "sap-v2",
-//   name:        "Solana Agent Protocol",
+//   name:        "Synapse Agent Protocol",
 //   version:     "0.1.0",
 //   description: "52 tools across 8 on-chain SAP v2 protocol domains …",
 //   tags:        ["solana", "agent", "sap", "x402", "escrow", "vault", …]
@@ -87,7 +87,7 @@ console.log(plugin.meta);
 | Field | Value |
 |-------|-------|
 | `id` | `"sap-v2"` |
-| `name` | `"Solana Agent Protocol"` |
+| `name` | `"Synapse Agent Protocol"` |
 | `version` | `"0.1.0"` |
 | `tags` | `solana`, `agent`, `sap`, `x402`, `escrow`, `vault`, `memory`, `reputation` |
 

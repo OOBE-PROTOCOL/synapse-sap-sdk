@@ -50,7 +50,7 @@ type SapProgram = Program<any>;
 
 /**
  * @name SapClient
- * @description Root entry point for the Solana Agent Protocol v2 TypeScript SDK.
+ * @description Root entry point for the Synapse Agent Protocol v2 TypeScript SDK.
  *
  * Each protocol domain is exposed as a lazily-instantiated module:
  * `agent`, `feedback`, `indexing`, `tools`, `vault`, `escrow`,
