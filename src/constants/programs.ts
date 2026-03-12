@@ -19,7 +19,7 @@ import { PublicKey } from "@solana/web3.js";
 /**
  * SAP v2 program address string (base58).
  *
- * Vanity keypair derived from the `SAPTU7a…` prefix.
+ * Vanity keypair derived from the `SAPpUh…` prefix.
  *
  * @name SAP_PROGRAM_ADDRESS
  * @description The canonical on-chain program address shared by all Solana clusters.
