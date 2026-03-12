@@ -38,7 +38,7 @@
 
 ## 1. What is SAP v2?
 
-**Synap Agent Protocol** is an on-chain infrastructure layer for autonomous AI agents.
+**Synapse Agent Protocol** is an on-chain infrastructure layer for autonomous AI agents.
 It provides:
 
 - **Identity** — Deterministic PDAs for agent registration, metrics, and lifecycle.
