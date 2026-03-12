@@ -510,3 +510,143 @@ export const deriveLedgerPage = (
     [toSeedBuf(SEEDS.LEDGER_PAGE), ledgerPda.toBuffer(), u32le(pageIndex)],
     programId,
   );
+
+// ═════════════════════════════════════════════
+//  Memory Buffer (legacy)
+// ═════════════════════════════════════════════
+
+/**
+ * Derive the **MemoryBuffer** PDA for a session at a given page index.
+ *
+ * Seeds: `["sap_buffer", session_pda, page_index_u32_le]`
+ *
+ * @name deriveBuffer
+ * @description Computes the buffer page PDA for chunked memory writes within a session.
+ * @param sessionPda - The parent session's PDA.
+ * @param pageIndex  - Zero-based page index.
+ * @param programId  - Override program ID (defaults to {@link SAP_PROGRAM_ID}).
+ * @returns {PdaResult} `[pda, bump]` tuple.
+ * @category PDA
+ * @since v0.3.1
+ * @see MemoryBuffer
+ */
+export const deriveBuffer = (
+  sessionPda: PublicKey,
+  pageIndex: number,
+  programId = SAP_PROGRAM_ID,
+): PdaResult =>
+  findPda(
+    [toSeedBuf(SEEDS.BUFFER), sessionPda.toBuffer(), u32le(pageIndex)],
+    programId,
+  );
+
+// ═════════════════════════════════════════════
+//  Session Digest
+// ═════════════════════════════════════════════
+
+/**
+ * Derive the **SessionDigest** PDA for a session.
+ *
+ * Seeds: `["sap_digest", session_pda]`
+ *
+ * @name deriveDigest
+ * @description Computes the digest PDA that stores a compact hash summary of a session.
+ * @param sessionPda - The parent session's PDA.
+ * @param programId  - Override program ID (defaults to {@link SAP_PROGRAM_ID}).
+ * @returns {PdaResult} `[pda, bump]` tuple.
+ * @category PDA
+ * @since v0.3.1
+ * @see SessionDigest
+ */
+export const deriveDigest = (
+  sessionPda: PublicKey,
+  programId = SAP_PROGRAM_ID,
+): PdaResult =>
+  findPda([toSeedBuf(SEEDS.DIGEST), sessionPda.toBuffer()], programId);
+
+// ═════════════════════════════════════════════
+//  Plugin
+// ═════════════════════════════════════════════
+
+/**
+ * Derive the **PluginConfig** PDA for an agent and plugin type.
+ *
+ * Seeds: `["sap_plugin", agent_pda, plugin_type_u8]`
+ *
+ * @name derivePlugin
+ * @description Computes the plugin configuration PDA scoped to an agent and plugin type.
+ * @param agentPda   - The owning agent's PDA.
+ * @param pluginType - The `u8` plugin type discriminant.
+ * @param programId  - Override program ID (defaults to {@link SAP_PROGRAM_ID}).
+ * @returns {PdaResult} `[pda, bump]` tuple.
+ * @category PDA
+ * @since v0.3.1
+ * @see PluginConfig
+ */
+export const derivePlugin = (
+  agentPda: PublicKey,
+  pluginType: number,
+  programId = SAP_PROGRAM_ID,
+): PdaResult =>
+  findPda(
+    [toSeedBuf(SEEDS.PLUGIN), agentPda.toBuffer(), Buffer.from([pluginType])],
+    programId,
+  );
+
+// ═════════════════════════════════════════════
+//  Legacy Memory (entry + chunk)
+// ═════════════════════════════════════════════
+
+/**
+ * Derive the **MemoryEntry** PDA for an agent and entry hash.
+ *
+ * Seeds: `["sap_memory", agent_pda, entry_hash]`
+ *
+ * @name deriveMemoryEntry
+ * @description Computes the memory entry PDA for legacy key-value memory storage.
+ * @param agentPda  - The owning agent's PDA.
+ * @param entryHash - SHA-256 hash of the entry key (32 bytes).
+ * @param programId - Override program ID (defaults to {@link SAP_PROGRAM_ID}).
+ * @returns {PdaResult} `[pda, bump]` tuple.
+ * @category PDA
+ * @since v0.3.1
+ * @see MemoryEntry
+ */
+export const deriveMemoryEntry = (
+  agentPda: PublicKey,
+  entryHash: Uint8Array,
+  programId = SAP_PROGRAM_ID,
+): PdaResult =>
+  findPda(
+    [toSeedBuf(SEEDS.MEMORY), agentPda.toBuffer(), Buffer.from(entryHash)],
+    programId,
+  );
+
+/**
+ * Derive the **MemoryChunk** PDA for a memory entry at a given chunk index.
+ *
+ * Seeds: `["sap_mem_chunk", memory_entry_pda, chunk_index_u8]`
+ *
+ * @name deriveMemoryChunk
+ * @description Computes the chunk PDA for fragmented memory entry data.
+ * @param memoryEntryPda - The parent memory entry's PDA.
+ * @param chunkIndex     - Zero-based chunk index (0–255).
+ * @param programId      - Override program ID (defaults to {@link SAP_PROGRAM_ID}).
+ * @returns {PdaResult} `[pda, bump]` tuple.
+ * @category PDA
+ * @since v0.3.1
+ * @see MemoryChunk
+ */
+export const deriveMemoryChunk = (
+  memoryEntryPda: PublicKey,
+  chunkIndex: number,
+  programId = SAP_PROGRAM_ID,
+): PdaResult =>
+  findPda(
+    [
+      toSeedBuf(SEEDS.MEMORY_CHUNK),
+      memoryEntryPda.toBuffer(),
+      Buffer.from([chunkIndex]),
+    ],
+    programId,
+  );

@@ -42,3 +42,14 @@ export {
   TOOL_CATEGORY_VALUES,
   HTTP_METHOD_VALUES,
 } from "./limits";
+// ── Mainnet Addresses ────────────────────────────────────────
+export {
+  SAP_PROGRAM,
+  SAP_UPGRADE_AUTHORITY,
+  GLOBAL_REGISTRY_ADDRESS,
+  GLOBAL_REGISTRY_BUMP,
+  IDL_ACCOUNT_ADDRESS,
+  PROGRAM_METADATA_PROGRAM,
+  TOOL_CATEGORY_ADDRESSES,
+  TOOL_CATEGORY_ADDRESS_LIST,
+} from "./addresses";

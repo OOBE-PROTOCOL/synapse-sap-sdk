@@ -242,6 +242,12 @@ All PDAs use deterministic seeds defined in `constants/seeds.ts`. Every derivati
 | `deriveAttestation(...)` | `["sap_attest", ...]` | Web of trust |
 | `deriveCapabilityIndex(hash)` | `["sap_cap_idx", hash]` | Capability discovery |
 | `deriveProtocolIndex(hash)` | `["sap_proto_idx", hash]` | Protocol discovery |
+| `deriveToolCategoryIndex(cat)` | `["sap_tool_cat", cat]` | Category discovery |
+| `deriveBuffer(sessionPda, idx)` | `["sap_buffer", session, idx]` | Memory buffer (legacy) |
+| `deriveDigest(sessionPda)` | `["sap_digest", session]` | Session digest (legacy) |
+| `derivePlugin(agentPda, type)` | `["sap_plugin", agent, type]` | Plugin config |
+| `deriveMemoryEntry(agentPda, hash)` | `["sap_memory", agent, hash]` | Memory entry (legacy) |
+| `deriveMemoryChunk(entryPda, idx)` | `["sap_mem_chunk", entry, idx]` | Memory chunk (legacy) |
 
 ```typescript
 import { deriveAgent, deriveVault, deriveLedger } from "@synapse-sap/sdk/pda";
@@ -252,6 +258,52 @@ const [ledgerPda] = deriveLedger(sessionPda);
 ```
 
 Seeds mirror the Rust `#[account(seeds = [...])]` definitions exactly. If you need to verify a PDA off-chain or cross-reference with an explorer, the seed strings match one-to-one.
+
+---
+
+## Mainnet Addresses
+
+Pre-computed addresses for all singleton and well-known PDAs on **mainnet-beta**.
+
+### Program & Infrastructure
+
+| Name | Address |
+|:-----|:--------|
+| **SAP v2 Program** | `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ` |
+| **Upgrade Authority** | `GBLQznn1QMnx64zHXcDguP9yNW9ZfYCVdrY8eDovBvPk` |
+| **Global Registry** | `9odFrYBBZq6UQC6aGyzMPNXWJQn55kMtfigzhLg6S6L5` |
+| **IDL Account** | `ENs7L1NFuoP7dur8cqGGE6b98CQHfNeDZPWPSjRzhc4f` |
+| **program-metadata Program** | `pmetaypqG6SiB47xMigYVMAkuHDWeSDXcv3zzDrJJvA` |
+
+### Tool Category Index PDAs
+
+| Category | Address |
+|:---------|:--------|
+| Swap (0) | `5H8yn9RuRgZWqkDiWbKNaCHzTMjqSpwbNQKMPLtUXx2G` |
+| Lend (1) | `5Lqqk6VtFWnYq3h4Ae4FuUAKnFzw1Nm1DaSdt2cjcTDj` |
+| Stake (2) | `kC8oAiVUcFMXEnmMNu1h2sdAc3dWKcwV5qVKRFYMmQD` |
+| Nft (3) | `2zNWR9J3znvGQ5J6xDfJyZkd12Gi66mjErRDkgPeKbyF` |
+| Payment (4) | `Eh7MwxJYWRN8bzAmY3ZPTRXYjWpWypokBf1STixu2dy9` |
+| Data (5) | `AwpVxehQUZCVTAJ9icZfS6oRbF66jNo32duXaL11B5df` |
+| Governance (6) | `2573WjZzV9QtbqtM6Z86YGivkk1kdvJa4gK3tZRQ2jkN` |
+| Bridge (7) | `664nyr6kBeeFiE1ij5gtdncNCVHrXqrk2uBhnKmUREvK` |
+| Analytics (8) | `4DFsiTZ6h6RoCZuUeMTpaoQguepnPUMJBLJuwwjKg5GL` |
+| Custom (9) | `3Nk5dvFWEyWPEArdG9cCdab6C6ym36mSWUSB8HzN35ZM` |
+
+```typescript
+import {
+  GLOBAL_REGISTRY_ADDRESS,
+  TOOL_CATEGORY_ADDRESSES,
+  SAP_UPGRADE_AUTHORITY,
+  IDL_ACCOUNT_ADDRESS,
+} from "@oobe-protocol-labs/synapse-sap-sdk";
+
+console.log(GLOBAL_REGISTRY_ADDRESS.toBase58());
+// "9odFrYBBZq6UQC6aGyzMPNXWJQn55kMtfigzhLg6S6L5"
+
+console.log(TOOL_CATEGORY_ADDRESSES.Swap.toBase58());
+// "5H8yn9RuRgZWqkDiWbKNaCHzTMjqSpwbNQKMPLtUXx2G"
+```
 
 ---
 

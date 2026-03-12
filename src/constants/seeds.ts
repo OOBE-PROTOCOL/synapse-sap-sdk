@@ -52,6 +52,8 @@ export const SEEDS = {
   ATTESTATION: "sap_attest",
   LEDGER: "sap_ledger",
   LEDGER_PAGE: "sap_page",
+  BUFFER: "sap_buffer",
+  DIGEST: "sap_digest",
 } as const;
 
 /**

@@ -1,8 +1,17 @@
 # @synapse-sap/sdk — Developer Documentation
 
-> **Version**: 0.1.0  
+> **Version**: 0.3.1  
 > **Program**: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`  
 > **Anchor**: 0.32.1 · **TypeScript**: 5.7+ · **Solana Web3.js**: ≥1.90
+
+### Mainnet Addresses
+
+| Name | Address |
+|:-----|:--------|
+| **SAP Program** | `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ` |
+| **Upgrade Authority** | `GBLQznn1QMnx64zHXcDguP9yNW9ZfYCVdrY8eDovBvPk` |
+| **Global Registry** | `9odFrYBBZq6UQC6aGyzMPNXWJQn55kMtfigzhLg6S6L5` |
+| **IDL Account** | `ENs7L1NFuoP7dur8cqGGE6b98CQHfNeDZPWPSjRzhc4f` |
 
 ---
 
