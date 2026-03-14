@@ -44,8 +44,8 @@
  */
 
 // ── Core ─────────────────────────────────────────────
-export { SapClient, SapConnection } from "./core";
-export type { SapCluster, SapConnectionConfig } from "./core";
+export { SapClient, SapConnection, KeypairWallet } from "./core";
+export type { SapCluster, SapConnectionConfig, SapWallet } from "./core";
 
 // ── Types ────────────────────────────────────────────
 export type {

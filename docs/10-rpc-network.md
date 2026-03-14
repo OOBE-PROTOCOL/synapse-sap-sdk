@@ -8,7 +8,7 @@ Choosing the right RPC endpoint is one of the highest-leverage decisions you'll 
 
 ## Synapse RPC Gateway (Recommended)
 
-**Endpoint**: `https://synapse.oobeprotocol.ai`
+**Endpoint**: `https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=`
 
 The Synapse RPC Gateway is the recommended RPC endpoint for all SAP protocol traffic. It's operated by the Oobe Protocol team and optimized for the specific access patterns of on-chain agent infrastructure.
 
@@ -31,7 +31,7 @@ import { Keypair } from "@solana/web3.js";
 
 // One-liner — returns { client, connection, cluster, programId }
 const { client } = SapConnection.fromKeypair(
-  "https://synapse.oobeprotocol.ai",
+  "https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=",
   keypair,
 );
 
@@ -54,7 +54,7 @@ import { SynapseAgentKit } from "@oobe-protocol-labs/synapse-client-sdk/ai/plugi
 import { createSAPPlugin } from "@synapse-sap/sdk/plugin";
 
 const kit = new SynapseAgentKit({
-  rpcUrl: "https://synapse.oobeprotocol.ai",
+  rpcUrl: "https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=",
 }).use(createSAPPlugin({ provider }));
 ```
 
@@ -99,11 +99,11 @@ const conn = SapConnection.devnet();
 const client = conn.fromKeypair(testKeypair);
 
 // Mainnet — Synapse Gateway (recommended)
-const conn = SapConnection.mainnet("https://synapse.oobeprotocol.ai");
+const conn = SapConnection.mainnet("https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=");
 const client = conn.createClient(wallet);
 
 // Mainnet — alternative RPC
-const conn = SapConnection.mainnet("https://rpc.helius.xyz/?api-key=xyz");
+const conn = SapConnection.mainnet("https://staging.oobeprotocol.ai/rpc?api_key=");
 const client = conn.createClient(wallet);
 
 // Localnet — local validator
@@ -113,7 +113,7 @@ await conn.airdrop(client.walletPubkey, 100); // local airdrop
 
 // fromKeypair — one-liner for any endpoint
 const { client } = SapConnection.fromKeypair(
-  "https://synapse.oobeprotocol.ai",
+  "https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=",
   keypair,
 );
 ```
@@ -124,8 +124,8 @@ For full control, instantiate `SapConnection` directly:
 
 ```typescript
 const conn = new SapConnection({
-  rpcUrl: "https://synapse.oobeprotocol.ai",
-  wsUrl: "wss://synapse.oobeprotocol.ai",
+  rpcUrl: "https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=", // api key needed from synapse.oobeprotocol.ai
+  wsUrl: "wss://us-1-mainnet.oobeprotocol.ai/ws?api_key=",
   commitment: "finalized",
   cluster: "mainnet-beta",
 });
@@ -160,7 +160,7 @@ const conn = SapConnection.devnet();
 **Use for**: Production deployments.
 
 ```typescript
-const conn = SapConnection.mainnet("https://synapse.oobeprotocol.ai");
+const conn = SapConnection.mainnet("https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=");
 ```
 
 - Program ID: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`
@@ -208,12 +208,12 @@ Solana offers three commitment levels. Choosing the right one affects latency, r
 
 ```typescript
 // Standard reads
-const conn = SapConnection.mainnet("https://synapse.oobeprotocol.ai");
+const conn = SapConnection.mainnet("https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=");
 // → commitment: "confirmed"
 
 // Critical operations — wait for finality
 const conn = new SapConnection({
-  rpcUrl: "https://synapse.oobeprotocol.ai",
+  rpcUrl: "https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=",
   commitment: "finalized",
 });
 ```
@@ -247,7 +247,7 @@ For production workloads, use a dedicated RPC provider:
 
 ```typescript
 // ✅ Production — dedicated endpoint
-const conn = SapConnection.mainnet("https://synapse.oobeprotocol.ai");
+const conn = SapConnection.mainnet("https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=");
 
 // ❌ Production — shared public RPC
 const conn = SapConnection.mainnet(); // defaults to api.mainnet-beta.solana.com
@@ -279,7 +279,7 @@ For long-running services (bots, indexers, backend APIs), monitor connection hea
 ```typescript
 import { SapConnection } from "@synapse-sap/sdk";
 
-const conn = SapConnection.mainnet("https://synapse.oobeprotocol.ai");
+const conn = SapConnection.mainnet("https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=");
 
 // Periodic health check
 async function checkHealth(): Promise<boolean> {
@@ -369,7 +369,7 @@ function createClient(env: "development" | "staging" | "production") {
   const rpcUrls: Record<string, string> = {
     development: "http://localhost:8899",
     staging: "https://api.devnet.solana.com",
-    production: "https://synapse.oobeprotocol.ai",
+    production: "https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=",
   };
 
   const { client } = SapConnection.fromKeypair(rpcUrls[env], keypair);
