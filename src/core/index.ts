@@ -16,5 +16,5 @@
  */
 
 export { SapClient } from "./client";
-export { SapConnection } from "./connection";
-export type { SapCluster, SapConnectionConfig } from "./connection";
+export { SapConnection, KeypairWallet } from "./connection";
+export type { SapCluster, SapConnectionConfig, SapWallet } from "./connection";

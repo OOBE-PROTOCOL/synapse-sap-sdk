@@ -10,13 +10,13 @@ This guide distills the lessons we've learned from building and operating agents
 
 **Use the Synapse RPC Gateway whenever possible.**
 
-The gateway at `synapse.oobeprotocol.ai` is purpose-built for SAP protocol traffic — lower latency, optimized transaction routing, and higher rate limits than public Solana RPCs.
+The gateway at `https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=` is purpose-built for SAP protocol traffic — lower latency, optimized transaction routing, and higher rate limits than public Solana RPCs.
 
 ```typescript
 import { SapConnection } from "@synapse-sap/sdk";
 
 const { client } = SapConnection.fromKeypair(
-  "https://synapse.oobeprotocol.ai",
+  "https://https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=",
   keypair,
 );
 ```
@@ -34,7 +34,7 @@ Use the `SapConnection` factory methods for quick setup:
 const conn = SapConnection.devnet();
 
 // Mainnet — custom RPC
-const conn = SapConnection.mainnet("https://synapse.oobeprotocol.ai");
+const conn = SapConnection.mainnet("https://https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=");
 
 // Localnet — localhost:8899
 const conn = SapConnection.localnet();
@@ -257,7 +257,7 @@ const conn = SapConnection.devnet(); // defaults to "confirmed"
 
 // Critical write — use "finalized"
 const conn = new SapConnection({
-  rpcUrl: "https://synapse.oobeprotocol.ai",
+  rpcUrl: "https://https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=",
   commitment: "finalized",
 });
 ```
@@ -441,7 +441,7 @@ await conn.airdrop(client.walletPubkey, 2);
 
 | Category | Recommendation |
 |----------|---------------|
-| **RPC** | Use Synapse Gateway (`synapse.oobeprotocol.ai`) for production |
+| **RPC** | Use Synapse Gateway (`https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=`) for production |
 | **Errors** | Catch `SapError` subclasses — never swallow raw errors |
 | **Cost** | Prefer Ledger over Vault; batch where possible; close unused accounts |
 | **Security** | Delegate wallets, input validation, escrow expiry, content hashing |

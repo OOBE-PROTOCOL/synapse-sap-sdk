@@ -31,9 +31,11 @@ import {
   type Commitment,
   Keypair,
   type PublicKey,
+  type Transaction,
+  type VersionedTransaction,
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
-import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
+import { AnchorProvider } from "@coral-xyz/anchor";
 import {
   SAP_PROGRAM_ID,
   MAINNET_SAP_PROGRAM_ID,
@@ -41,6 +43,56 @@ import {
   LOCALNET_SAP_PROGRAM_ID,
 } from "../constants";
 import { SapClient } from "./client";
+
+// ═══════════════════════════════════════════════════════════════════
+//  Wallet interface (replaces Anchor's Wallet which is not
+//  exported from the ESM bundle of @coral-xyz/anchor)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @interface SapWallet
+ * @description Minimal wallet/signer interface compatible with
+ * Anchor's `AnchorProvider`. Avoids importing `Wallet` from
+ * `@coral-xyz/anchor` which is absent in ESM builds.
+ * @category Core
+ * @since v0.4.1
+ */
+export interface SapWallet {
+  readonly publicKey: PublicKey;
+  signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T>;
+  signAllTransactions<T extends Transaction | VersionedTransaction>(txs: T[]): Promise<T[]>;
+}
+
+/**
+ * @name KeypairWallet
+ * @description Simple wallet wrapper around a `Keypair`.
+ * Drop-in replacement for Anchor's `NodeWallet` / `Wallet` class.
+ * @category Core
+ * @since v0.4.1
+ */
+export class KeypairWallet implements SapWallet {
+  readonly publicKey: PublicKey;
+
+  constructor(readonly payer: Keypair) {
+    this.publicKey = payer.publicKey;
+  }
+
+  async signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T> {
+    if ("partialSign" in tx) {
+      (tx as Transaction).partialSign(this.payer);
+    } else {
+      (tx as VersionedTransaction).sign([this.payer]);
+    }
+    return tx;
+  }
+
+  async signAllTransactions<T extends Transaction | VersionedTransaction>(txs: T[]): Promise<T[]> {
+    for (const tx of txs) {
+      await this.signTransaction(tx);
+    }
+    return txs;
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════
 //  Types
@@ -261,7 +313,7 @@ export class SapConnection {
       commitment: opts?.commitment,
       cluster: opts?.cluster,
     });
-    const client = conn.createClient(new Wallet(keypair));
+    const client = conn.createClient(new KeypairWallet(keypair));
     return Object.assign(conn, { client });
   }
 
@@ -270,18 +322,18 @@ export class SapConnection {
   // ─────────────────────────────────────────────
 
   /**
-   * Create a {@link SapClient} from an Anchor {@link Wallet} (signer).
+   * Create a {@link SapClient} from a {@link SapWallet} (signer).
    *
-   * @param {Wallet} wallet — An Anchor-compatible wallet/signer.
+   * @param {SapWallet} wallet — A wallet/signer implementing {@link SapWallet}.
    * @returns {SapClient} A fully-configured SAP client.
    * @since v0.1.0
    *
    * @example
    * ```ts
-   * const client = conn.createClient(new Wallet(keypair));
+   * const client = conn.createClient(new KeypairWallet(keypair));
    * ```
    */
-  createClient(wallet: Wallet): SapClient {
+  createClient(wallet: SapWallet): SapClient {
     const provider = new AnchorProvider(this.connection, wallet, {
       commitment: this.commitment,
     });
@@ -301,7 +353,7 @@ export class SapConnection {
    * ```
    */
   fromKeypair(keypair: Keypair): SapClient {
-    return this.createClient(new Wallet(keypair));
+    return this.createClient(new KeypairWallet(keypair));
   }
 
   // ─────────────────────────────────────────────
