@@ -1,6 +1,6 @@
 {
   "name": "@oobe-protocol-labs/synapse-sap-sdk",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "TypeScript SDK for the Synapse Agent Protocol (SAP v2) on Solana",
   "license": "MIT",
   "main": "dist/cjs/index.js",
@@ -131,6 +131,11 @@
       "import": "./dist/esm/postgres/index.js",
       "require": "./dist/cjs/postgres/index.js",
       "types": "./dist/types/postgres/index.d.ts"
+    },
+    "./parser": {
+      "import": "./dist/esm/parser/index.js",
+      "require": "./dist/cjs/parser/index.js",
+      "types": "./dist/types/parser/index.d.ts"
     }
   },
   "files": [

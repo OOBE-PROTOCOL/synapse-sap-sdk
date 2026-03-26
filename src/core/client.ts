@@ -36,6 +36,7 @@ import { EscrowModule } from "../modules/escrow";
 import { AttestationModule } from "../modules/attestation";
 import { LedgerModule } from "../modules/ledger";
 import { EventParser } from "../events";
+import { TransactionParser } from "../parser/client";
 import { DiscoveryRegistry } from "../registries/discovery";
 import { X402Registry } from "../registries/x402";
 import { SessionManager } from "../registries/session";
@@ -115,6 +116,9 @@ export class SapClient {
   #attestation?: AttestationModule;
   #ledger?: LedgerModule;
   #events?: EventParser;
+
+  // ── Lazy parser singleton ─────────────────────
+  #parser?: TransactionParser;
 
   // ── Lazy registry singletons ──────────────────────
   #discovery?: DiscoveryRegistry;
@@ -316,6 +320,27 @@ export class SapClient {
    */
   get events(): EventParser {
     return (this.#events ??= new EventParser(this.program));
+  }
+
+  /**
+   * @name parser
+   * @description Transaction parser: decode instruction names, arguments,
+   * accounts, inner CPI calls, and protocol events from raw transaction
+   * responses. Designed for indexers and explorers.
+   * @returns {TransactionParser} The lazily-instantiated `TransactionParser` singleton.
+   * @category Modules
+   * @since v0.5.0
+   * @see {@link TransactionParser}
+   *
+   * @example
+   * ```ts
+   * const tx = await connection.getTransaction(sig, { ... });
+   * const parsed = client.parser.parseTransaction(tx);
+   * console.log(parsed?.instructions.map(i => i.name));
+   * ```
+   */
+  get parser(): TransactionParser {
+    return (this.#parser ??= new TransactionParser(this.program));
   }
 
   // ═════════════════════════════════════════════
