@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.1] — 2025-07-13
+## [0.4.2] - 2026-03-26
+
+### Added
+
+- **Transaction parser module** (`src/parser/`) with 7 source files for full on-chain transaction decoding.
+  - `parseSapInstructionsFromTransaction` - Decode SAP instructions from a raw `TransactionResponse` (RPC `getTransaction`). Handles both legacy and versioned (v0) messages with address lookup table support.
+  - `parseSapInstructionsFromList` - Decode SAP instructions from a pre-built `TransactionInstruction[]`.
+  - `parseSapTransactionComplete` - Full parse combining instruction decode, inner CPI instruction decode, and event extraction from transaction logs into a single `ParsedSapTransaction` result.
+  - `parseSapTransactionBatch` - Batch processing for indexer pipelines.
+  - `decodeInnerInstructions` - Reconstruct full public keys from compiled inner instruction indices and decode CPI calls targeting the SAP program.
+  - `extractAccountKeys` - Extract the full ordered account key list from both legacy and versioned transaction formats.
+  - `containsSapInstruction` - Fast pre-filter check before committing to a full decode pass.
+  - `filterSapInnerInstructions` - Filter decoded inner instructions to SAP-only calls.
+  - `TransactionParser` - OOP wrapper that binds the Anchor `Program` once for repeated parse calls.
+- **`SapClient.parser`** accessor - Lazy singleton `TransactionParser` instance on the core client.
+- **Subpath export** `@oobe-protocol-labs/synapse-sap-sdk/parser` for direct deep imports.
+- **Types** - `DecodedSapInstruction`, `DecodedInnerInstruction`, `ParsedSapTransaction`, `ParseFilterOptions`, `SapInstructionCoder`, `CompiledInner`, `InnerInstructionGroup`.
+
+## [0.2.1] - 2025-07-13
 
 ### Added
 
@@ -19,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated CHANGELOG to use correct package name and GitHub URLs.
 
-## [0.2.0] — 2025-07-13
+## [0.2.0] - 2025-07-13
 
 ### Added
 
@@ -36,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Package renamed from `@synapse-sap/sdk` to `@oobe-protocol-labs/synapse-sap-sdk`.
 - Standalone decoupling — SDK works independently without monorepo structure.
 
-## [0.1.0] — 2025-03-09
+## [0.1.0] - 2025-03-09
 
 ### Added
 
@@ -58,7 +76,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Subpath exports** — `@synapse-sap/sdk/agent`, `@synapse-sap/sdk/pda`, etc.
 - **Strict TypeScript** — `strict`, `noUncheckedIndexedAccess`, `noUnusedLocals`, `noUnusedParameters`.
 
-[Unreleased]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.4.1...v0.4.2
 [0.2.1]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/releases/tag/v0.1.0

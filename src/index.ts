@@ -15,6 +15,7 @@
  * | `modules/`        | Low-level per-domain instruction wrappers     |
  * | `registries/`     | High-level abstractions (discovery, x402, …)  |
  * | `plugin/`         | SynapseAgentKit adapter (52 tools)            |
+ * | `parser/`         | Transaction decode, instruction + event parse |
  * | `idl/`            | Embedded Anchor IDL                           |
  *
  * @example
@@ -219,6 +220,30 @@ export type {
   SyncCursorRow,
   SyncOptions,
 } from "./postgres";
+
+// ── Parser (transaction decode + instruction + events) ─
+export {
+  parseSapInstructionsFromTransaction,
+  parseSapInstructionNamesFromTransaction,
+  parseSapInstructionsFromList,
+  parseSapInstructionNamesFromList,
+  containsSapInstruction,
+  parseSapTransactionComplete,
+  parseSapTransactionBatch,
+  decodeInnerInstructions,
+  filterSapInnerInstructions,
+  extractAccountKeys,
+  TransactionParser,
+} from "./parser";
+export type {
+  DecodedSapInstruction,
+  DecodedInnerInstruction,
+  ParsedSapTransaction,
+  ParseFilterOptions,
+  SapInstructionCoder,
+  CompiledInner,
+  InnerInstructionGroup,
+} from "./parser";
 
 // ── Registries (high-level developer abstractions) ────
 export {
