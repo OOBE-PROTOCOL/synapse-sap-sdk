@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-27
+
+### Added
+
+- **SapNetwork constant** (`src/constants/network.ts`) with four x402 network identifier values: `SOLANA_MAINNET`, `SOLANA_MAINNET_GENESIS`, `SOLANA_DEVNET`, `SOLANA_DEVNET_NAMED`. Solves the genesis-hash mismatch with Kamiyo, Helius x402, and other providers that validate against `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp` instead of `solana:mainnet-beta`.
+- **`SapNetworkId` type** -- Union of all known `SapNetwork` values; accepts custom strings where needed.
+- **`networkIdentifier` field on `PreparePaymentOptions`** -- Optional `SapNetworkId | string` to pin the x402 network at escrow creation time.
+- **`networkIdentifier` field on `PaymentContext`** -- Persisted value so subsequent `buildPaymentHeaders(ctx)` calls automatically use the correct network without re-specifying it.
+- **`skills/` directory** with two comprehensive developer guides:
+  - `skills/merchant.md` -- Full merchant/seller skill guide covering agent registration, pricing, tool publishing, discovery indexing, settlement, memory, attestations, metrics, events, plugin adapter, PostgreSQL mirror, dual-role pattern, and complete type reference.
+  - `skills/client.md` -- Full client/consumer skill guide covering agent discovery, x402 payment flow, header building, escrow management, cost estimation, feedback, attestations, ledger reading, transaction parsing, events, dual-role pattern, and complete type reference.
+
+### Changed
+
+- **`buildPaymentHeaders()`** -- Resolution order for `X-Payment-Network` is now: (1) `opts.network` per-call override, (2) `ctx.networkIdentifier` persisted at escrow creation, (3) `SapNetwork.SOLANA_MAINNET` fallback. The `opts.network` parameter type widened from `string` to `SapNetworkId | string`.
+- **`buildPaymentHeadersFromEscrow()`** -- Network parameter default changed from `"mainnet-beta"` to `SapNetwork.SOLANA_MAINNET`. Parameter type widened to `SapNetworkId | string`.
+- **`preparePayment()`** -- Now accepts optional `networkIdentifier` and persists it in the returned `PaymentContext`.
+
 ## [0.4.2] - 2026-03-26
 
 ### Added
@@ -76,7 +94,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Subpath exports** — `@synapse-sap/sdk/agent`, `@synapse-sap/sdk/pda`, etc.
 - **Strict TypeScript** — `strict`, `noUncheckedIndexedAccess`, `noUnusedLocals`, `noUnusedParameters`.
 
-[Unreleased]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.4.1...v0.4.2
 [0.2.1]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.1.0...v0.2.0

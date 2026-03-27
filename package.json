@@ -1,6 +1,6 @@
 {
   "name": "@oobe-protocol-labs/synapse-sap-sdk",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "TypeScript SDK for the Synapse Agent Protocol (SAP v2) on Solana",
   "license": "MIT",
   "main": "dist/cjs/index.js",
