@@ -76,6 +76,8 @@ import {
   deriveEscrow,
 } from "../pda";
 import { sha256, hashToArray } from "../utils";
+import { SapNetwork } from "../constants/network";
+import type { SapNetworkId } from "../constants/network";
 import type {
   EscrowAccountData,
   AgentAccountData,
@@ -136,6 +138,15 @@ export interface PaymentContext {
   readonly maxCalls: BN;
   /** Escrow creation TX signature. */
   readonly txSignature: TransactionSignature;
+  /**
+   * Network identifier for the `X-Payment-Network` header.
+   * Persisted at escrow creation so every subsequent
+   * `buildPaymentHeaders(ctx)` call uses the correct value.
+   *
+   * @default SapNetwork.SOLANA_MAINNET
+   * @since v0.4.3
+   */
+  readonly networkIdentifier: string;
 }
 
 /**
@@ -164,6 +175,28 @@ export interface PreparePaymentOptions {
   readonly tokenMint?: PublicKey | null;
   /** Token decimals (default: 9 for SOL). */
   readonly tokenDecimals?: number;
+  /**
+   * Network identifier written into the `X-Payment-Network` header.
+   *
+   * Accepts any {@link SapNetworkId} constant or a custom string.
+   * Defaults to `SapNetwork.SOLANA_MAINNET` (`"solana:mainnet-beta"`).
+   *
+   * @example
+   * ```ts
+   * import { SapNetwork } from "@synapse-sap/sdk";
+   *
+   * // Use genesis-hash form for Kamiyo / Helius x402
+   * const ctx = await x402.preparePayment(agentWallet, {
+   *   pricePerCall: 1000,
+   *   deposit: 100_000,
+   *   networkIdentifier: SapNetwork.SOLANA_MAINNET_GENESIS,
+   * });
+   * ```
+   *
+   * @default SapNetwork.SOLANA_MAINNET
+   * @since v0.4.3
+   */
+  readonly networkIdentifier?: SapNetworkId | string;
 }
 
 /**
@@ -510,6 +543,7 @@ export class X402Registry {
       pricePerCall,
       maxCalls,
       txSignature,
+      networkIdentifier: opts.networkIdentifier ?? SapNetwork.SOLANA_MAINNET,
     };
   }
 
@@ -623,13 +657,14 @@ export class X402Registry {
    *
    * @param agentWallet - Agent wallet to look up the escrow for.
    * @param opts - Optional settings.
-   * @param opts.network - Solana cluster name (defaults to `"mainnet-beta"`).
+   * @param opts.network - Network identifier for the `X-Payment-Network` header.
+   *   Defaults to `SapNetwork.SOLANA_MAINNET`.
    * @returns An {@link X402Headers} object, or `null` if no escrow exists.
    * @since v0.1.0
    */
   async buildPaymentHeadersFromEscrow(
     agentWallet: PublicKey,
-    opts?: { network?: string },
+    opts?: { network?: SapNetworkId | string },
   ): Promise<X402Headers | null> {
     const [agentPda] = deriveAgent(agentWallet);
     const [escrowPda] = deriveEscrow(agentPda, this.wallet);
@@ -648,7 +683,7 @@ export class X402Registry {
       "X-Payment-MaxCalls": escrow.maxCalls.toString(),
       "X-Payment-PricePerCall": escrow.pricePerCall.toString(),
       "X-Payment-Program": this.program.programId.toBase58(),
-      "X-Payment-Network": opts?.network ?? "mainnet-beta",
+      "X-Payment-Network": opts?.network ?? SapNetwork.SOLANA_MAINNET,
     };
   }
 

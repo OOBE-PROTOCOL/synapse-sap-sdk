@@ -121,7 +121,9 @@ export {
   VAULT_PROTOCOL_VERSION,
   TOOL_CATEGORY_VALUES,
   HTTP_METHOD_VALUES,
+  SapNetwork,
 } from "./constants";
+export type { SapNetworkId } from "./constants";
 
 // ── IDL ──────────────────────────────────────────────
 export { SAP_IDL, IDL_PROGRAM_ADDRESS, IDL_METADATA } from "./idl/index";

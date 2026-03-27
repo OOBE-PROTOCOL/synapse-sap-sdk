@@ -42,6 +42,10 @@ export {
   TOOL_CATEGORY_VALUES,
   HTTP_METHOD_VALUES,
 } from "./limits";
+// ── Network Identifiers (x402) ───────────────────────────────
+export { SapNetwork } from "./network";
+export type { SapNetworkId } from "./network";
+
 // ── Mainnet Addresses ────────────────────────────────────────
 export {
   SAP_PROGRAM,
