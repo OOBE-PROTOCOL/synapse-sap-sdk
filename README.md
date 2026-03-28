@@ -12,6 +12,7 @@
 
 - [Features](#features)
 - [Installation](#installation)
+- [CLI — `synapse-sap`](#cli--synapse-sap)
 - [Quick Start](#quick-start)
 - [Architecture](#architecture)
 - [Core — Client & Connection](#core--client--connection)
@@ -67,6 +68,109 @@ npm install @synapse-sap/sdk @coral-xyz/anchor @solana/web3.js
 
 ---
 
+## CLI — `synapse-sap`
+
+The SDK ships with a full-featured CLI for interacting with the SAP network from
+your terminal.
+
+### Install the CLI
+
+```bash
+# From the monorepo
+cd synapse-sap-sdk/cli
+npm install
+npm run build
+npm link          # makes "synapse-sap" available globally
+
+# Or install globally from npm (when published separately)
+npm install -g @oobe-protocol-labs/synapse-sap-cli
+```
+
+### Initial Setup
+
+```bash
+# Generate a .env from template
+synapse-sap env init --template devnet
+
+# Set your RPC (OOBE Protocol recommended)
+# Edit .env or use config:
+synapse-sap config set rpcUrl "https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=sk_example123"
+
+# Generate or import a keypair
+synapse-sap env keypair generate --out keys/my-agent.json
+synapse-sap env keypair import ./my-existing-key.json --out keys/agent.json
+
+# Verify everything works
+synapse-sap doctor run
+```
+
+### Usage Examples
+
+```bash
+# ─── Agent Discovery ──────────────────────────────────
+synapse-sap agent list --active --protocol kamiyo
+synapse-sap agent info <WALLET> --fetch-tools --fetch-endpoints
+synapse-sap agent health <WALLET> --timeout 5000
+synapse-sap discovery scan --limit 50 --sort reputation --output json
+synapse-sap discovery validate --wallet <WALLET>
+
+# ─── Escrow & Payments ────────────────────────────────
+synapse-sap escrow open <AGENT_WALLET> \
+  --deposit 100000 --max-calls 100 --token sol
+synapse-sap escrow deposit <AGENT_WALLET> --amount 50000
+synapse-sap escrow list
+synapse-sap escrow monitor <AGENT_WALLET>
+
+# ─── x402 Calls ──────────────────────────────────────
+synapse-sap x402 headers <AGENT_WALLET> --network solana:mainnet-beta
+synapse-sap x402 call <AGENT_WALLET> swap \
+  --args '{"inputMint":"SOL","outputMint":"USDC","amount":1}' \
+  --endpoint https://agent.example.com/x402 \
+  --save
+synapse-sap x402 settle <CLIENT_WALLET> --calls 5 --service "batch-result"
+
+# ─── Tools & Manifests ────────────────────────────────
+synapse-sap tools manifest generate <WALLET> --out manifest.json --include-schema
+synapse-sap tools manifest validate manifest.json
+synapse-sap tools typify manifest.json --out types/agent.ts
+synapse-sap tools compare <WALLET_A> <WALLET_B>
+
+# ─── Diagnostics ──────────────────────────────────────
+synapse-sap doctor run --quick
+synapse-sap env check
+synapse-sap config show
+```
+
+### Global Flags
+
+| Flag | Description |
+|------|-------------|
+| `--rpc <url>` | Override primary RPC (e.g. `https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=sk_...`) |
+| `--fallback-rpc <url>` | Override fallback RPC |
+| `--cluster <cluster>` | `mainnet-beta` \| `devnet` \| `localnet` |
+| `--json` | JSON output for scripting |
+| `--silent` | Suppress log output |
+| `--env-file <path>` | Custom `.env` file path |
+
+### 10 Command Groups
+
+| Group | Subcommands | Description |
+|-------|-------------|-------------|
+| `agent` | `list`, `info`, `tools`, `health`, `register` | Agent lifecycle |
+| `discovery` | `scan`, `validate`, `cache` | Network scanning |
+| `escrow` | `open`, `deposit`, `withdraw`, `close`, `dump`, `list`, `monitor` | Escrow management |
+| `x402` | `headers`, `call`, `sign`, `verify`, `settle`, `replay` | Payment flows |
+| `tools` | `manifest generate/validate`, `typify`, `publish`, `compare`, `doc` | Manifest & schema |
+| `env` | `init`, `check`, `keypair show/generate/import` | Environment setup |
+| `config` | `show`, `set`, `edit`, `reset`, `path` | Configuration |
+| `doctor` | `run` | 8 diagnostic checks |
+| `tmp` | `list`, `cat`, `diff`, `clean`, `archive` | Artifact management |
+| `plugin` | `list`, `install`, `create`, `validate` | Plugin system |
+
+> Full CLI reference: [`cli/README.md`](cli/README.md)
+
+---
+
 ## Quick Start
 
 ### Option A — Anchor Provider (classic)
@@ -98,14 +202,14 @@ console.log(agent.name, agent.isActive);
 import { SapConnection } from "@synapse-sap/sdk";
 import { Keypair } from "@solana/web3.js";
 
-// One-liner:
+// One-liner (OOBE Protocol RPC):
 const { client } = SapConnection.fromKeypair(
-  "https://api.devnet.solana.com",
+  "https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=sk_example123",
   Keypair.generate(),
 );
 
 // Or step-by-step:
-const conn = SapConnection.devnet();        // or .mainnet(rpcUrl), .localnet()
+const conn = SapConnection.mainnet("https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=sk_example123");
 const client = conn.fromKeypair(myKeypair);
 
 // Use exactly the same API:

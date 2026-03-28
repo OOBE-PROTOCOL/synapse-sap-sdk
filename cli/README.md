@@ -5,9 +5,12 @@
 ## Installation
 
 ```bash
+# From the monorepo
 cd cli && npm install && npm run build
-# link globally:
-npm link
+npm link          # makes "synapse-sap" available globally
+
+# Or install globally from npm
+npm install -g @oobe-protocol-labs/synapse-sap-cli
 ```
 
 ## Quick Start
@@ -16,6 +19,9 @@ npm link
 # Setup environment
 synapse-sap env init --template devnet
 synapse-sap env check
+
+# Set your OOBE Protocol RPC
+synapse-sap config set rpcUrl "https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=sk_example123"
 
 # Generate a keypair
 synapse-sap env keypair generate --out keys/my-agent.json
@@ -138,7 +144,7 @@ Checks: Node version, SDK version, env vars, keypair permissions, disk usage, RP
 
 | Flag | Description |
 |------|-------------|
-| `--rpc <url>` | Override primary RPC |
+| `--rpc <url>` | Override primary RPC (e.g. `https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=sk_...`) |
 | `--fallback-rpc <url>` | Override fallback RPC |
 | `--program <pubkey>` | Custom SAP program ID |
 | `--cluster <cluster>` | Cluster override (mainnet-beta\|devnet\|localnet) |
@@ -158,7 +164,7 @@ Config file: `~/.config/synapse-sap/config.json`
 
 ```json
 {
-  "rpcUrl": "https://api.mainnet-beta.solana.com",
+  "rpcUrl": "https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=sk_example123",
   "cluster": "mainnet-beta",
   "programId": "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ",
   "tmpDir": "/tmp/synapse-sap",
