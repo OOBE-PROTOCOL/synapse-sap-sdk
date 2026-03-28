@@ -3,6 +3,50 @@
 > **Version:** v0.6.0
 > **Role:** You are a client (consumer) that discovers on-chain agents, creates escrows, calls x402 endpoints, and verifies settlements.
 > **Companion:** For the merchant/seller perspective see [merchant.md](./merchant.md)
+> **Parent Reference:** For the full Synapse Client SDK (RPC, DAS, AI tools, plugins, MCP, gateway, x402, Next.js) see [skills.md](./skills.md)
+> **CLI Access:** All consumer operations (discovery, escrow, x402 calls) are also available via the `synapse-sap` CLI — see [cli/README.md](../cli/README.md)
+
+---
+
+## Ecosystem Documentation
+
+This guide covers **consumer-side SAP protocol operations** in depth. For the broader ecosystem:
+
+| Resource | Description |
+|----------|-------------|
+| [skills.md](./skills.md) | **Synapse Client SDK** — full reference (26 sections): RPC 53 methods, DAS 11 methods, WebSocket, gRPC, AI tools (139 LangChain tools), SynapseAgentKit (110 plugin tools), MCP server/client, Agent Commerce Gateway, x402 payments, intents, Solana Actions, persistence, context, Next.js, common patterns |
+| [merchant.md](./merchant.md) | **SAP Merchant (Seller) Skill Guide** — register agent, publish tools, settle payments, memory vault/ledger, delegate hot-wallets, attestations, reputation, plugin adapter, PostgreSQL mirror |
+| [cli/README.md](../cli/README.md) | **SAP CLI** — `synapse-sap` with 10 command groups, 40+ subcommands. Key consumer commands: `agent list`, `agent info`, `agent health`, `escrow open/deposit/withdraw/close/monitor`, `x402 headers/call/verify`, `discovery scan/validate` |
+| [docs/](../docs/) | **SAP SDK Documentation** — 11 technical guides covering architecture, agent lifecycle, memory systems, x402 payments, discovery, tools, plugin adapter, best practices, RPC configuration |
+
+### CLI Shortcuts for Consumer Operations
+
+Many operations in this guide have CLI equivalents that are faster for one-off tasks:
+
+```bash
+# Discovery (§3)
+synapse-sap agent list --active --capability jupiter:swap
+synapse-sap agent info <WALLET> --fetch-tools --fetch-endpoints
+synapse-sap agent health <WALLET> --timeout 5000
+
+# Escrow management (§6, §9)
+synapse-sap escrow open <AGENT_WALLET> --deposit 100000000 --max-calls 100
+synapse-sap escrow deposit <AGENT_WALLET> --amount 50000000
+synapse-sap escrow monitor <AGENT_WALLET>
+synapse-sap escrow close <AGENT_WALLET>
+
+# x402 payment (§6, §8)
+synapse-sap x402 headers <AGENT_WALLET> --network mainnet --output json
+synapse-sap x402 call <AGENT_WALLET> jupiterSwap --args '{"inputMint":"So111...","amount":1000000000}'
+synapse-sap x402 verify <SIGNATURE>
+
+# Network scanning
+synapse-sap discovery scan --limit 100 --sort reputation --output json
+synapse-sap discovery validate --wallet <AGENT_WALLET>
+
+# Diagnostics
+synapse-sap doctor run --quick
+```
 
 ---
 
@@ -1209,3 +1253,7 @@ from `deriveEscrow(yourAgentPda, clientWallet)`.
 > **Note:** This guide covers the client/consumer perspective. For the merchant/seller
 > perspective (registering agents, publishing tools, settling payments, managing memory),
 > see the companion guide: [merchant.md](./merchant.md)
+>
+> **See also:**
+> - [skills.md](./skills.md) — Full Synapse Client SDK reference (RPC, DAS, AI tools, plugins, MCP, gateway, Next.js)
+> - [cli/README.md](../cli/README.md) — `synapse-sap` CLI — 10 command groups, 40+ subcommands for terminal-based protocol access
