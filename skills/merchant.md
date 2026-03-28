@@ -4,9 +4,57 @@
 > **Role:** You are a merchant (agent/seller) that registers on-chain, publishes
 > tools, receives x402 micropayments, and manages sessions.
 > **Companion:** For the client/consumer perspective see [client.md](./client.md)
+> **Parent Reference:** For the full Synapse Client SDK (RPC, DAS, AI tools, plugins, MCP, gateway, x402, Next.js) see [skills.md](./skills.md)
+> **CLI Access:** All merchant operations (register, publish, settle, memory) are also available via the `synapse-sap` CLI — see [cli/README.md](../cli/README.md)
 >
 > Package: `@oobe-protocol-labs/synapse-sap-sdk`
 > Program: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`
+
+---
+
+## Ecosystem Documentation
+
+This guide covers **merchant/seller-side SAP protocol operations** in depth. For the broader ecosystem:
+
+| Resource | Description |
+|----------|-------------|
+| [skills.md](./skills.md) | **Synapse Client SDK** — full reference (26 sections): RPC 53 methods, DAS 11 methods, WebSocket, gRPC, AI tools (139 LangChain tools), SynapseAgentKit (110 plugin tools), MCP server/client, Agent Commerce Gateway, x402 payments, intents, Solana Actions, persistence, context, Next.js, common patterns |
+| [client.md](./client.md) | **SAP Client (Consumer) Skill Guide** — discover agents, create escrows, build x402 headers, verify settlements, endpoint validation, Zod schemas, RPC strategy |
+| [cli/README.md](../cli/README.md) | **SAP CLI** — `synapse-sap` with 10 command groups, 40+ subcommands. Key merchant commands: `agent register`, `tools publish/manifest generate/typify/compare`, `x402 settle`, `escrow dump/list`, `discovery scan` |
+| [docs/](../docs/) | **SAP SDK Documentation** — 11 technical guides covering architecture, agent lifecycle, memory systems, x402 payments, discovery, tools, plugin adapter, best practices, RPC configuration |
+
+### CLI Shortcuts for Merchant Operations
+
+Many operations in this guide have CLI equivalents that are faster for setup and ops:
+
+```bash
+# Agent registration (§4)
+synapse-sap agent register --manifest agent-manifest.json --simulate
+synapse-sap agent register --manifest agent-manifest.json  # execute for real
+
+# Tool publishing (§7, §8)
+synapse-sap tools manifest generate <WALLET> --out manifest.json --include-schema
+synapse-sap tools manifest validate manifest.json
+synapse-sap tools publish manifest.json
+synapse-sap tools typify manifest.json --out types/agent.ts
+synapse-sap tools compare <WALLET_A> <WALLET_B>
+synapse-sap tools doc <WALLET> --format markdown --out docs/my-agent.md
+
+# Settlement (§11)
+synapse-sap x402 settle <CLIENT_WALLET> --calls 5 --service swap-execution
+synapse-sap escrow dump <CLIENT_WALLET> --raw
+synapse-sap escrow list
+
+# Discovery indexing (§9)
+synapse-sap discovery scan --limit 50 --sort reputation
+synapse-sap discovery validate --wallet <MY_WALLET>
+
+# Environment & diagnostics
+synapse-sap env init --template devnet
+synapse-sap env check
+synapse-sap doctor run --quick --save
+synapse-sap config set rpcUrl "https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=YOUR_KEY"
+```
 
 ---
 
@@ -1614,3 +1662,7 @@ you are the agent (`deriveEscrow(yourAgent, clientWallet)`).
 > **Note:** This guide covers the merchant/seller perspective. For the client/consumer
 > perspective (discovering agents, creating escrows, building payment headers),
 > see the companion guide: [client.md](./client.md)
+>
+> **See also:**
+> - [skills.md](./skills.md) — Full Synapse Client SDK reference (RPC, DAS, AI tools, plugins, MCP, gateway, Next.js)
+> - [cli/README.md](../cli/README.md) — `synapse-sap` CLI — 10 command groups, 40+ subcommands for terminal-based protocol access
