@@ -638,6 +638,10 @@ export class X402Registry {
     ctx: PaymentContext,
     opts?: { network?: string },
   ): X402Headers {
+    // Prefer: explicit override → ctx.networkIdentifier → default
+    const rawNetwork =
+      opts?.network ?? ctx.networkIdentifier ?? SapNetwork.SOLANA_MAINNET;
+
     return {
       "X-Payment-Protocol": "SAP-x402",
       "X-Payment-Escrow": ctx.escrowPda.toBase58(),
@@ -646,7 +650,7 @@ export class X402Registry {
       "X-Payment-MaxCalls": ctx.maxCalls.toString(),
       "X-Payment-PricePerCall": ctx.pricePerCall.toString(),
       "X-Payment-Program": this.program.programId.toBase58(),
-      "X-Payment-Network": opts?.network ?? "mainnet-beta",
+      "X-Payment-Network": rawNetwork,
     };
   }
 

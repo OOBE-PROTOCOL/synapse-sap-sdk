@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-03-28
+
+### Added — SDK Hardening (Kamiyo / AceDataCloud feedback)
+
+- **Phase A — Endpoint Discovery Hardening**
+  - `EndpointDescriptor`, `HealthCheckDescriptor`, `ToolManifestEntry`, `AgentManifest`, `EndpointValidationResult` types (`src/types/endpoint.ts`)
+  - `validateEndpoint()`, `validateEndpointDescriptor()`, `validateHealthCheck()`, `validateAgentEndpoints()` utilities (`src/utils/endpoint-validator.ts`)
+  - Fail-fast on 404, HTML responses, CSRF-required endpoints
+
+- **Phase B — Network Normalization**
+  - `normalizeNetworkId()`, `isNetworkEquivalent()`, `getNetworkGenesisHash()`, `getNetworkClusterName()`, `isKnownNetwork()` (`src/utils/network-normalizer.ts`)
+  - Single source of truth for `solana:mainnet-beta` vs `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp` equivalence
+
+- **Phase C — RPC Strategy & Error Classification**
+  - `getRpcUrl()`, `getFallbackRpcUrl()`, `createDualConnection()` for dual-RPC resilience (`src/utils/rpc-strategy.ts`)
+  - `findATA()` for Associated Token Account lookup
+  - `classifyAnchorError()`, `extractAnchorErrorCode()` for friendly Anchor error messages (codes 6000–6019)
+
+- **Phase D — Zod Runtime Schemas**
+  - `createEnvSchema()`, `createEndpointDescriptorSchema()`, `createHealthCheckSchema()`, `createToolManifestEntrySchema()`, `createAgentManifestSchema()`, `createPreparePaymentSchema()`, `createRegisterAgentSchema()`, `createCallArgsSchema()`, `validateOrThrow()` (`src/utils/schemas.ts`)
+  - Zod v4 compatible (peer dependency)
+
+### Added — CLI (Power Edition)
+
+- **`synapse-sap` CLI** (`cli/`) — 10 command groups, 40+ subcommands
+  - `agent` — list, info, tools, health, register
+  - `discovery` — scan, validate, cache
+  - `escrow` — open, deposit, withdraw, close, dump, list, monitor
+  - `x402` — headers, call, sign, verify, settle, replay
+  - `tools` — manifest generate/validate, typify, publish, compare, doc
+  - `env` — init, check, keypair show/generate/import
+  - `config` — show, set, edit, reset, path
+  - `doctor` — run (8 diagnostic checks: node, sdk, env, keypair, disk, rpc, fallback, program)
+  - `tmp` — list, cat (jq-like), diff, clean, archive
+  - `plugin` — list, install, create (scaffold), validate
+
+### Changed
+
+- `buildPaymentHeaders()` now uses `ctx.networkIdentifier` with proper fallback chain instead of hardcoded `"mainnet-beta"`
+- All new utility exports added to main barrel (`src/index.ts`)
+- Zod `z.record()` calls updated for Zod v4 (requires key + value args)
+
 ## [0.5.0] - 2026-03-27
 
 ### Added

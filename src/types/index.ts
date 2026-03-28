@@ -90,3 +90,12 @@ export {
   SchemaType,
   CompressionType,
 } from "./instructions";
+
+// ── Endpoint & Manifest Types ────────────────────────
+export type {
+  EndpointDescriptor,
+  HealthCheckDescriptor,
+  ToolManifestEntry,
+  AgentManifest,
+  EndpointValidationResult,
+} from "./endpoint";
