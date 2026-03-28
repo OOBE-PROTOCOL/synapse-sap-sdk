@@ -17,3 +17,42 @@
 export { sha256, hashToArray } from "./hash";
 export { assert } from "./validation";
 export { serializeAccount, serializeValue } from "./serialization";
+
+// ── v0.6.0  Hardening utilities ─────────────────────
+export {
+  normalizeNetworkId,
+  isNetworkEquivalent,
+  getNetworkGenesisHash,
+  getNetworkClusterName,
+  isKnownNetwork,
+} from "./network-normalizer";
+
+export {
+  validateEndpoint,
+  validateEndpointDescriptor,
+  validateHealthCheck,
+  validateAgentEndpoints,
+} from "./endpoint-validator";
+export type { ValidateEndpointOptions } from "./endpoint-validator";
+
+export {
+  getRpcUrl,
+  getFallbackRpcUrl,
+  createDualConnection,
+  findATA,
+  classifyAnchorError,
+  extractAnchorErrorCode,
+} from "./rpc-strategy";
+export type { RpcConfig, DualConnection, AtaResult } from "./rpc-strategy";
+
+export {
+  createEnvSchema,
+  createEndpointDescriptorSchema,
+  createHealthCheckSchema,
+  createToolManifestEntrySchema,
+  createAgentManifestSchema,
+  createPreparePaymentSchema,
+  createRegisterAgentSchema,
+  createCallArgsSchema,
+  validateOrThrow,
+} from "./schemas";

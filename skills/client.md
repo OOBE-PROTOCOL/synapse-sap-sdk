@@ -1,256 +1,228 @@
-# Client (Consumer/Buyer) Skill Guide
+# SAP SDK — Client / Consumer Skill Guide
 
-> Everything a developer needs to **discover agents, pay for services,
-> and consume AI capabilities** on the SAP network.
->
-> Package: `@oobe-protocol-labs/synapse-sap-sdk`
-> Program: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`
+> **Version:** v0.6.0
+> **Role:** You are a client (consumer) that discovers on-chain agents, creates escrows, calls x402 endpoints, and verifies settlements.
+> **Companion:** For the merchant/seller perspective see [merchant.md](./merchant.md)
 
 ---
 
 ## Table of Contents
 
-1. [Role Overview](#1-role-overview)
-2. [Imports Cheat-Sheet](#2-imports-cheat-sheet)
-3. [Creating Your Client](#3-creating-your-client)
-4. [Discovering Agents and Tools](#4-discovering-agents-and-tools)
-5. [Paying for Services (x402 Flow)](#5-paying-for-services-x402-flow)
-6. [Building x402 HTTP Headers](#6-building-x402-http-headers)
-7. [Network Identifier and SapNetwork](#7-network-identifier-and-sapnetwork)
-8. [Managing Escrows](#8-managing-escrows)
-9. [Cost Estimation and Volume Pricing](#9-cost-estimation-and-volume-pricing)
-10. [Giving Feedback and Reputation](#10-giving-feedback-and-reputation)
-11. [Attestations](#11-attestations)
-12. [Reading Agent Memory (Ledger)](#12-reading-agent-memory-ledger)
-13. [Transaction Parsing](#13-transaction-parsing)
-14. [Events to Listen For](#14-events-to-listen-for)
-15. [Dual-Role: Client + Merchant](#15-dual-role-client--merchant)
-16. [Complete Type Reference](#16-complete-type-reference)
-17. [x402 Flow Checklist](#17-x402-flow-checklist)
+1. [Imports Cheat-Sheet](#1-imports-cheat-sheet)
+2. [Creating the Client](#2-creating-the-client)
+3. [Agent Discovery](#3-agent-discovery)
+4. [Endpoint Validation (v0.6.0)](#4-endpoint-validation-v060)
+5. [Network Normalization (v0.6.0)](#5-network-normalization-v060)
+6. [x402 Payment Flow — Complete Guide](#6-x402-payment-flow--complete-guide)
+7. [Escrow PDA Derivation — Deep Dive](#7-escrow-pda-derivation--deep-dive)
+8. [Building x402 Headers](#8-building-x402-headers)
+9. [Escrow Lifecycle Management](#9-escrow-lifecycle-management)
+10. [Cost Estimation](#10-cost-estimation)
+11. [Zod Schema Validation (v0.6.0)](#11-zod-schema-validation-v060)
+12. [RPC Strategy & Dual Connection (v0.6.0)](#12-rpc-strategy--dual-connection-v060)
+13. [Error Classification (v0.6.0)](#13-error-classification-v060)
+14. [Feedback & Attestations](#14-feedback--attestations)
+15. [Ledger & Memory (Read-Only)](#15-ledger--memory-read-only)
+16. [Transaction Parsing & Events](#16-transaction-parsing--events)
+17. [Dual-Role: Client + Merchant](#17-dual-role-client--merchant)
+18. [Complete Type Reference](#18-complete-type-reference)
+19. [Lifecycle Checklist](#19-lifecycle-checklist)
 
 ---
 
-## 1. Role Overview
-
-A **client** (also called consumer or buyer) is any wallet that:
-
-- Discovers agents via capability, protocol, or tool category searches
-- Creates and funds x402 escrows to pay for agent services
-- Builds `X-Payment-*` HTTP headers for x402 API calls
-- Monitors escrow balances, expiry, and settlement progress
-- Submits reputation feedback for agents it has used
-- Optionally issues attestations for trusted agents
-
-An agent **can also be a client**. SAP does not restrict roles: a single
-wallet can sell services (merchant) and buy from other agents (client)
-at the same time. See [Section 15](#15-dual-role-client--merchant).
-
----
-
-## 2. Imports Cheat-Sheet
+## 1. Imports Cheat-Sheet
 
 ```ts
-// === Core ===
-import { SapClient, SapConnection, KeypairWallet } from "@oobe-protocol-labs/synapse-sap-sdk";
-import type { SapCluster, SapWallet } from "@oobe-protocol-labs/synapse-sap-sdk";
-
-// === Enums (Anchor-style { variant: {} } objects) ===
+// ── Core ─────────────────────────────────────────────
 import {
-  TokenType,          // Sol | Usdc | Spl
-  SettlementMode,     // Instant | Escrow | Batched | X402
-  ToolHttpMethod,     // Get | Post | Put | Delete | Compound
-  ToolCategory,       // Swap | Lend | ... | Custom
-  SapNetwork,         // SOLANA_MAINNET | SOLANA_MAINNET_GENESIS | SOLANA_DEVNET | SOLANA_DEVNET_NAMED
+  SapClient,
+  SapConnection,
+  KeypairWallet,
 } from "@oobe-protocol-labs/synapse-sap-sdk";
 
-// === Type-level imports ===
-import type {
-  // Enum kind unions
-  TokenTypeKind,
-  SettlementModeKind,
-  ToolHttpMethodKind,
-  ToolCategoryKind,
-  SapNetworkId,
-
-  // Helper structs
-  Capability,
-  PricingTier,
-  VolumeCurveBreakpoint,
-
-  // Account data (deserialized on-chain PDAs)
-  AgentAccountData,
-  AgentStatsData,
-  EscrowAccountData,
-  FeedbackAccountData,
-  ToolDescriptorData,
-  GlobalRegistryData,
-  CapabilityIndexData,
-  ProtocolIndexData,
-  ToolCategoryIndexData,
-  AgentAttestationData,
-
-  // Instruction arg DTOs
-  CreateEscrowArgs,
-  GiveFeedbackArgs,
-  UpdateFeedbackArgs,
-  CreateAttestationArgs,
+// ── Constants ────────────────────────────────────────
+import {
+  SapNetwork,                      // Network identifier enum
+  SAP_PROGRAM_ID,                  // Program public key
+  SEEDS,                           // PDA seed constants
+  LIMITS,                          // Size / count limits
 } from "@oobe-protocol-labs/synapse-sap-sdk";
 
-// === Registries (high-level abstractions) ===
-import type {
-  // x402 payment types
-  CostEstimate,
-  PaymentContext,
-  PreparePaymentOptions,
-  X402Headers,
-  EscrowBalance,
-  SettlementResult,
-  BatchSettlementResult,
-
-  // Discovery types
-  DiscoveredAgent,
-  AgentProfile,
-  DiscoveredTool,
-  NetworkOverview,
-  ToolCategoryName,
-} from "@oobe-protocol-labs/synapse-sap-sdk";
-
-// === PDA derivation ===
+// ── PDA Derivation ───────────────────────────────────
 import {
   deriveAgent,
   deriveAgentStats,
   deriveEscrow,
-  deriveTool,
   deriveFeedback,
-  deriveAttestation,
+  deriveTool,
   deriveCapabilityIndex,
   deriveProtocolIndex,
   deriveToolCategoryIndex,
-  deriveGlobalRegistry,
 } from "@oobe-protocol-labs/synapse-sap-sdk";
 
-// === Events and Errors ===
+// ── Types ────────────────────────────────────────────
+import type {
+  SapNetworkId,
+  AgentAccountData,
+  EscrowAccountData,
+  FeedbackAccountData,
+  ToolDescriptorData,
+  AgentStatsData,
+  VolumeCurveBreakpoint,
+  // v0.6.0 — Typed endpoint metadata
+  EndpointDescriptor,
+  HealthCheckDescriptor,
+  ToolManifestEntry,
+  AgentManifest,
+  EndpointValidationResult,
+} from "@oobe-protocol-labs/synapse-sap-sdk";
+
+// ── Registry Types ───────────────────────────────────
+import type {
+  PaymentContext,
+  PreparePaymentOptions,
+  X402Headers,
+  EscrowBalance,
+  CostEstimate,
+  DiscoveredAgent,
+  AgentProfile,
+  DiscoveredTool,
+  NetworkOverview,
+} from "@oobe-protocol-labs/synapse-sap-sdk";
+
+// ── Enums ────────────────────────────────────────────
 import {
-  EventParser,
-  SAP_EVENT_NAMES,
+  TokenType,
+  SettlementMode,
+  ToolHttpMethod,
+  ToolCategory,
+} from "@oobe-protocol-labs/synapse-sap-sdk";
+
+// ── v0.6.0 — Network Normalizer ─────────────────────
+import {
+  normalizeNetworkId,
+  isNetworkEquivalent,
+  getNetworkGenesisHash,
+  getNetworkClusterName,
+  isKnownNetwork,
+} from "@oobe-protocol-labs/synapse-sap-sdk";
+
+// ── v0.6.0 — Endpoint Validation ────────────────────
+import {
+  validateEndpoint,
+  validateEndpointDescriptor,
+  validateHealthCheck,
+  validateAgentEndpoints,
+} from "@oobe-protocol-labs/synapse-sap-sdk";
+import type { ValidateEndpointOptions } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+// ── v0.6.0 — RPC Strategy ───────────────────────────
+import {
+  getRpcUrl,
+  getFallbackRpcUrl,
+  createDualConnection,
+  findATA,
+  classifyAnchorError,
+  extractAnchorErrorCode,
+} from "@oobe-protocol-labs/synapse-sap-sdk";
+import type { RpcConfig, DualConnection } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+// ── v0.6.0 — Zod Schemas ────────────────────────────
+import {
+  createEnvSchema,
+  createPreparePaymentSchema,
+  createCallArgsSchema,
+  createAgentManifestSchema,
+  createEndpointDescriptorSchema,
+  validateOrThrow,
+} from "@oobe-protocol-labs/synapse-sap-sdk";
+
+// ── Utilities ────────────────────────────────────────
+import { sha256, hashToArray } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+// ── Events / Parser ──────────────────────────────────
+import { EventParser, SAP_EVENT_NAMES } from "@oobe-protocol-labs/synapse-sap-sdk";
+import type { ParsedEvent, SapEvent } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+// ── Errors ───────────────────────────────────────────
+import {
   SapError,
+  SapValidationError,
   SapRpcError,
   SapAccountNotFoundError,
 } from "@oobe-protocol-labs/synapse-sap-sdk";
-import type {
-  SapEvent,
-  SapEventName,
-  ParsedEvent,
-  PaymentSettledEventData,
-} from "@oobe-protocol-labs/synapse-sap-sdk";
-
-// === Transaction Parser ===
-import {
-  TransactionParser,
-  parseSapTransactionComplete,
-  parseSapTransactionBatch,
-  containsSapInstruction,
-} from "@oobe-protocol-labs/synapse-sap-sdk";
-import type {
-  DecodedSapInstruction,
-  ParsedSapTransaction,
-} from "@oobe-protocol-labs/synapse-sap-sdk";
-
-// === Utilities ===
-import { sha256, hashToArray } from "@oobe-protocol-labs/synapse-sap-sdk";
-
-// === Constants ===
-import {
-  SAP_PROGRAM_ID,
-  SAP_PROGRAM_ADDRESS,
-  LIMITS,
-  TOOL_CATEGORY_VALUES,
-} from "@oobe-protocol-labs/synapse-sap-sdk";
 ```
 
 ---
 
-## 3. Creating Your Client
+## 2. Creating the Client
+
+### From Anchor Provider (Testing / dApps)
 
 ```ts
-// Option A: From Anchor provider
 import { AnchorProvider } from "@coral-xyz/anchor";
+
 const provider = AnchorProvider.env();
 const client = SapClient.from(provider);
-
-// Option B: From RPC URL + keypair (scripts, backends)
-const conn = SapConnection.mainnet();
-const client = conn.fromKeypair(keypair);
-
-// Option C: From RPC + wallet adapter
-const conn = SapConnection.mainnet();
-const client = conn.fromWallet(walletAdapter);
 ```
 
-### Client Properties (Client-Relevant)
+### From SapConnection (Production)
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `client.discovery` | `DiscoveryRegistry` | Search agents, tools, network stats |
-| `client.x402` | `X402Registry` | Escrow lifecycle, headers, cost estimation |
-| `client.escrow` | `EscrowModule` | Low-level escrow operations |
-| `client.feedback` | `FeedbackModule` | Submit/update feedback |
-| `client.attestation` | `AttestationModule` | Issue attestations |
-| `client.events` | `EventParser` | Parse transaction log events |
-| `client.parser` | `TransactionParser` | Decode instructions + events from TXs |
-| `client.walletPubkey` | `PublicKey` | Your wallet address |
-| `client.program` | `SapProgram` | Underlying Anchor program |
+```ts
+const conn = SapConnection.mainnet({
+  rpcUrl: "https://my-rpc.example.com",
+  commitment: "confirmed",
+});
+const client = conn.fromKeypair(myKeypair);
+
+// Or devnet for testing
+const devConn = SapConnection.devnet();
+const devClient = devConn.fromKeypair(testKeypair);
+```
+
+### With Dual Connection (v0.6.0 — Recommended for Production)
+
+Some authenticated RPCs (Helius, QuickNode) reject WebSocket connections used
+by SPL token operations. The dual-connection strategy solves this:
+
+```ts
+const { primary, fallback } = createDualConnection(
+  { primaryUrl: "https://my-authenticated-rpc.example.com" },
+  "mainnet-beta",
+);
+
+// Use primary for SAP program calls
+const provider = new AnchorProvider(primary, wallet, {
+  commitment: "confirmed",
+});
+const client = SapClient.from(provider);
+
+// Use fallback for SPL token operations (avoids WebSocket-400 loop)
+// const ata = findATA(ownerPubkey, mintPubkey);
+```
 
 ---
 
-## 4. Discovering Agents and Tools
+## 3. Agent Discovery
 
-### Find Agents by Capability
+### Search by Capability
 
 ```ts
 const agents: DiscoveredAgent[] = await client.discovery.findAgentsByCapability(
   "jupiter:swap",
-  { hydrate: true }, // fetch full agent data (not just PDAs)
 );
 
-for (const a of agents) {
-  console.log(a.name, a.wallet.toBase58());
-  console.log("  Score:", a.reputationScore);
-  console.log("  Pricing:", a.pricing.map(t => `${t.tierId}: ${t.pricePerCall} per call`));
-  console.log("  Capabilities:", a.capabilities.map(c => c.id));
+for (const agent of agents) {
+  console.log(agent.name, agent.wallet.toBase58());
+  console.log("Score:", agent.reputationScore);
+  console.log("Pricing:", agent.pricing);
 }
 ```
 
-### Find Agents by Protocol
+### Search by Protocol
 
 ```ts
-const agents = await client.discovery.findAgentsByProtocol("jupiter", { hydrate: true });
-```
-
-### Find Agents by Multiple Capabilities
-
-```ts
-// Returns deduplicated results across all capabilities
-const agents = await client.discovery.findAgentsByCapabilities(
-  ["jupiter:swap", "jupiter:quote"],
-  { hydrate: true },
-);
-```
-
-### Find Tools by Category
-
-```ts
-const tools: DiscoveredTool[] = await client.discovery.findToolsByCategory(
-  "Swap",        // or TOOL_CATEGORY_VALUES.Swap (numeric 0)
-  { hydrate: true },
-);
-
-for (const t of tools) {
-  console.log(t.toolName, t.agent.toBase58());
-  console.log("  Method:", t.httpMethod);
-  console.log("  Params:", t.paramsCount, "(", t.requiredParams, "required)");
-  console.log("  Invocations:", t.totalInvocations.toString());
-}
+const jupiterAgents = await client.discovery.findAgentsByProtocol("jupiter");
 ```
 
 ### Get Full Agent Profile
@@ -259,284 +231,570 @@ for (const t of tools) {
 const profile: AgentProfile | null = await client.discovery.getAgentProfile(agentWallet);
 
 if (profile) {
-  console.log(profile.name);
+  console.log(profile.name, profile.reputationScore);
+  console.log("Capabilities:", profile.capabilities);
+  console.log("Tools:", profile.tools.map(t => t.toolName));
   console.log("Active:", profile.isActive);
-  console.log("Score:", profile.reputationScore);
-  console.log("Pricing tiers:", profile.pricing.length);
-  console.log("Capabilities:", profile.capabilities.map(c => c.id));
-  console.log("Protocols:", profile.protocols);
   console.log("x402 Endpoint:", profile.x402Endpoint);
 }
 ```
 
-### Check Agent Status
+### Fetch Tool Details
 
 ```ts
-const isActive: boolean = await client.discovery.isAgentActive(agentWallet);
+const [agentPda] = deriveAgent(agentWallet);
+const tool: ToolDescriptorData = await client.tools.fetch(agentPda, "swap");
+
+console.log("Tool:", tool.toolName);
+console.log("Category:", tool.category);
+console.log("HTTP Method:", tool.httpMethod);
+console.log("Invocations:", tool.totalInvocations.toString());
 ```
 
-### Network-Wide Overview
+### Network Overview
 
 ```ts
 const overview: NetworkOverview = await client.discovery.getNetworkOverview();
-console.log("Total agents:", overview.totalAgents.toString());
-console.log("Active agents:", overview.activeAgents.toString());
-console.log("Total tools:", overview.totalTools);
-console.log("Total escrows:", overview.totalEscrows);
-```
-
-### Tool Category Summary
-
-```ts
-const categories = await client.discovery.getToolCategorySummary();
-for (const cat of categories) {
-  console.log(`${cat.category}: ${cat.toolCount} tools`);
-}
-```
-
-### Direct Account Reads (Low-Level)
-
-```ts
-// Read raw agent account
-const [agentPda] = deriveAgent(agentWallet);
-const agentData: AgentAccountData = await client.agent.fetch(agentWallet);
-
-// Read capability index
-const capIndex: CapabilityIndexData | null =
-  await client.indexing.fetchCapabilityIndexNullable("jupiter:swap");
-
-// Read protocol index
-const protoIndex: ProtocolIndexData | null =
-  await client.indexing.fetchProtocolIndexNullable("jupiter");
-
-// Read tool category index
-const catIndex: ToolCategoryIndexData | null =
-  await client.indexing.fetchToolCategoryIndexNullable(TOOL_CATEGORY_VALUES.Swap);
-
-// Read global registry
-const [globalPda] = deriveGlobalRegistry();
-// Use program.account directly for global registry
+console.log("Total agents:", overview.totalAgents);
+console.log("Active agents:", overview.activeAgents);
 ```
 
 ---
 
-## 5. Paying for Services (x402 Flow)
+## 4. Endpoint Validation (v0.6.0)
 
-The x402 payment flow has four steps:
+Before committing funds to an escrow, **validate** that the agent's x402 endpoint
+is reachable, returns JSON, and supports SAP headers. This prevents failures where
+an endpoint 404s, requires CSRF tokens, or serves HTML login pages instead of JSON.
+
+### Validate a Single URL
+
+```ts
+const result: EndpointValidationResult = await validateEndpoint(
+  "https://agent.example.com/x402",
+  { timeoutMs: 5000, checkCors: true },
+);
+
+if (!result.reachable) {
+  console.error("Endpoint unreachable:", result.error);
+  // Do NOT create an escrow — the agent is offline
+  return;
+}
+
+if (!result.isSapCapable) {
+  console.warn("Endpoint issues:", result.warnings);
+}
+
+console.log("Latency:", result.latencyMs, "ms");
+console.log("Returns JSON:", result.isJson);
+console.log("Has CORS:", result.hasCors);
+```
+
+### Validate a Full EndpointDescriptor
+
+When the agent publishes typed endpoint metadata (v0.6.0 `AgentManifest`),
+use the descriptor-aware validator:
+
+```ts
+const descriptor: EndpointDescriptor = {
+  url: "https://agent.example.com/x402",
+  method: "POST",
+  contentType: "application/json",
+  requiresAuth: true,
+  authType: "x402",
+  requiresCSRF: false,
+  requiresCookies: false,
+  corsOrigins: ["*"],
+};
+
+const result = await validateEndpointDescriptor(descriptor, {
+  timeoutMs: 5000,
+  checkCors: true,
+});
+
+// Descriptor-specific warnings are included automatically:
+// e.g. "Endpoint requires auth but no authType specified"
+// e.g. "Endpoint declares requiresCSRF — automated calls may need token management"
+```
+
+### Validate All Agent Endpoints (Primary + Health + Tools)
+
+```ts
+const results: Map<string, EndpointValidationResult> = await validateAgentEndpoints({
+  endpoint: manifest.endpoint,
+  healthCheck: manifest.healthCheck,
+  toolEndpoints: manifest.tools
+    .filter(t => t.endpointOverride)
+    .map(t => ({ name: t.name, endpoint: t.endpointOverride! })),
+});
+
+for (const [label, result] of results) {
+  const status = result.isSapCapable ? "OK" : "FAIL";
+  console.log(`${status} ${label}: ${result.statusCode} (${result.latencyMs}ms)`);
+  if (result.warnings.length) {
+    result.warnings.forEach(w => console.log(`  WARNING: ${w}`));
+  }
+}
+```
+
+### Validate Health Check
+
+```ts
+const health: HealthCheckDescriptor = {
+  url: "https://agent.example.com/health",
+  expectedStatus: 200,
+  timeoutMs: 3000,
+  method: "GET",
+};
+
+const healthResult = await validateHealthCheck(health);
+if (!healthResult.isSapCapable) {
+  console.error("Agent health check failed:", healthResult.error);
+}
+```
+
+### `EndpointValidationResult` Shape
+
+```ts
+interface EndpointValidationResult {
+  url: string;           // URL tested
+  reachable: boolean;    // No network error
+  statusCode: number;    // HTTP status (0 if unreachable)
+  latencyMs: number;     // Response time in ms
+  isJson: boolean;       // Content-Type includes JSON
+  hasCors: boolean;      // CORS headers present
+  isSapCapable: boolean; // JSON + status < 400 + no HTML
+  error?: string;        // Error message if failed
+  warnings: string[];    // Non-fatal issues
+}
+```
+
+---
+
+## 5. Network Normalization (v0.6.0)
+
+The x402 ecosystem uses different network identifier formats. Some providers accept
+`solana:mainnet-beta` while others require the genesis-hash form
+`solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp`. The v0.6.0 network normalizer
+prevents the Kamiyo "sap network mismatch" error at the SDK level.
+
+### The Problem
 
 ```
-  Client                          Agent
-  ──────                          ─────
-  1. preparePayment()
-     → creates escrow on-chain
-  2. buildPaymentHeaders(ctx)
-     → X-Payment-* headers
-  3. HTTP request with headers ──→ Agent validates headers
-                                   Agent serves request
-                                   Agent calls settle()
-  4. Verify settlement on-chain
+Client sends:   X-Payment-Network: solana:mainnet-beta
+Agent expects:  X-Payment-Network: solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp
+Result:         "sap network mismatch" — payment rejected
 ```
 
-### Step 1: Prepare Payment (Create + Fund Escrow)
+### SapNetwork Constants
+
+| Constant                  | Value                                       | Accepted by         |
+|---------------------------|---------------------------------------------|---------------------|
+| `SOLANA_MAINNET`          | `solana:mainnet-beta`                       | Coinbase, Phantom   |
+| `SOLANA_MAINNET_GENESIS`  | `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp`  | Kamiyo, Helius x402 |
+| `SOLANA_DEVNET`           | `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`  | Devnet providers    |
+| `SOLANA_DEVNET_NAMED`     | `solana:devnet`                             | Local / test flows  |
+
+### Normalize Any String
+
+```ts
+normalizeNetworkId("solana:mainnet-beta");
+// -> "solana:mainnet-beta"
+
+normalizeNetworkId("5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp");
+// -> "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
+
+normalizeNetworkId("  MAINNET  ");
+// -> "solana:mainnet-beta"
+
+normalizeNetworkId("devnet");
+// -> "solana:devnet"
+```
+
+### Equivalence Checking
+
+Instead of comparing strings literally, compare **equivalence classes**:
+
+```ts
+// Different formats, same network -> true
+isNetworkEquivalent(
+  "solana:mainnet-beta",
+  "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
+);
+// -> true
+
+isNetworkEquivalent("solana:devnet", "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1");
+// -> true
+
+// Different networks -> false
+isNetworkEquivalent("solana:mainnet-beta", "solana:devnet");
+// -> false
+```
+
+### Format Conversion
+
+```ts
+// Get genesis-hash form (for Kamiyo, Helius x402):
+getNetworkGenesisHash("solana:mainnet-beta");
+// -> "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
+
+// Get cluster-name form (for Coinbase, Phantom):
+getNetworkClusterName("solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp");
+// -> "solana:mainnet-beta"
+```
+
+### Best Practice: Normalize Before Comparing
+
+```ts
+const agentNetwork = agentProfile.supportedNetworks?.[0] ?? "solana:mainnet-beta";
+const myNetwork = SapNetwork.SOLANA_MAINNET;
+
+if (!isNetworkEquivalent(agentNetwork, myNetwork)) {
+  throw new Error(
+    `Network mismatch: agent uses ${agentNetwork}, you use ${myNetwork}`
+  );
+}
+
+// When the agent requires genesis-hash format:
+const networkForHeaders = getNetworkGenesisHash(myNetwork);
+```
+
+---
+
+## 6. x402 Payment Flow — Complete Guide
+
+The x402 standard defines a 6-step HTTP micropayment protocol built on Solana
+escrows. Here is the complete production-grade flow.
+
+### Flow Diagram
+
+```
+ CLIENT (Consumer)                          AGENT (Merchant)
+ ==================                         =================
+
+ 1. DISCOVER --- find agent on-chain ------->
+    <--- AgentAccountData + pricing ---------
+
+ 2. VALIDATE --- check endpoint (v0.6.0) --->
+    <--- EndpointValidationResult -----------
+
+ 3. PREPARE --- create & fund escrow (tx) ==>
+    <--- PaymentContext { escrowPda, ... } ---
+
+ 4. CALL --- HTTP POST with x402 headers --->
+    <--- 200 OK + JSON response -------------
+
+ 5. SETTLE --- agent settles on-chain (tx) <=
+    <--- PaymentSettledEvent ----------------
+
+ 6. VERIFY --- check escrow balance ========>
+```
+
+### Step 1 — Discover the Agent
+
+```ts
+const agents = await client.discovery.findAgentsByCapability("serp:search");
+const profile = await client.discovery.getAgentProfile(agentWallet);
+
+if (!profile || !profile.isActive) throw new Error("Agent not available");
+
+const agent: AgentAccountData = await client.agent.fetchByWallet(agentWallet);
+console.log("Base price:", agent.basePricePerCall.toString(), "lamports/call");
+console.log("Settlement mode:", agent.settlementMode);
+```
+
+### Step 2 — Validate the Endpoint (v0.6.0)
+
+```ts
+const validation = await validateEndpoint(
+  profile.x402Endpoint ?? `${profile.agentUri}/x402`,
+  { timeoutMs: 5000, checkCors: true },
+);
+
+if (!validation.isSapCapable) {
+  console.error("Agent endpoint issues:", validation.warnings);
+  throw new Error(`Endpoint not SAP-capable: ${validation.error}`);
+}
+
+// Optional: check network compatibility
+const agentNetwork = profile.supportedNetworks?.[0];
+if (agentNetwork && !isNetworkEquivalent(agentNetwork, SapNetwork.SOLANA_MAINNET)) {
+  throw new Error(`Network mismatch: ${agentNetwork}`);
+}
+```
+
+### Step 3 — Prepare Payment (Create Escrow + Deposit)
 
 ```ts
 const ctx: PaymentContext = await client.x402.preparePayment(agentWallet, {
-  pricePerCall: 100_000,    // 0.0001 SOL per call
-  maxCalls: 100,            // maximum 100 calls (0 = unlimited)
-  deposit: 10_000_000,      // 0.01 SOL initial deposit
-  expiresAt: Math.floor(Date.now() / 1000) + 86400, // optional: expires in 24h (0 = never)
-  volumeCurve: [            // optional: tiered discounts
-    { afterCalls: 50, pricePerCall: 90_000 },
-    { afterCalls: 100, pricePerCall: 80_000 },
-  ],
-  tokenMint: null,          // null = native SOL
-  tokenDecimals: 9,
-  networkIdentifier: SapNetwork.SOLANA_MAINNET, // optional: defaults to this
+  pricePerCall: agent.basePricePerCall.toNumber(),  // lamports per call
+  maxCalls: 100,                                     // optional: hard cap
+  deposit: 100_000,                                  // total lamports to deposit
+  expiresAt: Math.floor(Date.now() / 1000) + 86400, // optional: 24h expiry
+
+  // CRITICAL: match the agent's expected network format
+  networkIdentifier: SapNetwork.SOLANA_MAINNET_GENESIS,
+
+  // For SPL token escrows (USDC, etc.):
+  // tokenMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  // tokenDecimals: 6,
 });
 
 console.log("Escrow PDA:", ctx.escrowPda.toBase58());
-console.log("Network:", ctx.networkIdentifier); // "solana:mainnet-beta"
+console.log("Agent PDA:", ctx.agentPda.toBase58());
+console.log("Network:", ctx.networkIdentifier);
 console.log("TX:", ctx.txSignature);
 ```
 
-### Step 2: Build x402 Headers
+#### PaymentContext — Full Shape
+
+```ts
+interface PaymentContext {
+  escrowPda: PublicKey;        // Escrow account PDA
+  agentPda: PublicKey;         // Agent PDA
+  agentWallet: PublicKey;      // Agent's wallet
+  depositor: PublicKey;        // Your wallet
+  pricePerCall: BN;            // Per-call price
+  maxCalls: BN;                // Max allowed calls
+  deposit: BN;                 // Amount deposited
+  networkIdentifier: string;   // Network for x402 headers
+  tokenMint: PublicKey | null; // Null for native SOL
+  txSignature: string;         // Create+deposit TX signature
+}
+```
+
+#### PreparePaymentOptions — Full Shape
+
+```ts
+interface PreparePaymentOptions {
+  pricePerCall: number | string | BN;
+  maxCalls?: number | string | BN;
+  deposit: number | string | BN;
+  expiresAt?: number | string | BN;
+  networkIdentifier?: SapNetworkId | string;
+  tokenMint?: string;
+  tokenDecimals?: number;
+  volumeCurve?: VolumeCurveBreakpoint[];
+}
+```
+
+### Step 4 — Build Headers & Call the Agent
 
 ```ts
 const headers: X402Headers = client.x402.buildPaymentHeaders(ctx);
 
-// Headers object:
-// {
-//   "X-Payment-Protocol":     "SAP-x402",
-//   "X-Payment-Escrow":       "<base58>",
-//   "X-Payment-Agent":        "<base58>",
-//   "X-Payment-Depositor":    "<base58>",
-//   "X-Payment-MaxCalls":     "100",
-//   "X-Payment-PricePerCall": "100000",
-//   "X-Payment-Program":      "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ",
-//   "X-Payment-Network":      "solana:mainnet-beta",
+// headers = {
+//   "X-Payment-Escrow":    "<base58 escrow PDA>",
+//   "X-Payment-Agent":     "<base58 agent PDA>",
+//   "X-Payment-Depositor": "<base58 your wallet>",
+//   "X-Payment-Network":   "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+//   "X-Payment-Token":     "<base58 mint or 'native'>",
 // }
-```
 
-### Step 3: Make HTTP Request
-
-```ts
-const response = await fetch("https://agent.example.com/api/swap", {
+const response = await fetch("https://agent.example.com/x402/search", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
     ...headers,
   },
-  body: JSON.stringify({ inputMint: "So11...", outputMint: "EPjF...", amount: 1_000_000 }),
+  body: JSON.stringify({
+    query: "solana defi protocols",
+    maxResults: 10,
+  }),
 });
 
 if (response.status === 402) {
-  // Agent requires more deposit or escrow expired
-  console.error("Payment required:", await response.text());
+  console.error("Payment required — escrow underfunded or expired");
+} else if (response.ok) {
+  const data = await response.json();
+  console.log("Agent response:", data);
 }
 ```
 
-### Step 4: Verify Settlement
+### Step 5 — Agent Settles (Agent-Side)
 
-After the agent settles, you can verify on-chain:
+After serving the request the agent settles on-chain:
 
 ```ts
-const balance: EscrowBalance | null = await client.x402.getBalance(agentWallet);
+// [ Agent-side code — shown for understanding ]
+const receipt = await agentClient.x402.settle(clientWallet, 1, "search-query");
+```
+
+### Step 6 — Verify Settlement (Optional)
+
+```ts
+const balance: EscrowBalance | null = await client.x402.getBalance(
+  agentWallet,
+  client.walletPubkey,
+);
+
 if (balance) {
-  console.log("Remaining balance:", balance.balance.toString());
-  console.log("Calls settled:", balance.totalCallsSettled.toString());
-  console.log("Total settled:", balance.totalSettled.toString());
+  console.log("Remaining:", balance.balance.toString(), "lamports");
+  console.log("Calls remaining:", balance.callsRemaining);
+  console.log("Affordable calls:", balance.affordableCalls);
+  console.log("Expired:", balance.isExpired);
 }
 ```
 
 ---
 
-## 6. Building x402 HTTP Headers
+## 7. Escrow PDA Derivation — Deep Dive
 
-### From PaymentContext (Recommended)
+Understanding escrow PDA derivation is essential for verifying on-chain state
+and debugging payment issues.
 
-```ts
-// NetworkIdentifier is persisted in the context at preparePayment time.
-// No need to pass it again:
-const headers = client.x402.buildPaymentHeaders(ctx);
+### Derivation Diagram
 
-// Override network for a specific call:
-const hdrs = client.x402.buildPaymentHeaders(ctx, {
-  network: SapNetwork.SOLANA_MAINNET_GENESIS,
-});
+```
+    SAP Program ID: SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ
+                          |
+        +-----------------+-----------------+
+        |                 |                 |
+    SEED="agent"     Agent Wallet     Depositor Wallet
+        |                 |                 |
+        +--------+--------+                 |
+                 |                           |
+           Agent PDA                         |
+           deriveAgent(wallet)               |
+           Seeds: ["agent", wallet]          |
+                 |                           |
+        +--------+---------------------------+
+        |
+    SEED="escrow"
+        |
+    Escrow PDA
+    deriveEscrow(agentPda, depositor)
+    Seeds: ["escrow", agentPda, depositor]
 ```
 
-**Resolution order for `X-Payment-Network`:**
-1. `opts.network` (explicit per-call override)
-2. `ctx.networkIdentifier` (persisted at escrow creation)
-3. `SapNetwork.SOLANA_MAINNET` (fallback)
-
-### From Escrow On-Chain (Convenience)
-
-If you have already created an escrow but lost the `PaymentContext`:
+### Code
 
 ```ts
-const headers: X402Headers | null = await client.x402.buildPaymentHeadersFromEscrow(
-  agentWallet,
-  { network: SapNetwork.SOLANA_MAINNET }, // optional
-);
+import { deriveAgent, deriveEscrow } from "@oobe-protocol-labs/synapse-sap-sdk";
 
-if (!headers) {
-  console.error("No escrow found for this agent");
+// Step 1: Agent PDA from agent's wallet
+const [agentPda, agentBump] = deriveAgent(agentWallet);
+// Seeds: ["agent", agentWallet.toBytes()]
+
+// Step 2: Escrow PDA from agentPda + depositor
+const [escrowPda, escrowBump] = deriveEscrow(agentPda, myWallet);
+// Seeds: ["escrow", agentPda.toBytes(), myWallet.toBytes()]
+
+// The escrow is unique per (agent, depositor) pair:
+// - Your escrow for AgentA != your escrow for AgentB
+// - Your escrow for AgentA != another client's escrow for AgentA
+```
+
+### All PDA Derivation Functions
+
+| Function | Seeds | Description |
+|----------|-------|-------------|
+| `deriveAgent(wallet)` | `["agent", wallet]` | Agent account |
+| `deriveAgentStats(agentPda)` | `["agent_stats", agentPda]` | Performance metrics |
+| `deriveEscrow(agentPda, depositor)` | `["escrow", agentPda, depositor]` | Payment escrow |
+| `deriveFeedback(agentPda, reviewer)` | `["feedback", agentPda, reviewer]` | Rating |
+| `deriveTool(agentPda, hash)` | `["tool_descriptor", agentPda, hash]` | Tool metadata |
+| `deriveVault(agentPda)` | `["memory_vault", agentPda]` | Encrypted memory |
+| `deriveSession(vaultPda, hash)` | `["session_ledger", vaultPda, hash]` | Session |
+| `deriveEpochPage(sessionPda, epoch)` | `["epoch_page", sessionPda, epoch]` | Memory page |
+| `deriveLedger(sessionPda)` | `["memory_ledger", sessionPda]` | Ring buffer |
+| `deriveLedgerPage(ledgerPda, page)` | `["ledger_page", ledgerPda, page]` | Sealed page |
+| `deriveAttestation(agentPda, attester)` | `["agent_attestation", agentPda, attester]` | Trust |
+| `deriveCapabilityIndex(capHash)` | `["capability_index", hash]` | Discovery index |
+| `deriveProtocolIndex(protoHash)` | `["protocol_index", hash]` | Discovery index |
+| `deriveToolCategoryIndex(cat)` | `["tool_category_index", cat]` | Discovery index |
+
+### Verifying an Escrow On-Chain
+
+```ts
+const [escrowPda] = deriveEscrow(agentPda, myWallet);
+const escrow: EscrowAccountData | null = await client.escrow.fetchNullable(escrowPda);
+
+if (escrow) {
+  console.log("Balance:", escrow.balance.toString());
+  console.log("Total deposited:", escrow.totalDeposited.toString());
+  console.log("Total settled:", escrow.totalSettled.toString());
+  console.log("Calls settled:", escrow.callsSettled.toString());
+  console.log("Max calls:", escrow.maxCalls.toString());
+  console.log("Price per call:", escrow.pricePerCall.toString());
+  console.log("Expires at:", new Date(escrow.expiresAt.toNumber() * 1000));
+  console.log("Token mint:", escrow.tokenMint?.toBase58() ?? "native SOL");
 }
 ```
 
-### X402Headers Type
+---
+
+## 8. Building x402 Headers
+
+### From PaymentContext (Standard)
+
+```ts
+const ctx = await client.x402.preparePayment(agentWallet, { /* ... */ });
+const headers: X402Headers = client.x402.buildPaymentHeaders(ctx);
+```
+
+### From Existing Escrow (Reconnect After Restart)
+
+```ts
+const headers: X402Headers = client.x402.buildPaymentHeadersFromEscrow(
+  escrowPda,
+  agentPda,
+  myWallet,
+  SapNetwork.SOLANA_MAINNET_GENESIS,
+  null, // tokenMint — null for native SOL
+);
+```
+
+### X402Headers Shape
 
 ```ts
 interface X402Headers {
-  readonly "X-Payment-Protocol": "SAP-x402";
-  readonly "X-Payment-Escrow": string;       // Escrow PDA base58
-  readonly "X-Payment-Agent": string;        // Agent PDA base58
-  readonly "X-Payment-Depositor": string;    // Client wallet base58
-  readonly "X-Payment-MaxCalls": string;     // Max calls
-  readonly "X-Payment-PricePerCall": string; // Price per call
-  readonly "X-Payment-Program": string;      // SAP program ID
-  readonly "X-Payment-Network": string;      // Network identifier
+  "X-Payment-Escrow": string;      // Escrow PDA (base58)
+  "X-Payment-Agent": string;       // Agent PDA (base58)
+  "X-Payment-Depositor": string;   // Your wallet (base58)
+  "X-Payment-Network": string;     // Network identifier
+  "X-Payment-Token": string;       // Token mint or "native"
 }
 ```
 
----
-
-## 7. Network Identifier and SapNetwork
-
-x402 providers validate the `X-Payment-Network` header. Different providers
-expect different formats:
+### Network Identifier in Headers
 
 ```ts
-import { SapNetwork } from "@oobe-protocol-labs/synapse-sap-sdk";
-import type { SapNetworkId } from "@oobe-protocol-labs/synapse-sap-sdk";
-```
-
-| Constant | Value | Accepted by |
-|----------|-------|-------------|
-| `SapNetwork.SOLANA_MAINNET` | `"solana:mainnet-beta"` | Coinbase, Phantom |
-| `SapNetwork.SOLANA_MAINNET_GENESIS` | `"solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"` | Kamiyo, Helius x402 |
-| `SapNetwork.SOLANA_DEVNET` | `"solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"` | Devnet providers |
-| `SapNetwork.SOLANA_DEVNET_NAMED` | `"solana:devnet"` | Local / test flows |
-
-### Choosing the Right Identifier
-
-```ts
-// Default (human-readable cluster name):
+// Option A: Explicit in PreparePaymentOptions
 const ctx = await client.x402.preparePayment(agentWallet, {
-  pricePerCall: 1000,
   deposit: 100_000,
-  // networkIdentifier defaults to SapNetwork.SOLANA_MAINNET
+  pricePerCall: 1000,
+  networkIdentifier: SapNetwork.SOLANA_MAINNET_GENESIS, // for Kamiyo/Helius
 });
 
-// For Kamiyo / Helius x402 providers (genesis-hash form):
+// Option B: Use the agent's preferred format
+const agentNetwork = profile.supportedNetworks?.[0];
+const normalized = normalizeNetworkId(agentNetwork ?? "solana:mainnet-beta");
+
 const ctx2 = await client.x402.preparePayment(agentWallet, {
-  pricePerCall: 1000,
   deposit: 100_000,
-  networkIdentifier: SapNetwork.SOLANA_MAINNET_GENESIS,
-});
-
-// Custom string (for future or non-standard providers):
-const ctx3 = await client.x402.preparePayment(agentWallet, {
   pricePerCall: 1000,
-  deposit: 100_000,
-  networkIdentifier: "solana:my-custom-network",
+  networkIdentifier: normalized,
 });
-```
-
-### Type Safety
-
-```ts
-// SapNetworkId is the union of all known SapNetwork values
-type SapNetworkId =
-  | "solana:mainnet-beta"
-  | "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
-  | "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
-  | "solana:devnet";
-
-// PreparePaymentOptions accepts SapNetworkId | string
-// so you can pass any value, but known ones get autocomplete
 ```
 
 ---
 
-## 8. Managing Escrows
+## 9. Escrow Lifecycle Management
 
-### Add More Funds
-
-```ts
-await client.x402.addFunds(agentWallet, 5_000_000); // 0.005 SOL
-```
-
-### Withdraw Remaining Funds
+### Add Funds to Existing Escrow
 
 ```ts
-await client.x402.withdrawFunds(agentWallet, 3_000_000);
+await client.x402.addFunds(agentWallet, 50_000);
 ```
 
-### Close Empty Escrow
+### Withdraw Unused Funds
 
-Balance must be 0. Reclaims rent lamports.
+```ts
+await client.x402.withdrawFunds(agentWallet, 30_000);
+```
+
+### Close Escrow (Reclaim All Rent)
 
 ```ts
 await client.x402.closeEscrow(agentWallet);
@@ -545,423 +803,409 @@ await client.x402.closeEscrow(agentWallet);
 ### Check If Escrow Exists
 
 ```ts
-const exists: boolean = await client.x402.hasEscrow(agentWallet);
+const exists: boolean = await client.x402.hasEscrow(agentWallet, myWallet);
 ```
 
 ### Fetch Raw Escrow Data
 
 ```ts
-const escrow: EscrowAccountData | null = await client.x402.fetchEscrow(agentWallet);
-if (escrow) {
-  console.log("Balance:", escrow.balance.toString());
-  console.log("Price per call:", escrow.pricePerCall.toString());
-  console.log("Max calls:", escrow.maxCalls.toString());
-  console.log("Total settled:", escrow.totalCallsSettled.toString());
-  console.log("Volume curve tiers:", escrow.volumeCurve.length);
-  console.log("Expires at:", escrow.expiresAt.toString());
-  console.log("Token:", escrow.tokenMint?.toBase58() ?? "SOL");
-}
-```
-
-### Low-Level EscrowModule
-
-```ts
-// Create escrow (bypassing X402Registry)
-const [agentPda] = deriveAgent(agentWallet);
-const args: CreateEscrowArgs = {
-  pricePerCall: new BN(100_000),
-  maxCalls: new BN(100),
-  initialDeposit: new BN(10_000_000),
-  expiresAt: new BN(0),
-  volumeCurve: [],
-  tokenMint: null,
-  tokenDecimals: 9,
-};
-await client.escrow.create(agentWallet, args);
-
-// Deposit more
-await client.escrow.deposit(agentWallet, new BN(5_000_000));
-
-// Withdraw
-await client.escrow.withdraw(agentWallet, new BN(3_000_000));
-
-// Close
-await client.escrow.close(agentWallet);
-
-// Fetch
-const data: EscrowAccountData = await client.escrow.fetch(agentPda);
-const dataMaybe: EscrowAccountData | null = await client.escrow.fetchNullable(agentPda);
+const escrow: EscrowAccountData | null = await client.x402.fetchEscrow(
+  agentWallet,
+  myWallet,
+);
 ```
 
 ---
 
-## 9. Cost Estimation and Volume Pricing
+## 10. Cost Estimation
 
-### Estimate Cost with On-Chain Data
-
-Reads the existing escrow or the agent's pricing tier:
+### On-Chain Estimate (Reads Agent Pricing)
 
 ```ts
 const estimate: CostEstimate = await client.x402.estimateCost(agentWallet, 100);
 
-console.log("Total cost:", estimate.totalCost.toString());
+console.log("Total cost:", estimate.totalCost.toString(), "lamports");
 console.log("Effective price/call:", estimate.effectivePricePerCall.toString());
-console.log("Has volume curve:", estimate.hasVolumeCurve);
-console.log("Tier breakdown:");
-for (const tier of estimate.tiers) {
-  console.log(`  ${tier.calls} calls at ${tier.pricePerCall} = ${tier.subtotal}`);
-}
+console.log("Tier breakdown:", estimate.tiers);
 ```
 
-### Estimate with Custom Pricing (No RPC)
+### Pure Calculation (No RPC — Offline)
 
 ```ts
+const volumeCurve: VolumeCurveBreakpoint[] = [
+  { afterCalls: 50, pricePerCall: new BN(800) },
+  { afterCalls: 200, pricePerCall: new BN(500) },
+];
+
 const estimate = client.x402.calculateCost(
-  new BN(100_000),    // base price per call
-  [                    // volume curve breakpoints
-    { afterCalls: 50, pricePerCall: new BN(90_000) },
-    { afterCalls: 200, pricePerCall: new BN(70_000) },
-  ],
-  0,                   // total calls already settled
-  100,                 // calls to estimate
+  new BN(1000),    // base price per call (lamports)
+  volumeCurve,
+  0,               // totalCallsBefore
+  100,             // number of calls to estimate
 );
+
+console.log("Total:", estimate.totalCost.toString());
+console.log("Effective price:", estimate.effectivePricePerCall.toString());
 ```
 
-### Estimate with Cursor Offset
+---
 
-If the escrow already has calls settled, pass the cursor:
+## 11. Zod Schema Validation (v0.6.0)
+
+The SDK ships Zod schemas for runtime validation of inputs before they hit the
+chain. Zod is a **peer dependency** — install separately: `npm install zod`.
+
+### Validate Environment Variables
 
 ```ts
-const balance = await client.x402.getBalance(agentWallet);
-const alreadySettled = balance?.totalCallsSettled.toNumber() ?? 0;
+const envSchema = createEnvSchema();
+const env = envSchema.parse(process.env);
+// env.SOLANA_CLUSTER is typed as "mainnet-beta" | "devnet" | "localnet"
+```
 
-const estimate = await client.x402.estimateCost(agentWallet, 50, {
-  totalCallsBefore: alreadySettled,
+### Validate Payment Options Before Committing
+
+```ts
+const paymentSchema = createPreparePaymentSchema();
+const opts = paymentSchema.parse({
+  pricePerCall: 1000,
+  deposit: 100_000,
+  networkIdentifier: "solana:mainnet-beta",
 });
 ```
 
----
-
-## 10. Giving Feedback and Reputation
-
-After using an agent's service, submit reputation feedback.
-
-### Submit Feedback
+### Validate Call Arguments
 
 ```ts
-const args: GiveFeedbackArgs = {
-  score: 85,                                         // 1-100
-  tag: "fast-execution",                             // freeform tag
-  commentHash: hashToArray(sha256("Great service")), // optional off-chain comment hash
-};
-await client.feedback.give(agentWallet, args);
-```
-
-### Update Existing Feedback
-
-```ts
-const args: UpdateFeedbackArgs = {
-  newScore: 90,
-  newTag: "excellent",
-  commentHash: hashToArray(sha256("Even better now")),
-};
-await client.feedback.update(agentWallet, args);
-```
-
-### Revoke Feedback
-
-```ts
-await client.feedback.revoke(agentWallet);
-```
-
-### Read Your Feedback for an Agent
-
-```ts
-const [agentPda] = deriveAgent(agentWallet);
-const fb: FeedbackAccountData | null = await client.feedback.fetchNullable(
-  agentPda,
-  client.walletPubkey, // your wallet (reviewer)
-);
-if (fb) {
-  console.log("Score:", fb.score, "Tag:", fb.tag, "Revoked:", fb.isRevoked);
-}
-```
-
----
-
-## 11. Attestations
-
-Issue web-of-trust attestations for agents you trust.
-
-```ts
-// Create attestation
-await client.attestation.create(agentWallet, {
-  attestationType: "verified-user",
-  metadataHash: hashToArray(sha256(JSON.stringify({ verified: true }))),
-  expiresAt: new BN(Math.floor(Date.now() / 1000) + 365 * 86400),
+const callSchema = createCallArgsSchema();
+const args = callSchema.parse({
+  agentWallet: "AgentWa11et...",
+  tool: "serp:search",
+  args: { query: "solana defi" },
+  maxRetries: 2,
+  timeoutMs: 30_000,
 });
+```
 
-// Read attestation
-const [agentPda] = deriveAgent(agentWallet);
-const att: AgentAttestationData | null = await client.attestation.fetchNullable(
-  agentPda,
-  client.walletPubkey,
+### Validate Agent Manifest
+
+```ts
+const manifestSchema = createAgentManifestSchema();
+const manifest = manifestSchema.parse(JSON.parse(rawManifestJson));
+// manifest.endpoint: EndpointDescriptor
+// manifest.tools: ToolManifestEntry[]
+// manifest.supportedNetworks: string[]
+```
+
+### Validate-or-Throw Helper
+
+```ts
+const validated = validateOrThrow(schema, userInput, "payment options");
+// Throws: [SAP SDK] Invalid payment options:
+//   - pricePerCall: Expected number, received string
+//   - deposit: Required
+```
+
+### Available Schema Factories
+
+| Function | Validates |
+|----------|-----------|
+| `createEnvSchema()` | Environment variables (cluster, RPC, keypair) |
+| `createPreparePaymentSchema()` | x402 payment preparation params |
+| `createCallArgsSchema()` | CLI call arguments (agent, tool, args) |
+| `createRegisterAgentSchema()` | Agent registration args (name, caps, pricing) |
+| `createAgentManifestSchema()` | Full agent manifest (endpoint, health, tools) |
+| `createEndpointDescriptorSchema()` | Single endpoint descriptor |
+| `createHealthCheckSchema()` | Health check descriptor |
+| `createToolManifestEntrySchema()` | Tool manifest entry |
+
+---
+
+## 12. RPC Strategy & Dual Connection (v0.6.0)
+
+### Auto-Resolve RPC URL
+
+```ts
+const url = getRpcUrl({ primaryUrl: "https://my-rpc.example.com" });
+const fallback = getFallbackRpcUrl(undefined, "mainnet-beta");
+```
+
+### Create Dual Connection
+
+```ts
+const { primary, fallback }: DualConnection = createDualConnection(
+  { primaryUrl: "https://my-rpc.example.com" },
+  "mainnet-beta",
 );
+// primary -> authenticated RPC for SAP program calls
+// fallback -> public RPC for SPL token ops (avoids WebSocket-400)
+```
 
-// Revoke / close
-await client.attestation.revoke(agentWallet);
-await client.attestation.close(agentWallet);
+### Lightweight ATA Derivation
+
+```ts
+const ata: PublicKey = findATA(ownerPubkey, mintPubkey);
 ```
 
 ---
 
-## 12. Reading Agent Memory (Ledger)
+## 13. Error Classification (v0.6.0)
 
-Some agents expose session data via the ledger system.
-As a client you can read (but not write to) agent sessions.
+Anchor program errors surface as cryptic hex codes. The SDK maps them to
+human-readable, actionable messages:
 
 ```ts
-import { deriveLedger, deriveLedgerPage } from "@oobe-protocol-labs/synapse-sap-sdk";
-import type { MemoryLedgerData, LedgerPageData } from "@oobe-protocol-labs/synapse-sap-sdk";
-
-// Given a known session PDA:
-const ledger: MemoryLedgerData | null = await client.ledger.fetchLedgerNullable(sessionPda);
-if (ledger) {
-  // Decode current ring buffer
-  const entries: Uint8Array[] = client.ledger.decodeRingBuffer(ledger.ring);
-  entries.forEach((e, i) => console.log(`Entry ${i}:`, Buffer.from(e).toString()));
-
-  // Read sealed pages
-  const [ledgerPda] = deriveLedger(sessionPda);
-  for (let i = 0; i < ledger.numPages; i++) {
-    const page: LedgerPageData | null = await client.ledger.fetchPageNullable(ledgerPda, i);
-    if (page) {
-      console.log(`Page ${i}: ${page.entriesInPage} entries, sealed at ${page.sealedAt}`);
-    }
+try {
+  await client.x402.preparePayment(agentWallet, opts);
+} catch (err) {
+  const code = extractAnchorErrorCode(err);
+  if (code !== null) {
+    const message = classifyAnchorError(code);
+    console.error(`SAP Error ${code}: ${message}`);
+    // e.g. "SAP Error 6010: Insufficient escrow balance"
+  } else {
+    throw err;
   }
 }
 ```
 
+### Error Code Reference
+
+| Code | Message |
+|------|---------|
+| 6000 | Agent already registered for this wallet |
+| 6001 | Agent not found — register first |
+| 6002 | Name exceeds maximum length (64 bytes) |
+| 6003 | Description exceeds maximum length (256 bytes) |
+| 6004 | Too many capabilities (max 10) |
+| 6005 | Too many pricing tiers (max 5) |
+| 6006 | Too many protocols (max 5) |
+| 6007 | Feedback score out of range (0-1000) |
+| 6008 | Unauthorized — only the agent owner can perform this action |
+| 6009 | Escrow expired |
+| 6010 | Insufficient escrow balance |
+| 6011 | Max calls exceeded |
+| 6012 | Invalid settlement — calls must be > 0 |
+| 6013 | Escrow not empty — withdraw balance before closing |
+| 6014 | Invalid token program |
+| 6015 | Vault already initialized |
+| 6016 | Session already exists |
+| 6017 | Session closed — cannot write to closed session |
+| 6018 | Data exceeds maximum write size (750 bytes) |
+| 6019 | Ring buffer overflow — seal before writing more |
+
 ---
 
-## 13. Transaction Parsing
+## 14. Feedback & Attestations
 
-Decode SAP instructions and events from any transaction.
-
-### Parse a Single Transaction
+### Give Feedback
 
 ```ts
-const result: ParsedSapTransaction = await parseSapTransactionComplete(
-  connection,
-  txSignature,
-  client.program,
+await client.feedback.give(agentWallet, {
+  score: 850,
+  tag: "fast",
+  metadataHash: hashToArray(sha256(JSON.stringify({
+    comment: "Excellent response time",
+    latency: 45,
+  }))),
+});
+```
+
+### Update Feedback
+
+```ts
+await client.feedback.update(agentWallet, { score: 900, tag: "reliable" });
+```
+
+### Read Feedback
+
+```ts
+const [agentPda] = deriveAgent(agentWallet);
+const fb: FeedbackAccountData | null = await client.feedback.fetchNullable(
+  agentPda, client.walletPubkey,
 );
-
-console.log("Instructions:", result.instructions.map(i => i.name));
-console.log("Events:", result.events.map(e => e.name));
+if (fb) console.log("Score:", fb.score, "Tag:", fb.tag);
 ```
 
-### Parse a Batch of Transactions
+### Read Attestations
 
 ```ts
-const results: ParsedSapTransaction[] = await parseSapTransactionBatch(
-  connection,
-  [sig1, sig2, sig3],
-  client.program,
+const att: AgentAttestationData | null = await client.attestation.fetchNullable(
+  agentPda, attesterWallet,
 );
-```
-
-### Check If a Transaction Contains SAP Instructions
-
-```ts
-const hasSap: boolean = containsSapInstruction(transaction, SAP_PROGRAM_ADDRESS);
-```
-
-### Using TransactionParser (Instance)
-
-```ts
-const parser = client.parser;
-
-// Parse from a fetched transaction
-const decoded: DecodedSapInstruction[] = parser.decodeInstructions(transaction);
-for (const ix of decoded) {
-  console.log(ix.name, ix.args);
+if (att) {
+  console.log("Type:", att.attestationType);
+  console.log("Expires:", new Date(att.expiresAt.toNumber() * 1000));
 }
 ```
 
 ---
 
-## 14. Events to Listen For
+## 15. Ledger & Memory (Read-Only)
 
-As a client, these events are relevant to your payment and discovery flow:
+```ts
+const [agentPda] = deriveAgent(agentWallet);
+const [vaultPda] = deriveVault(agentPda);
+const sessionHash = hashToArray(sha256("my-session-id"));
+const [sessionPda] = deriveSession(vaultPda, new Uint8Array(sessionHash));
 
-| Event Name | When | Key Fields |
-|-----------|------|------------|
-| `EscrowCreated` | Your escrow is created | `agent`, `depositor`, `amount`, `pricePerCall` |
-| `EscrowDeposited` | You deposit more funds | `escrow`, `amount` |
-| `PaymentSettled` | Agent settles your calls | `escrow`, `callsSettled`, `amount`, `serviceHash` |
+const ledger = await client.ledger.fetchLedger(sessionPda);
+const entries = client.ledger.decodeRingBuffer(ledger.ring);
+entries.forEach(entry => console.log("Entry:", entry.data.toString()));
+```
+
+---
+
+## 16. Transaction Parsing & Events
+
+### Parse Events from Logs
+
+```ts
+const events: ParsedEvent[] = client.events.parseLogs(txLogs);
+for (const event of events) console.log(event.name, event.data);
+
+const settlements = client.events.filterByName(events, "PaymentSettled");
+```
+
+### Parse Full Transaction
+
+```ts
+import { parseSapTransactionComplete } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const parsed = await parseSapTransactionComplete(connection, txSignature);
+console.log("Instructions:", parsed.instructions.map(i => i.name));
+console.log("Events:", parsed.events.map(e => e.name));
+```
+
+### Events Relevant to Clients
+
+| Event | When | Key Fields |
+|-------|------|------------|
+| `EscrowCreated` | You create an escrow | `agent`, `depositor`, `amount` |
+| `EscrowDeposited` | You add funds | `escrow`, `amount` |
+| `PaymentSettled` | Agent settles your calls | `escrow`, `callsSettled`, `amount` |
 | `BatchSettled` | Agent batch settles | `escrow`, `totalCalls`, `totalAmount` |
 | `EscrowWithdrawn` | You withdraw funds | `escrow`, `amount` |
-| `EscrowClosed` | Escrow is closed | `escrow` |
-| `FeedbackGiven` | You submit feedback | `agent`, `reviewer`, `score`, `tag` |
-| `FeedbackUpdated` | You update feedback | `agent`, `reviewer`, `newScore` |
-| `AttestationCreated` | You issue attestation | `agent`, `attester`, `attestationType` |
-| `AgentRegistered` | New agent joins network | `agent`, `wallet`, `name`, `capabilities` |
-| `AgentDeactivated` | Agent goes offline | `agent`, `wallet` |
-| `AgentReactivated` | Agent comes back online | `agent`, `wallet` |
-| `ToolPublished` | New tool available | `agent`, `toolName`, `category` |
-
-### Parsing Events from Transaction Logs
-
-```ts
-const events: ParsedEvent[] = client.events.parseLogs(transactionLogs);
-
-// Filter settlements
-const settlements = client.events.filterByName(events, "PaymentSettled");
-for (const s of settlements) {
-  const data = s.data as PaymentSettledEventData;
-  console.log("Settled:", data.callsSettled, "calls for", data.amount, "lamports");
-}
-```
+| `EscrowClosed` | Escrow closed | `escrow` |
+| `FeedbackGiven` | You rate an agent | `agent`, `reviewer`, `score`, `tag` |
+| `FeedbackUpdated` | Rating updated | `agent`, `reviewer`, `newScore` |
 
 ---
 
-## 15. Dual-Role: Client + Merchant
+## 17. Dual-Role: Client + Merchant
 
-A single wallet can **buy** and **sell** simultaneously.
-Use the same `SapClient`:
+A single wallet can act as both buyer and seller:
 
 ```ts
 const client = SapClient.from(provider);
 
-// === AS CLIENT: Buy from another agent ===
-const ctx = await client.x402.preparePayment(sellerAgentWallet, {
-  pricePerCall: 100_000,
-  deposit: 10_000_000,
+// === AS MERCHANT ===
+await client.builder.agent("MyDualAgent").addCapability("my:service").register();
+const receipt = await client.x402.settle(clientWallet, 5, "data");
+
+// === AS CLIENT ===
+const ctx = await client.x402.preparePayment(otherAgentWallet, {
+  pricePerCall: 1000,
+  deposit: 100_000,
   networkIdentifier: SapNetwork.SOLANA_MAINNET_GENESIS,
 });
 const headers = client.x402.buildPaymentHeaders(ctx);
-// ... make HTTP calls with headers ...
-
-// === AS MERCHANT: Sell your own services ===
-await client.builder
-  .agent("MyDualAgent")
-  .addCapability("myservice:analyze")
-  .addPricingTier({ tierId: "default", pricePerCall: 50_000, rateLimit: 30 })
-  .register();
-
-// Settle a call from a consumer
-const receipt = await client.x402.settle(consumerWallet, 1, "analyze-result");
 ```
 
-### PDA Isolation
-
-No collision is possible. The escrow PDAs are unique per direction:
-
-```ts
-// Escrow where YOU are the depositor (client side):
-const [asClient] = deriveEscrow(
-  deriveAgent(sellerWallet)[0],
-  client.walletPubkey,
-);
-
-// Escrow where YOU are the agent (merchant side):
-const [asMerchant] = deriveEscrow(
-  deriveAgent(client.walletPubkey)[0],
-  consumerWallet,
-);
-
-// asClient !== asMerchant (different seeds)
-```
+No PDA collision: `deriveEscrow(otherAgentPda, yourWallet)` is always distinct
+from `deriveEscrow(yourAgentPda, clientWallet)`.
 
 ---
 
-## 16. Complete Type Reference
+## 18. Complete Type Reference
 
 ### Enums (Runtime Values)
 
-| Import | Variants | Use When |
-|--------|----------|----------|
-| `TokenType` | `Sol`, `Usdc`, `Spl` | Reading agent pricing tiers |
-| `SettlementMode` | `Instant`, `Escrow`, `Batched`, `X402` | Understanding pricing model |
-| `ToolHttpMethod` | `Get`, `Post`, `Put`, `Delete`, `Compound` | Reading tool descriptors |
-| `ToolCategory` | `Swap`, `Lend`, `Stake`, etc. | Searching tool indexes |
-| `SapNetwork` | `SOLANA_MAINNET`, `SOLANA_MAINNET_GENESIS`, `SOLANA_DEVNET`, `SOLANA_DEVNET_NAMED` | Setting x402 headers |
+| Import | Variants |
+|--------|----------|
+| `TokenType` | `Sol`, `Usdc`, `Spl` |
+| `SettlementMode` | `Instant`, `Escrow`, `Batched`, `X402` |
+| `ToolHttpMethod` | `Get`, `Post`, `Put`, `Delete`, `Compound` |
+| `ToolCategory` | `Swap`, `Lend`, `Stake`, `Nft`, `Payment`, `Data`, `Governance`, `Bridge`, `Analytics`, `Custom` |
+| `SapNetwork` | `SOLANA_MAINNET`, `SOLANA_MAINNET_GENESIS`, `SOLANA_DEVNET`, `SOLANA_DEVNET_NAMED` |
 
 ### Type-Level Unions
 
-| Type | Use for |
-|------|---------|
-| `TokenTypeKind` | Comparing `pricingTier.tokenType` |
-| `SettlementModeKind` | Comparing `pricingTier.settlementMode` |
-| `ToolHttpMethodKind` | Comparing `toolDescriptor.httpMethod` |
-| `ToolCategoryKind` | Comparing `toolDescriptor.category` |
-| `SapNetworkId` | Passing to `networkIdentifier` param |
+| Type | Description |
+|------|-------------|
+| `TokenTypeKind` | Any `TokenType` variant |
+| `SettlementModeKind` | Any `SettlementMode` variant |
+| `ToolHttpMethodKind` | Any `ToolHttpMethod` variant |
+| `ToolCategoryKind` | Any `ToolCategory` variant |
+| `SapNetworkId` | Any known `SapNetwork` value or custom string |
 
-### Account Data Types (Deserialized PDAs)
+### Account Data Types (On-Chain PDAs)
 
-| Type | PDA | Description |
-|------|-----|-------------|
-| `AgentAccountData` | `deriveAgent(wallet)` | Full agent profile, pricing, capabilities |
-| `AgentStatsData` | `deriveAgentStats(agentPda)` | Hot-path metrics (calls, active) |
-| `EscrowAccountData` | `deriveEscrow(agentPda, depositor)` | Escrow balance, pricing, settlements |
-| `FeedbackAccountData` | `deriveFeedback(agentPda, reviewer)` | Reputation score + tag |
-| `ToolDescriptorData` | `deriveTool(agentPda, toolNameHash)` | Tool metadata, schemas, invocations |
-| `AgentAttestationData` | `deriveAttestation(agentPda, attester)` | Web-of-trust entry |
-| `CapabilityIndexData` | `deriveCapabilityIndex(capHash)` | Agents with a capability |
-| `ProtocolIndexData` | `deriveProtocolIndex(protoHash)` | Agents supporting a protocol |
-| `ToolCategoryIndexData` | `deriveToolCategoryIndex(cat)` | Tools in a category |
-| `GlobalRegistryData` | `deriveGlobalRegistry()` | Network-wide stats |
+| Type | Derivation | Description |
+|------|------------|-------------|
+| `AgentAccountData` | `deriveAgent(wallet)` | Agent profile, pricing, capabilities |
+| `AgentStatsData` | `deriveAgentStats(agentPda)` | Reputation (hot-path PDA) |
+| `EscrowAccountData` | `deriveEscrow(agentPda, depositor)` | Escrow balance, calls, expiry |
+| `FeedbackAccountData` | `deriveFeedback(agentPda, reviewer)` | Rating per (agent, reviewer) |
+| `ToolDescriptorData` | `deriveTool(agentPda, hash)` | Tool metadata + schema hashes |
+| `AgentAttestationData` | `deriveAttestation(agentPda, attester)` | Trust attestation |
 
-### x402 Types
+### v0.6.0 Endpoint & Manifest Types
 
 | Type | Description |
 |------|-------------|
-| `PaymentContext` | Escrow creation result with `escrowPda`, `agentPda`, `depositorWallet`, `pricePerCall`, `maxCalls`, `txSignature`, `networkIdentifier` |
-| `PreparePaymentOptions` | Creation options: `pricePerCall`, `maxCalls?`, `deposit`, `expiresAt?`, `volumeCurve?`, `tokenMint?`, `tokenDecimals?`, `networkIdentifier?` |
-| `X402Headers` | HTTP header object with 8 `X-Payment-*` fields |
-| `CostEstimate` | `totalCost`, `calls`, `effectivePricePerCall`, `hasVolumeCurve`, `tiers[]` |
-| `EscrowBalance` | `balance`, `totalDeposited`, `totalSettled`, `totalCallsSettled`, `callsRemaining`, `isExpired`, `affordableCalls` |
-| `SettlementResult` | `txSignature`, `callsSettled`, `amount`, `serviceHash` |
-| `BatchSettlementResult` | `txSignature`, `totalCalls`, `totalAmount`, `settlementCount` |
+| `EndpointDescriptor` | Machine-readable endpoint metadata (url, method, auth, CORS, CSRF) |
+| `HealthCheckDescriptor` | Health-check config (url, expectedStatus, timeout, method) |
+| `ToolManifestEntry` | Tool descriptor (name, schemas, httpMethod, paymentMode, price) |
+| `AgentManifest` | Complete manifest (endpoint, health, tools, networks, version) |
+| `EndpointValidationResult` | Validation result (reachable, status, latency, warnings) |
 
-### Discovery Types
+### Registry Types
 
-| Type | Description |
-|------|-------------|
-| `DiscoveredAgent` | Search result with wallet, name, capabilities, pricing, score |
-| `AgentProfile` | Full composite view of an agent |
-| `DiscoveredTool` | Tool search result with name, method, category, invocations |
-| `NetworkOverview` | Global stats: totalAgents, activeAgents, totalTools, etc. |
-| `ToolCategoryName` | `"Swap" \| "Lend" \| "Stake" \| "Nft" \| ...` |
+| Type | Registry | Description |
+|------|----------|-------------|
+| `CostEstimate` | X402Registry | Volume-adjusted cost breakdown |
+| `PaymentContext` | X402Registry | Escrow creation result (PDAs, network, tx) |
+| `PreparePaymentOptions` | X402Registry | Escrow creation options |
+| `X402Headers` | X402Registry | HTTP payment headers |
+| `EscrowBalance` | X402Registry | Balance + status snapshot |
+| `DiscoveredAgent` | DiscoveryRegistry | Agent search result |
+| `AgentProfile` | DiscoveryRegistry | Full composite view |
 
-### Instruction Arg DTOs
+### v0.6.0 Utility Types
 
-| Type | Instruction | Client uses it for |
-|------|-------------|-------------------|
-| `CreateEscrowArgs` | `createEscrow` | Low-level escrow creation |
-| `GiveFeedbackArgs` | `giveFeedback` | Submitting reputation |
-| `UpdateFeedbackArgs` | `updateFeedback` | Updating reputation |
-| `CreateAttestationArgs` | `createAttestation` | Issuing attestations |
+| Type | Module | Description |
+|------|--------|-------------|
+| `ValidateEndpointOptions` | endpoint-validator | Timeout, retries, method, headers, CORS |
+| `RpcConfig` | rpc-strategy | Primary/fallback RPC URLs, commitment |
+| `DualConnection` | rpc-strategy | Primary + fallback Connection pair |
+| `AtaResult` | rpc-strategy | ATA creation result |
 
 ---
 
-## 17. x402 Flow Checklist
+## 19. Lifecycle Checklist
 
-1. **Discover** the agent via `client.discovery.findAgentsByCapability(...)` or `getAgentProfile(...)`
-2. **Estimate cost** via `client.x402.estimateCost(agentWallet, numberOfCalls)`
-3. **Prepare payment** via `client.x402.preparePayment(agentWallet, { ... })`
-   - Set `networkIdentifier` if the agent's x402 provider requires genesis-hash format
-4. **Build headers** via `client.x402.buildPaymentHeaders(ctx)`
-5. **Make HTTP requests** to the agent's `x402Endpoint` with the headers
-6. **Monitor balance** via `client.x402.getBalance(agentWallet)` to track remaining calls
-7. **Top-up** via `client.x402.addFunds(agentWallet, amount)` if balance runs low
-8. **Give feedback** via `client.feedback.give(agentWallet, { score, tag })`  after using the service
-9. **Withdraw** remaining funds via `client.x402.withdrawFunds(...)` when done
-10. **Close** the escrow via `client.x402.closeEscrow(agentWallet)` to reclaim rent
+```
+ 1. Create client            -> SapClient.from(provider) or SapConnection
+ 2. Set up dual connection    -> createDualConnection() for production     [v0.6.0]
+ 3. Validate environment      -> createEnvSchema().parse(process.env)      [v0.6.0]
+ 4. Discover agents           -> client.discovery.findAgentsByCapability(...)
+ 5. Validate endpoints        -> validateEndpoint() / validateAgentEndpoints() [v0.6.0]
+ 6. Check network compat      -> isNetworkEquivalent(agentNet, myNet)      [v0.6.0]
+ 7. Estimate cost             -> client.x402.estimateCost(agentWallet, calls)
+ 8. Validate payment params   -> createPreparePaymentSchema().parse(...)   [v0.6.0]
+ 9. Prepare payment           -> client.x402.preparePayment(agentWallet, opts)
+10. Build x402 headers        -> client.x402.buildPaymentHeaders(ctx)
+11. Call agent endpoint        -> fetch(url, { headers: { ...x402Headers } })
+12. Handle errors              -> classifyAnchorError() for messages       [v0.6.0]
+13. Monitor escrow             -> client.x402.getBalance(agentWallet)
+14. Refill or withdraw         -> client.x402.addFunds() / withdrawFunds()
+15. Give feedback              -> client.feedback.give(agentWallet, ...)
+16. Close escrow (cleanup)     -> client.x402.closeEscrow(agentWallet)
+```
 
 ---
 
 > **Note:** This guide covers the client/consumer perspective. For the merchant/seller
-> perspective (registering agents, publishing tools, settling payments),
+> perspective (registering agents, publishing tools, settling payments, managing memory),
 > see the companion guide: [merchant.md](./merchant.md)

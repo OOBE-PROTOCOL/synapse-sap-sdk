@@ -95,6 +95,12 @@ export type {
   CreateEscrowArgs,
   CreateAttestationArgs,
   InscribeToolSchemaArgs,
+  // v0.6.0 — Endpoint & Manifest types
+  EndpointDescriptor,
+  HealthCheckDescriptor,
+  ToolManifestEntry,
+  AgentManifest,
+  EndpointValidationResult,
 } from "./types";
 
 export {
@@ -153,6 +159,48 @@ export {
 // ── Utilities ────────────────────────────────────────
 export { sha256, hashToArray, assert } from "./utils";
 export { serializeAccount, serializeValue } from "./utils";
+
+// v0.6.0 — Network normalizer
+export {
+  normalizeNetworkId,
+  isNetworkEquivalent,
+  getNetworkGenesisHash,
+  getNetworkClusterName,
+  isKnownNetwork,
+} from "./utils";
+
+// v0.6.0 — Endpoint validation
+export {
+  validateEndpoint,
+  validateEndpointDescriptor,
+  validateHealthCheck,
+  validateAgentEndpoints,
+} from "./utils";
+export type { ValidateEndpointOptions } from "./utils";
+
+// v0.6.0 — RPC strategy & error classification
+export {
+  getRpcUrl,
+  getFallbackRpcUrl,
+  createDualConnection,
+  findATA,
+  classifyAnchorError,
+  extractAnchorErrorCode,
+} from "./utils";
+export type { RpcConfig, DualConnection, AtaResult } from "./utils";
+
+// v0.6.0 — Zod runtime schemas
+export {
+  createEnvSchema,
+  createEndpointDescriptorSchema,
+  createHealthCheckSchema,
+  createToolManifestEntrySchema,
+  createAgentManifestSchema,
+  createPreparePaymentSchema,
+  createRegisterAgentSchema,
+  createCallArgsSchema,
+  validateOrThrow,
+} from "./utils";
 
 // ── Errors ───────────────────────────────────────────
 export {

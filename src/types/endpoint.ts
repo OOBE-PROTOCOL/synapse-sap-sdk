@@ -1,0 +1,181 @@
+/**
+ * @module types/endpoint
+ * @description Typed endpoint metadata for SAP agent discovery.
+ *
+ * Provides machine-verifiable descriptions of an agent's HTTP endpoints,
+ * authentication requirements, health-check expectations, and CORS/CSRF
+ * needs. These types solve the "guess the endpoint" interoperability
+ * problem highlighted by Kamiyo and AceDataCloud integrations.
+ *
+ * @category Types
+ * @since v0.6.0
+ */
+
+// ═══════════════════════════════════════════════════════════════════
+//  Endpoint Descriptor
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @interface EndpointDescriptor
+ * @description Machine-readable description of an agent's HTTP endpoint.
+ *
+ * Designed so that clients never have to "guess" the method, auth
+ * requirements, or content type of an agent's API.
+ *
+ * @category Types
+ * @since v0.6.0
+ */
+export interface EndpointDescriptor {
+  /** Full URL of the endpoint (e.g. `https://api.example.com/x402`). */
+  readonly url: string;
+  /** HTTP method (uppercase). Defaults to `"POST"`. */
+  readonly method: "GET" | "POST" | "PUT" | "DELETE";
+  /** Expected `Content-Type` of the response (defaults to `"application/json"`). */
+  readonly contentType: string;
+  /** Whether the endpoint requires an `Authorization` header. */
+  readonly requiresAuth: boolean;
+  /** Type of auth if `requiresAuth` is true: bearer, api-key, x402, etc. */
+  readonly authType?: "bearer" | "api-key" | "x402" | "none";
+  /** Whether the endpoint requires CSRF tokens / cookies. */
+  readonly requiresCSRF: boolean;
+  /** Whether the endpoint requires browser cookies. */
+  readonly requiresCookies: boolean;
+  /** Expected CORS headers (if any specific origins are required). */
+  readonly corsOrigins?: string[];
+  /** Additional custom headers that the endpoint requires. */
+  readonly requiredHeaders?: Record<string, string>;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Health Check
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @interface HealthCheckDescriptor
+ * @description Health-check endpoint configuration for an agent.
+ *
+ * Clients and the CLI can use this to verify that an agent's
+ * endpoint is reachable and SAP-capable before attempting x402 calls.
+ *
+ * @category Types
+ * @since v0.6.0
+ */
+export interface HealthCheckDescriptor {
+  /** Health-check URL (e.g. `https://api.example.com/health`). */
+  readonly url: string;
+  /** Expected HTTP status code (defaults to `200`). */
+  readonly expectedStatus: number;
+  /** Timeout in milliseconds for the check (defaults to `5000`). */
+  readonly timeoutMs: number;
+  /** HTTP method to use (defaults to `"GET"`). */
+  readonly method?: "GET" | "HEAD";
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Agent Manifest (typed capability manifest)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @interface ToolManifestEntry
+ * @description Typed descriptor for a single tool in an agent's manifest.
+ *
+ * Provides enough metadata so clients can statically validate arguments,
+ * know the payment mode, and understand prerequisites before calling.
+ *
+ * @category Types
+ * @since v0.6.0
+ */
+export interface ToolManifestEntry {
+  /** Tool name (e.g. `"serp:search"`, `"jupiter:swap"`). */
+  readonly name: string;
+  /** Human-readable description. */
+  readonly description: string;
+  /** Protocol namespace (e.g. `"kamiyo"`, `"ace_data_cloud"`). */
+  readonly protocol: string;
+  /** Tool category. */
+  readonly category: string;
+  /** JSON Schema (draft-07) for input arguments. */
+  readonly inputSchema: Record<string, unknown>;
+  /** JSON Schema (draft-07) for output shape. */
+  readonly outputSchema: Record<string, unknown>;
+  /** HTTP method used to invoke this tool. */
+  readonly httpMethod: "GET" | "POST" | "PUT" | "DELETE" | "COMPOUND";
+  /** Payment mode: `"x402"`, `"free"`, `"prepaid"`, etc. */
+  readonly paymentMode: "x402" | "free" | "prepaid" | "subscription";
+  /** Price per call (in smallest token unit; 0 for free). */
+  readonly pricePerCall: number;
+  /** Required arguments (subset of inputSchema.required). */
+  readonly requiredArgs: string[];
+  /** Prerequisites or preconditions (e.g. "requires escrow"). */
+  readonly prerequisites: string[];
+  /** Endpoint override for this specific tool (if different from agent default). */
+  readonly endpointOverride?: EndpointDescriptor;
+}
+
+/**
+ * @interface AgentManifest
+ * @description Complete typed manifest for an agent, including
+ * endpoints, health checks, tools, and discovery metadata.
+ *
+ * Replaces the "stringly typed" approach to agent metadata with
+ * machine-verifiable schemas. Generated by the CLI or published
+ * to the on-chain registry.
+ *
+ * @category Types
+ * @since v0.6.0
+ */
+export interface AgentManifest {
+  /** Manifest schema version. */
+  readonly version: "1.0.0";
+  /** Agent's wallet address (base58). */
+  readonly wallet: string;
+  /** Agent name. */
+  readonly name: string;
+  /** Agent description. */
+  readonly description: string;
+  /** Primary x402 endpoint descriptor. */
+  readonly endpoint: EndpointDescriptor;
+  /** Health-check configuration. */
+  readonly healthCheck?: HealthCheckDescriptor;
+  /** All available tools with typed schemas. */
+  readonly tools: ToolManifestEntry[];
+  /** Supported network identifiers for x402 headers. */
+  readonly supportedNetworks: string[];
+  /** Timestamp of manifest generation (ISO 8601). */
+  readonly generatedAt: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Endpoint Validation Result
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @interface EndpointValidationResult
+ * @description Result of validating an agent's endpoint reachability and capabilities.
+ *
+ * Returned by the SDK's validation utilities and the CLI's
+ * `discovery validate` command.
+ *
+ * @category Types
+ * @since v0.6.0
+ */
+export interface EndpointValidationResult {
+  /** The URL that was tested. */
+  readonly url: string;
+  /** Whether the endpoint is reachable. */
+  readonly reachable: boolean;
+  /** HTTP status code received (or 0 if unreachable). */
+  readonly statusCode: number;
+  /** Response time in milliseconds. */
+  readonly latencyMs: number;
+  /** Whether the response Content-Type is JSON. */
+  readonly isJson: boolean;
+  /** Whether CORS headers are present. */
+  readonly hasCors: boolean;
+  /** Whether the endpoint returned SAP-compatible headers. */
+  readonly isSapCapable: boolean;
+  /** Error message if validation failed. */
+  readonly error?: string;
+  /** Warnings (e.g. "requires CSRF", "returns HTML"). */
+  readonly warnings: string[];
+}
