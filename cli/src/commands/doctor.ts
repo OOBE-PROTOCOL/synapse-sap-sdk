@@ -207,7 +207,24 @@ async function checkSdkVersion(): Promise<CheckResult> {
 export function registerDoctorCommands(program: Command): void {
   const doctor = program
     .command("doctor")
-    .description("Run diagnostic checks on your environment");
+    .description("Run diagnostic checks on your environment")
+    .addHelpText("after", `
+Examples:
+  $ synapse-sap doctor run                # full check (Node, SDK, RPC, keypair, program, disk)
+  $ synapse-sap doctor run --quick        # skip network checks (offline-safe)
+  $ synapse-sap doctor run --save         # save report to tmp directory
+  $ synapse-sap doctor run --json         # machine-readable output
+
+Checks performed:
+  1. Node.js version (>= 18 required, >= 20 recommended)
+  2. SDK version detection
+  3. Required environment variables
+  4. Keypair file permissions & format
+  5. RPC connectivity + latency measurement
+  6. Fallback RPC health
+  7. SAP program deployment verification
+  8. Disk space in tmp directory
+`);
 
   doctor
     .command("run")

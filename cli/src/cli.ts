@@ -40,6 +40,30 @@ program
   .name("synapse-sap")
   .description("🧰 synapse-sap CLI — Power Edition\nComplete toolbox for the Synapse Agent Protocol (SAP v2) on Solana")
   .version("0.6.0")
+  .addHelpText("after", `
+Quick Start:
+  $ synapse-sap env init --template devnet
+  $ synapse-sap config set rpcUrl "https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=sk_..."
+  $ synapse-sap agent list --active
+  $ synapse-sap doctor run
+
+Command Groups:
+  agent       Agent lifecycle (list, info, tools, health, register)
+  discovery   Network scanning (scan, validate, cache)
+  escrow      Escrow lifecycle (open, deposit, withdraw, close, dump, list, monitor)
+  x402        Payment flows (headers, call, sign, verify, settle, replay)
+  tools       Manifest & schema (manifest, typify, publish, compare, doc)
+  env         Environment (init, check, keypair)
+  config      Configuration (show, set, edit, reset, path)
+  doctor      Diagnostics (run)
+  tmp         Artifacts (list, cat, diff, clean, archive)
+  plugin      Plugins (list, install, create, validate)
+
+Documentation:
+  SDK:      https://github.com/OOBE-PROTOCOL/synapse-sap-sdk
+  Explorer: https://synapse.oobeprotocol.ai
+  RPC:      https://oobeprotocol.ai
+`)
   .option("--rpc <url>", "Override primary RPC")
   .option("--fallback-rpc <url>", "Override fallback RPC for token ops")
   .option("--program <pubkey>", "Custom SAP program ID")

@@ -23,7 +23,17 @@ const EDITABLE_KEYS = [
 export function registerConfigCommands(program: Command): void {
   const cfg = program
     .command("config")
-    .description("CLI configuration management");
+    .description("CLI configuration management")
+    .addHelpText("after", `
+Examples:
+  $ synapse-sap config show
+  $ synapse-sap config show --raw
+  $ synapse-sap config set rpcUrl "https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=sk_..."
+  $ synapse-sap config set cluster devnet
+  $ synapse-sap config edit
+  $ synapse-sap config reset --confirm
+  $ synapse-sap config path
+`);
 
   // ── config show ─────────────────────────────────
   cfg

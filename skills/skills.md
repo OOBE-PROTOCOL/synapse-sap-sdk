@@ -1162,6 +1162,27 @@ import {
 | `X402_HEADER_PAYMENT_REQUIRED` | Payment header key |
 | `X402_HEADER_PAYMENT_SIGNATURE` | Signature header key |
 
+### Priority Fees & Settlement Timeouts (SAP SDK v0.6.2)
+
+When settling x402 payments on Solana, transactions at base fee can take
+35–40 s — exceeding the 30 s timeout many agents impose.
+
+The **SAP SDK** (v0.6.2+) provides priority-fee presets that land settle
+txs in ~5–10 s:
+
+```ts
+import { FAST_SETTLE_OPTIONS } from "@oobe-protocol-labs/synapse-sap-sdk";
+await sapClient.x402.settle(depositor, 1, data, FAST_SETTLE_OPTIONS);
+```
+
+> **Timeout guidance for public RPC users**
+>
+> The public Solana mainnet endpoint (`api.mainnet-beta.solana.com`) is
+> rate-limited to ~10 req/s. If you don't have a dedicated RPC (OOBE
+> Protocol, Helius, etc.), set your x402 settlement/HTTP timeout to
+> **60 seconds** as a safe default. With a dedicated RPC +
+> `FAST_SETTLE_OPTIONS`, 30 s is sufficient.
+
 ---
 
 ## 17. Intents System
@@ -1318,7 +1339,7 @@ SapClient
 |-------|---------|---------|
 | **Identity** | Agent registration, lifecycle, reputation metrics | `agent`, `feedback`, `attestation` |
 | **Memory** | Conversation storage — ring buffer (Ledger) or encrypted (Vault) | `ledger`, `vault`, `session` |
-| **Reputation** | On-chain feedback (1–5 score), attestations, health scoring | `feedback`, `attestation` |
+| **Reputation** | On-chain feedback (0–1000 score → 0–10000 aggregate), attestations, trust signals | `feedback`, `attestation` |
 | **Commerce** | x402 micropayment escrow — SOL & SPL token, volume curves | `escrow`, `x402` |
 | **Tools** | On-chain tool descriptors with schema hashing, versioning | `tools` |
 | **Discovery** | Capability/protocol indexes, agent profiles, network overview | `discovery`, `indexing` |
@@ -1601,6 +1622,443 @@ await client.tools.deactivate('jupiterSwap');
 await client.tools.reactivate('jupiterSwap');
 await client.tools.reportInvocations('jupiterSwap', 100);
 ```
+
+#### Complete Publish + Inscribe Pipeline (v0.6.2)
+
+> **⚠ Many agents publish tools but never inscribe schemas.** This makes
+> tools invisible to schema-aware discovery and prevents AI agents from
+> auto-composing pipelines. Always inscribe all 3 schema types.
+
+```ts
+import { SchemaType, CompressionType, sha256, hashToArray } from '@synapse-sap/sdk';
+
+// ── 1. Define schemas ─────────────────────────────
+const inputSchema = JSON.stringify({
+  type: 'object',
+  properties: {
+    inputMint:  { type: 'string', description: 'Source token mint' },
+    outputMint: { type: 'string', description: 'Target token mint' },
+    amount:     { type: 'number', description: 'Amount in lamports' },
+  },
+  required: ['inputMint', 'outputMint', 'amount'],
+});
+const outputSchema = JSON.stringify({
+  type: 'object',
+  properties: {
+    txSignature: { type: 'string' },
+    outputAmount: { type: 'number' },
+  },
+});
+const description = 'Execute a token swap via Jupiter aggregator';
+
+// ── 2. Publish the tool ───────────────────────────
+await client.tools.publishByName(
+  'jupiterSwap', 'jupiter', description,
+  inputSchema, outputSchema,
+  HTTP_METHOD_VALUES.Post, TOOL_CATEGORY_VALUES.Swap,
+  3, 3, false,
+);
+
+// ── 3. Inscribe all 3 schemas (zero rent, permanent) ──
+for (const [type, data] of [
+  [SchemaType.Input, inputSchema],
+  [SchemaType.Output, outputSchema],
+  [SchemaType.Description, description],
+] as const) {
+  await client.tools.inscribeSchema('jupiterSwap', {
+    schemaType: type,
+    schemaData: Buffer.from(data),
+    schemaHash: hashToArray(sha256(data)),
+    compression: CompressionType.None,
+  });
+}
+```
+
+#### Tool Analytics & Invocation Tracking (v0.6.2)
+
+```ts
+// Report invocations (call after serving each request)
+await client.tools.reportInvocations('jupiterSwap', 1);
+
+// Fetch tool analytics
+const [agentPda] = deriveAgent(wallet);
+const tools = await client.program.account.toolDescriptor.all([
+  { memcmp: { offset: 9, bytes: agentPda.toBase58() } },
+]);
+
+for (const { account: t } of tools) {
+  const hasSchema = !t.inputSchemaHash.every(b => b === 0)
+                 && !t.outputSchemaHash.every(b => b === 0);
+  console.log(`${t.toolName}: ${t.totalInvocations} invocations, schema: ${hasSchema ? '✓' : '✗'}`);
+}
+
+// AgentStats — authoritative call counter (updated by settlements)
+const [statsPda] = deriveAgentStats(agentPda);
+const stats = await client.program.account.agentStats.fetch(statsPda);
+console.log('Total calls served:', stats.totalCallsServed.toString());
+```
+
+#### Consumer: Evaluate Agent Tool Quality (v0.6.2)
+
+```ts
+// Before committing funds, check the agent's tool schema completeness
+const tools = await client.program.account.toolDescriptor.all([
+  { memcmp: { offset: 9, bytes: agentPda.toBase58() } },
+]);
+
+const withSchema = tools.filter(({ account: t }) =>
+  !t.inputSchemaHash.every(b => b === 0) && !t.outputSchemaHash.every(b => b === 0)
+);
+console.log(`${withSchema.length}/${tools.length} tools have schemas`);
+
+// Retrieve inscribed schema from TX logs
+const eventParser = new EventParser(client.program);
+const sigs = await connection.getSignaturesForAddress(toolPda, { limit: 50 });
+for (const { signature } of sigs) {
+  const tx = await connection.getTransaction(signature, { maxSupportedTransactionVersion: 0 });
+  if (!tx?.meta?.logMessages) continue;
+  const events = eventParser.parseLogs(tx.meta.logMessages);
+  for (const e of events) {
+    if (e.name === 'ToolSchemaInscribedEvent') {
+      const types = ['input', 'output', 'description'];
+      console.log(`Schema [${types[e.data.schemaType]}]:`, Buffer.from(e.data.schemaData).toString());
+    }
+  }
+}
+```
+
+> **Full details:** [merchant.md §8b — Tool Schema Pipeline](./skills/merchant.md#8b-tool-schema-inscription--complete-pipeline-v062) |
+> [merchant.md §8c — Tool Analytics](./skills/merchant.md#8c-tool-analytics--invocation-tracking-v062) |
+> [client.md §16b — Schema Discovery](./skills/client.md#16b-tool-schema-discovery--validation-v062) |
+> [client.md §16c — Consumer Analytics](./skills/client.md#16c-agent--tool-analytics-for-consumers-v062)
+
+---
+
+### On-Chain Tool Schemas — Why and How
+
+> **⚠ Many agents publish tools but never inscribe schemas.** Without
+> on-chain schemas, AI agents cannot auto-compose pipelines, consumers
+> cannot validate request/response formats, and discovery systems cannot
+> match tools to intents. **Always inscribe all 3 schema types.**
+
+On-chain schemas are stored permanently in TX logs (zero rent) via
+`ToolSchemaInscribedEvent`. The `ToolDescriptor` PDA tracks only the
+SHA-256 hash of each schema — the full JSON Schema lives in the TX log.
+
+#### Schema Types
+
+| Type | Value | Purpose | Example |
+|------|-------|---------|---------|
+| `SchemaType.Input` | `0` | JSON Schema for request body | `{ inputMint, outputMint, amount }` |
+| `SchemaType.Output` | `1` | JSON Schema for response body | `{ txSignature, outputAmount }` |
+| `SchemaType.Description` | `2` | Human/LLM-readable tool description | `"Execute a token swap via Jupiter"` |
+
+#### How schemas are stored
+
+```
+On-chain PDA (ToolDescriptor):
+  input_schema_hash:   [u8; 32]  ← SHA-256 of the input JSON Schema
+  output_schema_hash:  [u8; 32]  ← SHA-256 of the output JSON Schema
+  description_hash:    [u8; 32]  ← SHA-256 of the description string
+
+TX logs (permanent, zero rent):
+  ToolSchemaInscribedEvent {
+    agent, toolName, schemaType, schemaData, schemaHash, compression
+  }
+```
+
+#### Merchant: Publish + Inscribe (complete pipeline)
+
+```ts
+import { SchemaType, CompressionType, sha256, hashToArray } from '@synapse-sap/sdk';
+
+const inputSchema = JSON.stringify({
+  type: 'object',
+  properties: {
+    inputMint:  { type: 'string', description: 'Source token mint address' },
+    outputMint: { type: 'string', description: 'Target token mint address' },
+    amount:     { type: 'number', description: 'Amount in lamports' },
+    slippage:   { type: 'number', description: 'Max slippage basis points' },
+  },
+  required: ['inputMint', 'outputMint', 'amount'],
+});
+
+const outputSchema = JSON.stringify({
+  type: 'object',
+  properties: {
+    txSignature: { type: 'string' },
+    outputAmount: { type: 'number' },
+    priceImpact: { type: 'number' },
+  },
+});
+
+const description = 'Execute a token swap via Jupiter DEX aggregator. Finds optimal route across all Solana DEXs.';
+
+// Step 1: Publish the tool descriptor
+await client.tools.publishByName(
+  'jupiterSwap', 'jupiter', description,
+  inputSchema, outputSchema,
+  HTTP_METHOD_VALUES.Post, TOOL_CATEGORY_VALUES.Swap,
+  4, 3, false,
+);
+
+// Step 2: Inscribe all 3 schemas (MANDATORY for full discoverability)
+for (const [type, data] of [
+  [SchemaType.Input, inputSchema],
+  [SchemaType.Output, outputSchema],
+  [SchemaType.Description, description],
+] as const) {
+  await client.tools.inscribeSchema('jupiterSwap', {
+    schemaType: type,
+    schemaData: Buffer.from(data),
+    schemaHash: hashToArray(sha256(data)),
+    compression: CompressionType.None,  // or Deflate/Gzip/Brotli for large schemas
+  });
+}
+// 3 TXs total — each ~0.000005 SOL (TX fee only)
+// Schemas are now PERMANENTLY on Solana and retrievable by any consumer
+```
+
+#### Consumer: Verify schemas before paying
+
+```ts
+const [agentPda] = deriveAgent(agentWallet);
+const tools = await client.program.account.toolDescriptor.all([
+  { memcmp: { offset: 9, bytes: agentPda.toBase58() } },
+]);
+
+for (const { account: t } of tools) {
+  const hasInput  = !t.inputSchemaHash.every(b => b === 0);
+  const hasOutput = !t.outputSchemaHash.every(b => b === 0);
+  const hasDesc   = !t.descriptionHash.every(b => b === 0);
+  console.log(`${t.toolName}: input=${hasInput ? '✓' : '✗'} output=${hasOutput ? '✓' : '✗'} desc=${hasDesc ? '✓' : '✗'}`);
+}
+
+// Only trust agents with full schemas inscribed
+const fullyInscribed = tools.filter(({ account: t }) =>
+  !t.inputSchemaHash.every(b => b === 0) && !t.outputSchemaHash.every(b => b === 0)
+);
+```
+
+#### Consumer: Retrieve schema from TX logs and validate
+
+```ts
+import { inflateSync } from 'node:zlib';
+
+const [toolPda] = deriveTool(agentPda, hashToArray(sha256('jupiterSwap')));
+const sigs = await connection.getSignaturesForAddress(toolPda, { limit: 50 });
+
+const schemas: Record<number, string> = {};
+for (const { signature } of sigs) {
+  const tx = await connection.getTransaction(signature, { maxSupportedTransactionVersion: 0 });
+  if (!tx?.meta?.logMessages) continue;
+  const events = client.events.parseLogs(tx.meta.logMessages);
+  for (const e of events) {
+    if (e.name === 'ToolSchemaInscribedEvent') {
+      const raw = Buffer.from(e.data.schemaData);
+      schemas[e.data.schemaType] = e.data.compression === 1
+        ? inflateSync(raw).toString()
+        : raw.toString();
+    }
+  }
+}
+
+// Validate your request against the on-chain schema
+import Ajv from 'ajv';
+const ajv = new Ajv();
+if (schemas[0]) {
+  const validate = ajv.compile(JSON.parse(schemas[0]));
+  const valid = validate({ inputMint: 'So11...', outputMint: 'EPjF...', amount: 1e9 });
+  if (!valid) console.error('Invalid request:', validate.errors);
+}
+```
+
+> **Deep dive:** [merchant.md §8b](./merchant.md) — full inscription pipeline with compression, CLI commands, builder pattern |
+> [client.md §16b](./client.md) — full consumer schema discovery with AJV validation
+
+---
+
+### Feedback & Reputation System
+
+On-chain feedback is the **only way to change an agent's `reputationScore`**.
+It's fully trustless — no admin or oracle can modify it.
+
+#### Reputation Score Formula
+
+```
+reputationScore = (reputationSum × 10) / totalFeedbacks
+```
+
+- Each feedback `score`: **0–1000** (1000 = perfect)
+- Aggregate `reputationScore` range: **0–10000** (2 decimal places: 8547 = 85.47%)
+- Self-review blocked on-chain (`SelfReviewNotAllowed`)
+- One feedback PDA per (agent, reviewer) pair
+
+#### Two Independent Signal Types
+
+| Signal | Who Sets It | Trustless? | Fields |
+|--------|------------|-----------|--------|
+| **Reputation score** | Other users via `give_feedback` | **Yes** | `reputationScore`, `reputationSum`, `totalFeedbacks` |
+| **Self-reported metrics** | Agent owner via `reportCalls` / `updateReputation` | **No** | `totalCallsServed`, `avgLatencyMs`, `uptimePercent` |
+
+> Consumers should weight these differently. A high `reputationScore` with
+> many `totalFeedbacks` is significantly more trustworthy than self-reported
+> latency/uptime claims.
+
+#### Give, Update, Revoke, Close Feedback
+
+```ts
+// ── Give feedback (creates FeedbackAccount PDA) ──
+await client.feedback.give(agentWallet, {
+  score: 850,      // 0-1000
+  tag: 'fast',     // max 32 chars
+  metadataHash: hashToArray(sha256(JSON.stringify({
+    comment: 'Excellent swap execution', latency: 42,
+  }))),
+});
+
+// ── Update (same reviewer, same agent) ──
+await client.feedback.update(agentWallet, { score: 900, tag: 'reliable' });
+
+// ── Revoke (removes score from reputation calculation) ──
+await client.feedback.revoke(agentWallet);
+
+// ── Close PDA (must revoke first — reclaims rent) ──
+await client.feedback.close(agentWallet);
+```
+
+#### Read reputation & feedback data
+
+```ts
+// Agent's reputation
+const agent = await client.agent.fetch();
+console.log('Score:', agent.reputationScore, '/ 10000');
+console.log('Feedbacks:', agent.totalFeedbacks);
+
+// Self-reported metrics (treat as claims, NOT trustless)
+console.log('Self-reported latency:', agent.avgLatencyMs, 'ms');
+console.log('Self-reported uptime:', agent.uptimePercent, '%');
+
+// Scan all feedbacks for an agent
+const [agentPda] = deriveAgent(agentWallet);
+const feedbacks = await client.program.account.feedbackAccount.all([
+  { memcmp: { offset: 9, bytes: agentPda.toBase58() } },
+]);
+const active = feedbacks.filter(f => !f.account.isRevoked);
+for (const { account: f } of active) {
+  console.log(`${f.reviewer.toBase58()}: ${f.score}/1000 [${f.tag}]`);
+}
+```
+
+> **Deep dive:** [merchant.md §18](./merchant.md) — full reputation/feedback lifecycle for sellers |
+> [client.md §14a–§14e](./client.md) — consumer feedback guide with scoring heuristics
+
+---
+
+### Attestations (Web of Trust)
+
+Attestations are **institutional trust signals** — not score-based reviews.
+They represent identity-level trust from third parties: "OtterSec: code
+audited", "Jupiter: API verified", "Solana Foundation: official partner".
+
+Trust comes from **WHO** is attesting (the wallet identity), not from
+the attestation content itself. Anyone can create attestations — the value
+is in the attester's real-world reputation.
+
+#### PDA & Constraints
+
+```
+Seeds: ["sap_attest", agent_pda, attester_wallet]
+One attestation per (agent, attester) pair
+Self-attestation blocked: attester.key() != agent.wallet
+Lifecycle: create → (optional) revoke → close
+Must revoke before closing
+```
+
+#### Create, Revoke, Close
+
+```ts
+// ── Create attestation ──
+await client.attestation.create(agentWallet, {
+  attestationType: 'audit',          // max 32 chars
+  metadataHash: hashToArray(sha256(JSON.stringify({
+    auditor: 'OtterSec', report: 'https://...', result: 'pass',
+  }))),
+  expiresAt: new BN(Math.floor(Date.now() / 1000) + 365 * 86400), // 1 year (0 = never)
+});
+
+// ── Revoke (only original attester) ──
+await client.attestation.revoke(agentWallet);
+
+// ── Close PDA (must be revoked first — rent returned to attester) ──
+await client.attestation.close(agentWallet);
+```
+
+#### Read & Verify Attestations
+
+```ts
+const [agentPda] = deriveAgent(agentWallet);
+const att = await client.attestation.fetchNullable(agentPda, attesterWallet);
+if (att && att.isActive) {
+  const expired = att.expiresAt > 0 && att.expiresAt < Date.now() / 1000;
+  console.log(`${att.attestationType} by ${att.attester.toBase58()} — ${expired ? 'EXPIRED' : 'VALID'}`);
+}
+
+// Scan all attestations for an agent
+const allAtts = await client.program.account.agentAttestation.all([
+  { memcmp: { offset: 9, bytes: agentPda.toBase58() } },
+]);
+console.log(`${allAtts.filter(a => a.account.isActive).length} active attestations`);
+```
+
+#### Common Attestation Types
+
+| Type | Who Attests | Meaning |
+|------|------------|---------|
+| `"audit"` | Security firms | Code audited |
+| `"kyc"` | KYC providers | Identity verified |
+| `"api-verified"` | Protocol teams | API integration tested |
+| `"community"` | DAOs, power users | Community endorsement |
+| `"official-partner"` | Ecosystem partners | Formal partnership |
+| `"data-certified"` | Data providers | Data feed quality certified |
+
+> **Deep dive:** [merchant.md §17](./merchant.md) — full attestation lifecycle for agents |
+> [client.md §14f–§14g](./client.md) — consumer attestation creation and verification
+
+---
+
+### Delegate System (Hot-Wallet Access)
+
+Delegates let agents authorize a **hot wallet** (server signer) to perform
+vault operations without exposing the cold agent owner keypair.
+
+#### Permission Bitmask
+
+| Bit | Value | Permission | Allows |
+|-----|-------|-----------|--------|
+| 0 | `1` | `INSCRIBE` | Write encrypted memory |
+| 1 | `2` | `CLOSE_SESSION` | Close sessions |
+| 2 | `4` | `OPEN_SESSION` | Create new sessions |
+| — | `7` | `ALL` | Full access |
+
+```ts
+import { DelegatePermission } from '@synapse-sap/sdk';
+
+// Add delegate (hot wallet) with inscribe + open permission
+await client.vault.addDelegate(
+  hotWalletPubkey,
+  DelegatePermission.Inscribe | DelegatePermission.OpenSession,  // bitmask = 5
+  Math.floor(Date.now() / 1000) + 86400,  // expires in 24h (0 = never)
+);
+
+// Inscribe memory via delegate (auth chain: signer → VaultDelegate → Vault → Session)
+await client.vault.inscribeDelegated(delegatePubkey, vaultPda, sessionPda, epochPda, args);
+
+// Revoke delegate (immediately, reclaim rent)
+await client.vault.revokeDelegate(hotWalletPubkey);
+```
+
+> **Deep dive:** [merchant.md §16](./merchant.md) — full delegate lifecycle, hot wallet production pattern, expiry management
 
 ---
 
@@ -2093,9 +2551,12 @@ The SAP SDK ships two **role-specific skill guides** that provide production-gra
 11. **Zod Schema Validation (v0.6.0)** — Runtime validation: env, payment options, call args, manifests
 12. **RPC Strategy & Dual Connection (v0.6.0)** — Primary + fallback RPC, lightweight ATA derivation
 13. **Error Classification (v0.6.0)** — Anchor error codes → human-readable messages (6000–6019)
-14. **Feedback & Attestations** — Give/update feedback, read attestations
-15. **Ledger & Memory (Read-Only)** — Fetch and decode ring buffer entries
+14. **Feedback & Attestations** — Reputation formula, give/update/revoke/close feedback, create/revoke/close attestations, scan all feedbacks and attestations for an agent
+14h. **Discovery Registry — Finding Agents** — `findAgentsByCapability()`, `findAgentsByProtocol()`, `findToolsByCategory()`, `getAgentProfile()`, `getNetworkOverview()`, `isAgentActive()`
+15. **Ledger & Memory (Read Paths)** — Read ring buffer, read sealed pages, read all chronologically, verify merkle root integrity
 16. **Transaction Parsing & Events** — Parse logs, filter events, complete TX analysis
+16b. **Tool Schema Discovery & Validation (v0.6.2)** — Check schema completeness, retrieve inscribed schemas from TX logs, validate requests with AJV
+16c. **Agent & Tool Analytics for Consumers (v0.6.2)** — Quality scoring, agent comparison, spending tracking per agent
 17. **Dual-Role: Client + Merchant** — Both-role pattern with PDA isolation
 18. **Complete Type Reference** — All enums, unions, account data types, registry types, v0.6.0 types
 19. **Lifecycle Checklist** — Step-by-step consumer flow
@@ -2110,16 +2571,18 @@ The SAP SDK ships two **role-specific skill guides** that provide production-gra
 6. **Endpoint Descriptors & Agent Manifest (v0.6.0)** — Typed endpoint metadata, health checks, tool manifests
 7. **Publishing Tools** — `publishByName()` with schemas, HTTP methods, categories, inscriptions
 8. **Tool Lifecycle** — Update, deactivate, reactivate, close, report invocations
+8b. **Tool Schema Inscription Pipeline (v0.6.2)** — Complete 3-step publish+inscribe flow, compressed schemas, builder pattern, CLI manifest commands
+8c. **Tool Analytics & Invocation Tracking (v0.6.2)** — `reportInvocations()`, AgentStats, per-tool revenue, service_hash correlation, merchant dashboard
 9. **Discovery Indexing (Be Found)** — Capability/protocol/category indexes
 10. **Network Normalization (v0.6.0)** — Network IDs in settlement, header normalization
 11. **Settling Payments (x402)** — Single and batch settlement, hash computation, escrow queries
 12. **Zod Schema Validation (v0.6.0)** — Validate registration args, manifests, call inputs
 13. **RPC Strategy & Dual Connection (v0.6.0)** — Dual RPC for production stability
 14. **Error Classification (v0.6.0)** — SAP error code → message mapping
-15. **Memory Vault and Ledger** — Init vault, open sessions, write entries, seal, close, encrypted memory
-16. **Delegate Hot-Wallet Access** — Permission bitmask (Inscribe, CloseSession, OpenSession, All)
-17. **Attestations (Web of Trust)** — Create, revoke, read attestations
-18. **Reputation and Metrics** — Report calls, update latency/uptime, fetch stats
+15. **Memory Systems — Vault & Ledger** — Two memory systems compared, vault architecture (epoch system, merkle accumulator, nonce rotation), SessionManager high-level API, VaultModule low-level (init, open, inscribe 8-arg, compact 4-arg, multi-fragment, close lifecycle), LedgerModule (ring buffer, write/seal/close, cost model)
+16. **Delegate Hot-Wallet Access** — Permission bitmask (Inscribe=1, CloseSession=2, OpenSession=4, All=7), add/revoke delegate, inscribe via delegate auth chain, hot wallet production pattern, expiry management
+17. **Attestations (Web of Trust)** — Institutional trust signals, create with attestation_type + metadata_hash + expires_at, revoke/close lifecycle, common attestation types, scan all attestations, self-attestation blocked
+18. **Reputation, Feedback & Metrics** — Reputation score formula `(sum×10)/count` (0-10000), self-reported vs feedback-driven distinction, full feedback lifecycle (give/update/revoke/close), self-review prevention, scan all feedbacks, composite AgentProfile
 19. **Events to Listen For** — All SAP events with key fields (both agent/client events)
 20. **Plugin Adapter (52 Tools)** — `createSAPPlugin()` → LangChain StructuredTool integration
 21. **PostgreSQL Mirror** — Off-chain indexing with `PostgresListener`
@@ -2134,11 +2597,29 @@ The SAP SDK ships two **role-specific skill guides** that provide production-gra
 | Find and call another agent's x402 endpoint | **client.md** §3 + §6 |
 | Create and fund an escrow | **client.md** §6 + §7 |
 | Validate an agent's endpoint before paying | **client.md** §4 |
+| Check if an agent's tools have inscribed schemas | **client.md** §16b |
+| Evaluate agent quality before committing funds | **client.md** §16c |
+| Retrieve a tool's JSON Schema for input validation | **client.md** §16b |
+| Discover agents by capability, protocol, or tool category | **client.md** §14h |
+| Get a full agent profile with composite view | **client.md** §14h |
+| Get network-wide statistics (total agents, tools, etc.) | **client.md** §14h |
+| Give, update or revoke feedback for an agent | **client.md** §14b–§14d |
+| Create attestations as a consumer/DAO/partner | **client.md** §14f |
+| Understand reputation scores and what they mean | **client.md** §14a |
+| Read an agent's ledger ring buffer or sealed pages | **client.md** §15 |
+| Verify ledger data integrity via merkle root | **client.md** §15 |
 | Register on-chain and become discoverable | **merchant.md** §4 + §9 |
 | Publish tools with JSON schemas | **merchant.md** §7 |
+| Inscribe full schemas (input + output + description) | **merchant.md** §8b |
+| Track tool invocations and per-tool revenue | **merchant.md** §8c |
+| Build a merchant analytics dashboard | **merchant.md** §8c |
 | Settle x402 payments after serving calls | **merchant.md** §11 |
-| Store conversation memory on-chain | **merchant.md** §15 |
-| Delegate a hot wallet for automated operations | **merchant.md** §16 |
+| Store encrypted conversation memory on-chain | **merchant.md** §15a–§15c |
+| Use the ring buffer ledger for hot memory | **merchant.md** §15d |
+| Delegate a hot wallet for automated vault operations | **merchant.md** §16 |
+| Issue or receive attestations (KYC, audit, API verified) | **merchant.md** §17 |
+| Understand and manage your reputation score | **merchant.md** §18a–§18b |
+| Read feedbacks you've received and scan reviewers | **merchant.md** §18e |
 | Build a plugin that exposes all 52 SAP tools | **merchant.md** §20 |
 | Mirror on-chain data to PostgreSQL | **merchant.md** §21 |
 | Act as both buyer and seller | **client.md** §17 or **merchant.md** §22 |

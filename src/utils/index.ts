@@ -56,3 +56,18 @@ export {
   createCallArgsSchema,
   validateOrThrow,
 } from "./schemas";
+
+// ── v0.6.2  Priority Fee & Settle Options ───────────
+export {
+  buildPriorityFeeIxs,
+  buildRpcOptions,
+  FAST_SETTLE_OPTIONS,
+  FAST_BATCH_SETTLE_OPTIONS,
+  DEFAULT_SETTLE_PRIORITY_FEE,
+  DEFAULT_SETTLE_COMPUTE_UNITS,
+  DEFAULT_BATCH_SETTLE_COMPUTE_UNITS,
+} from "./priority-fee";
+export type {
+  PriorityFeeConfig,
+  SettleOptions,
+} from "./priority-fee";

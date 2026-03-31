@@ -106,7 +106,18 @@ const SENSITIVE_VARS = [
 export function registerEnvCommands(program: Command): void {
   const env = program
     .command("env")
-    .description("Environment & keypair management");
+    .description("Environment & keypair management")
+    .addHelpText("after", `
+Examples:
+  $ synapse-sap env init --template devnet
+  $ synapse-sap env init --template full --force
+  $ synapse-sap env check
+  $ synapse-sap env check --show-secrets
+  $ synapse-sap env keypair show
+  $ synapse-sap env keypair generate --out keys/agent.json
+  $ synapse-sap env keypair generate --vanity SAP --out keys/vanity.json
+  $ synapse-sap env keypair import ./legacy-key.json --out keys/imported.json
+`);
 
   // ── env init ────────────────────────────────────
   env

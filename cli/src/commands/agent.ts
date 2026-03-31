@@ -11,7 +11,16 @@ import { log, output, saveTmp } from "../logger";
 export function registerAgentCommands(program: Command): void {
   const agent = program
     .command("agent")
-    .description("Agent lifecycle management");
+    .description("Agent lifecycle management")
+    .addHelpText("after", `
+Examples:
+  $ synapse-sap agent list --active
+  $ synapse-sap agent list --capability image-gen --protocol kamiyo
+  $ synapse-sap agent info <WALLET> --fetch-tools --fetch-endpoints
+  $ synapse-sap agent tools <WALLET> --category Swap --schema
+  $ synapse-sap agent health <WALLET> --timeout 10000
+  $ synapse-sap agent register --manifest agent.json --simulate
+`);
 
   // ── agent list ──────────────────────────────────
   agent
@@ -22,6 +31,13 @@ export function registerAgentCommands(program: Command): void {
     .option("--protocol <proto>", "Filter by protocol (sap|kamiyo|mcp)")
     .option("--search <regex>", "Search by name/description regex")
     .option("--limit <n>", "Max results", "50")
+    .addHelpText("after", `
+Examples:
+  $ synapse-sap agent list                                   # all agents
+  $ synapse-sap agent list --active --limit 10               # top 10 active
+  $ synapse-sap agent list --capability image-gen            # by capability
+  $ synapse-sap agent list --protocol kamiyo --search "bot"  # protocol + search
+`)
     .action(async (opts) => {
       const config = loadConfig(program.opts());
       const ctx = buildContext(config);
@@ -74,6 +90,12 @@ export function registerAgentCommands(program: Command): void {
     .description("Show full agent profile (identity, stats, capabilities, pricing, x402)")
     .option("--fetch-tools", "Also fetch published tools")
     .option("--fetch-endpoints", "Validate advertised endpoints")
+    .addHelpText("after", `
+Examples:
+  $ synapse-sap agent info <WALLET>
+  $ synapse-sap agent info <WALLET> --fetch-tools --fetch-endpoints
+  $ synapse-sap agent info <WALLET> --json | jq '.capabilities'
+`)
     .action(async (walletStr: string, opts) => {
       const config = loadConfig(program.opts());
       const ctx = buildContext(config);
@@ -245,6 +267,12 @@ export function registerAgentCommands(program: Command): void {
     .option("--x402-endpoint <url>", "x402 payment endpoint URL")
     .option("--simulate", "Dry run — don't send transaction")
     .option("--fee-payer <path>", "Fee payer keypair path")
+    .addHelpText("after", `
+Examples:
+  $ synapse-sap agent register --manifest agent.json
+  $ synapse-sap agent register --manifest agent.json --simulate    # dry run
+  $ synapse-sap agent register --name "My Agent" --x402-endpoint https://api.example.com
+`)
     .action(async (opts) => {
       const config = loadConfig(program.opts());
       const ctx = buildContext(config);
