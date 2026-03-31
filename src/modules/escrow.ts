@@ -29,6 +29,11 @@ import type {
   CreateEscrowArgs,
   Settlement,
 } from "../types";
+import {
+  buildPriorityFeeIxs,
+  buildRpcOptions,
+} from "../utils/priority-fee";
+import type { SettleOptions } from "../utils/priority-fee";
 
 /**
  * @name EscrowModule
@@ -157,20 +162,26 @@ export class EscrowModule extends BaseModule {
    * @param callsToSettle - Number of calls to settle payment for.
    * @param serviceHash - A 32-byte SHA-256 hash identifying the service rendered.
    * @param splAccounts - Remaining accounts for SPL token transfers. Defaults to `[]`.
+   * @param opts - Optional {@link SettleOptions} for priority fees and RPC tuning.
    * @returns {Promise<TransactionSignature>} The transaction signature.
    * @since v0.1.0
+   * @updated v0.6.2 — Added optional `opts` parameter for priority fees.
    */
   async settle(
     depositorWallet: PublicKey,
     callsToSettle: BN | number | bigint,
     serviceHash: number[],
     splAccounts: AccountMeta[] = [],
+    opts?: SettleOptions,
   ): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(this.walletPubkey);
     const [escrowPda] = deriveEscrow(agentPda, depositorWallet);
     const [statsPda] = deriveAgentStats(agentPda);
 
-    return this.methods
+    const preIxs = buildPriorityFeeIxs(opts);
+    const rpcOpts = buildRpcOptions(opts);
+
+    let builder = this.methods
       .settleCalls(this.bn(callsToSettle), serviceHash)
       .accounts({
         wallet: this.walletPubkey,
@@ -179,8 +190,13 @@ export class EscrowModule extends BaseModule {
         escrow: escrowPda,
         systemProgram: SystemProgram.programId,
       })
-      .remainingAccounts(splAccounts)
-      .rpc();
+      .remainingAccounts(splAccounts);
+
+    if (preIxs.length > 0) {
+      builder = builder.preInstructions(preIxs);
+    }
+
+    return builder.rpc(rpcOpts);
   }
 
   /**
@@ -238,19 +254,25 @@ export class EscrowModule extends BaseModule {
    * @param depositorWallet - The wallet of the client who funded the escrow.
    * @param settlements - Array of settlement entries (up to 10).
    * @param splAccounts - Remaining accounts for SPL token transfers. Defaults to `[]`.
+   * @param opts - Optional {@link SettleOptions} for priority fees and RPC tuning.
    * @returns {Promise<TransactionSignature>} The transaction signature.
    * @since v0.1.0
+   * @updated v0.6.2 — Added optional `opts` parameter for priority fees.
    */
   async settleBatch(
     depositorWallet: PublicKey,
     settlements: Settlement[],
     splAccounts: AccountMeta[] = [],
+    opts?: SettleOptions,
   ): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(this.walletPubkey);
     const [escrowPda] = deriveEscrow(agentPda, depositorWallet);
     const [statsPda] = deriveAgentStats(agentPda);
 
-    return this.methods
+    const preIxs = buildPriorityFeeIxs(opts);
+    const rpcOpts = buildRpcOptions(opts);
+
+    let builder = this.methods
       .settleBatch(settlements)
       .accounts({
         wallet: this.walletPubkey,
@@ -259,8 +281,13 @@ export class EscrowModule extends BaseModule {
         escrow: escrowPda,
         systemProgram: SystemProgram.programId,
       })
-      .remainingAccounts(splAccounts)
-      .rpc();
+      .remainingAccounts(splAccounts);
+
+    if (preIxs.length > 0) {
+      builder = builder.preInstructions(preIxs);
+    }
+
+    return builder.rpc(rpcOpts);
   }
 
   // ── Fetchers ─────────────────────────────────────────

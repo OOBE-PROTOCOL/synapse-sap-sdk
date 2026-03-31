@@ -11,7 +11,17 @@ import { log, output, saveTmp } from "../logger";
 export function registerEscrowCommands(program: Command): void {
   const escrow = program
     .command("escrow")
-    .description("x402 escrow lifecycle management");
+    .description("x402 escrow lifecycle management")
+    .addHelpText("after", `
+Examples:
+  $ synapse-sap escrow open <WALLET> --token sol --deposit 500000000
+  $ synapse-sap escrow deposit <WALLET> --amount 100000000
+  $ synapse-sap escrow withdraw <WALLET> --amount 50000000
+  $ synapse-sap escrow close <WALLET> --force
+  $ synapse-sap escrow dump <WALLET> --json
+  $ synapse-sap escrow list
+  $ synapse-sap escrow monitor <WALLET>
+`);
 
   // ── escrow open ─────────────────────────────────
   escrow
@@ -25,6 +35,12 @@ export function registerEscrowCommands(program: Command): void {
     .option("--deposit <lamports>", "Initial deposit amount")
     .option("--network <id>", "SapNetworkId for x402 headers")
     .option("--expires <timestamp>", "Expiry unix timestamp (0=never)", "0")
+    .addHelpText("after", `
+Examples:
+  $ synapse-sap escrow open <WALLET> --token sol --deposit 1000000000
+  $ synapse-sap escrow open <WALLET> --token spl --mint EPjF... --deposit 5000000
+  $ synapse-sap escrow open <WALLET> --deposit 500000000 --max-calls 100 --dry-run
+`)
     .action(async (walletStr: string, opts) => {
       const config = loadConfig(program.opts());
       const ctx = buildContext(config);

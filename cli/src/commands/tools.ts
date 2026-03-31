@@ -13,7 +13,16 @@ import { log, output, saveTmp } from "../logger";
 export function registerToolsCommands(program: Command): void {
   const tools = program
     .command("tools")
-    .description("Tool manifest & schema management");
+    .description("Tool manifest & schema management")
+    .addHelpText("after", `
+Examples:
+  $ synapse-sap tools manifest generate <WALLET> --out agent.manifest.json
+  $ synapse-sap tools manifest validate agent.manifest.json
+  $ synapse-sap tools typify agent.manifest.json --out src/generated/agent.ts
+  $ synapse-sap tools publish agent.manifest.json --dry-run
+  $ synapse-sap tools compare <WALLET_A> <WALLET_B>
+  $ synapse-sap tools doc <WALLET> --format markdown --out TOOLS.md
+`);
 
   // ── tools manifest generate ─────────────────────
   const manifest = tools

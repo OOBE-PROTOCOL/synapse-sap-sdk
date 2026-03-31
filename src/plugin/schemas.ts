@@ -390,6 +390,22 @@ export const escrowSchemas = {
       depositorWallet: pubkey.describe("Depositor (client) wallet"),
       callsToSettle: z.string().describe("Number of calls to settle"),
       serviceHash: hash32.describe("SHA-256 hash of the service rendered"),
+      priorityFeeMicroLamports: z
+        .number()
+        .int()
+        .min(0)
+        .nullish()
+        .describe("Priority fee in microlamports per CU (0 = none, 5000 = recommended)"),
+      computeUnits: z
+        .number()
+        .int()
+        .min(0)
+        .nullish()
+        .describe("Compute unit limit (default 200k, recommended 100k for settle)"),
+      skipPreflight: z
+        .boolean()
+        .nullish()
+        .describe("Skip Solana simulation before submitting (saves ~400ms)"),
     }),
     output: writeOutput,
   },
@@ -410,6 +426,22 @@ export const escrowSchemas = {
         .min(1)
         .max(10)
         .describe("Up to 10 settlement entries"),
+      priorityFeeMicroLamports: z
+        .number()
+        .int()
+        .min(0)
+        .nullish()
+        .describe("Priority fee in microlamports per CU (0 = none, 5000 = recommended)"),
+      computeUnits: z
+        .number()
+        .int()
+        .min(0)
+        .nullish()
+        .describe("Compute unit limit (default 200k, recommended 300k for batch)"),
+      skipPreflight: z
+        .boolean()
+        .nullish()
+        .describe("Skip Solana simulation before submitting (saves ~400ms)"),
     }),
     output: writeOutput,
   },

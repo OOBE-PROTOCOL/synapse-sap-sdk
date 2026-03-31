@@ -59,7 +59,18 @@ function listTmpFiles(tmpDir: string): TmpFileInfo[] {
 export function registerTmpCommands(program: Command): void {
   const tmp = program
     .command("tmp")
-    .description("Manage tmp artifacts (responses, manifests, reports)");
+    .description("Manage tmp artifacts (responses, manifests, reports)")
+    .addHelpText("after", `
+Examples:
+  $ synapse-sap tmp list --sort size
+  $ synapse-sap tmp list --older-than 7d
+  $ synapse-sap tmp cat x402-call-*.json --jq .body
+  $ synapse-sap tmp cat report.json --head 20
+  $ synapse-sap tmp diff scan-1.json scan-2.json
+  $ synapse-sap tmp clean --older-than 30d --dry-run
+  $ synapse-sap tmp clean --all
+  $ synapse-sap tmp archive --older-than 7d --remove
+`);
 
   // ── tmp list ────────────────────────────────────
   tmp

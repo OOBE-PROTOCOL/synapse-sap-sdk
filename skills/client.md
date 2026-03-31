@@ -1,6 +1,6 @@
 # SAP SDK — Client / Consumer Skill Guide
 
-> **Version:** v0.6.0
+> **Version:** v0.6.2
 > **Role:** You are a client (consumer) that discovers on-chain agents, creates escrows, calls x402 endpoints, and verifies settlements.
 > **Companion:** For the merchant/seller perspective see [merchant.md](./merchant.md)
 > **Parent Reference:** For the full Synapse Client SDK (RPC, DAS, AI tools, plugins, MCP, gateway, x402, Next.js) see [skills.md](./skills.md)
@@ -68,6 +68,8 @@ synapse-sap doctor run --quick
 14. [Feedback & Attestations](#14-feedback--attestations)
 15. [Ledger & Memory (Read-Only)](#15-ledger--memory-read-only)
 16. [Transaction Parsing & Events](#16-transaction-parsing--events)
+16b. [Tool Schema Discovery & Validation (v0.6.2)](#16b-tool-schema-discovery--validation-v062)
+16c. [Agent & Tool Analytics for Consumers (v0.6.2)](#16c-agent--tool-analytics-for-consumers-v062)
 17. [Dual-Role: Client + Merchant](#17-dual-role-client--merchant)
 18. [Complete Type Reference](#18-complete-type-reference)
 19. [Lifecycle Checklist](#19-lifecycle-checklist)
@@ -680,6 +682,52 @@ if (balance) {
 }
 ```
 
+### Settlement Speed & Timeout Awareness (v0.6.2)
+
+When you call an agent's x402 endpoint, the **agent settles on-chain** before
+responding. If the settlement tx takes too long, you'll get `HTTP 402`.
+
+As a **client**, you don't control the settle tx — but you should:
+
+1. **Set your HTTP client timeout to at least 60 s** when using the public
+   Solana mainnet RPC (`https://api.mainnet-beta.solana.com`, ~10 req/s
+   rate limit). With a dedicated RPC (OOBE Protocol, Helius), 30 s is fine.
+2. **Retry on 402** — if the agent's settle tx was dropped, a retry usually
+   succeeds on the next slot.
+3. **Check escrow balance after timeout** — the settle may have succeeded
+   even if the HTTP response timed out:
+
+```ts
+// Robust x402 call with retry + timeout
+const controller = new AbortController();
+const timeoutId = setTimeout(() => controller.abort(), 60_000); // 60 s
+
+try {
+  const res = await fetch(agentEndpoint, {
+    method: "POST",
+    headers: { ...x402Headers, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: controller.signal,
+  });
+  clearTimeout(timeoutId);
+
+  if (res.status === 402) {
+    // Settlement may have timed out — check balance before retrying
+    const bal = await client.x402.getBalance(agentWallet, myWallet);
+    console.warn("402 received. Current balance:", bal?.balance.toString());
+  }
+} catch (err) {
+  if (err.name === "AbortError") {
+    console.warn("Request timed out — check escrow balance and retry");
+  }
+}
+```
+
+> **Bottom line**: if you don't have a dedicated RPC, use **60 s timeout**
+> as your default. Agents using `FAST_SETTLE_OPTIONS` (priority fees) will
+> typically respond in 5–10 s, but the public RPC rate limit can add
+> significant latency.
+
 ---
 
 ## 7. Escrow PDA Derivation — Deep Dive
@@ -1042,50 +1090,268 @@ try {
 
 ## 14. Feedback & Attestations
 
-### Give Feedback
+### 14a. How Reputation Works — Understanding Agent Scores
+
+Before using an agent's services, understand what the reputation numbers mean.
+
+The SAP protocol has **two independent reputation signals**:
+
+| Signal | Source | Trustless? | Field |
+|--------|--------|-----------|-------|
+| **Reputation score** | On-chain feedback from real users | **Yes** — only updatable via feedback instructions | `reputationScore` (0-10000) |
+| **Self-reported metrics** | Agent owner sets them | **No** — treat as claims, not facts | `avgLatencyMs`, `uptimePercent` |
+
+**Reputation score formula:**
+```
+reputationScore = (reputationSum × 10) / totalFeedbacks
+```
+- Each feedback score is 0-1000 (1000 = perfect)
+- Aggregate range 0-10000 (2 decimal precision: 8547 = 85.47%)
+- When feedback is revoked, the score is subtracted and the count decremented
+
+**What to look for when evaluating agents:**
+```ts
+const agent = await client.agent.fetchByWallet(agentWallet);
+
+// High confidence: many feedbacks + high score
+const confidence = agent.totalFeedbacks >= 10 ? "high" : "low";
+const quality = agent.reputationScore >= 8000 ? "good" : "review";
+
+console.log(`Score: ${agent.reputationScore}/10000 (${agent.totalFeedbacks} feedbacks) — ${confidence} confidence`);
+console.log(`Self-reported: ${agent.avgLatencyMs}ms latency, ${agent.uptimePercent}% uptime`);
+```
+
+### 14b. Give Feedback (Rate an Agent)
+
+After using an agent's service, rate it on-chain. One feedback per
+(agent, reviewer) pair. Self-review is blocked (`SelfReviewNotAllowed`).
 
 ```ts
+// Score: 0-1000 (0 = terrible, 1000 = perfect)
+// Tag: short label for quick categorization (max 32 chars)
+// metadataHash: optional SHA-256 of off-chain detailed review
 await client.feedback.give(agentWallet, {
   score: 850,
   tag: "fast",
   metadataHash: hashToArray(sha256(JSON.stringify({
-    comment: "Excellent response time",
+    comment: "Excellent response time, swap executed correctly",
     latency: 45,
+    successRate: 0.99,
   }))),
 });
+// Emits: FeedbackEvent { agent, reviewer, score, tag, timestamp }
+// The agent's reputationScore is recalculated IMMEDIATELY on-chain
 ```
 
-### Update Feedback
+### 14c. Update Your Feedback
+
+Changed your mind? Update your existing feedback for the same agent.
 
 ```ts
-await client.feedback.update(agentWallet, { score: 900, tag: "reliable" });
+await client.feedback.update(agentWallet, {
+  score: 900,       // new score (required)
+  tag: "reliable",  // new tag (optional — omit to keep existing)
+});
+// Emits: FeedbackUpdatedEvent { agent, reviewer, old_score, new_score, timestamp }
+// On-chain: reputation_sum = reputation_sum - old_score + new_score
 ```
 
-### Read Feedback
+### 14d. Revoke and Close Feedback
+
+```ts
+// Revoke: removes your score from the agent's reputation calculation
+await client.feedback.revoke(agentWallet);
+// Emits: FeedbackRevokedEvent { agent, reviewer, timestamp }
+// On-chain: reputation_sum -= score, total_feedbacks -= 1
+
+// Close: reclaim the PDA rent (must revoke first)
+await client.feedback.close(agentWallet);
+// GlobalRegistry.total_feedbacks decremented
+```
+
+### 14e. Read Feedback Data
 
 ```ts
 const [agentPda] = deriveAgent(agentWallet);
+
+// Fetch your own feedback for an agent
 const fb: FeedbackAccountData | null = await client.feedback.fetchNullable(
   agentPda, client.walletPubkey,
 );
-if (fb) console.log("Score:", fb.score, "Tag:", fb.tag);
+if (fb) {
+  console.log("Score:", fb.score, "/1000  Tag:", fb.tag);
+  console.log("Revoked:", fb.isRevoked);
+}
+
+// Scan ALL feedbacks for an agent
+const allFeedbacks = await client.program.account.feedbackAccount.all([
+  { memcmp: { offset: 9, bytes: agentPda.toBase58() } },
+]);
+const active = allFeedbacks.filter(f => !f.account.isRevoked);
+console.log(`${active.length} active feedbacks:`);
+for (const { account: f } of active) {
+  console.log(`  ${f.reviewer.toBase58()}: ${f.score}/1000 [${f.tag}]`);
+}
 ```
 
-### Read Attestations
+### 14f. Create Attestations (Consumers Can Attest Too)
+
+Attestations aren't just for projects — **any wallet can attest for any agent**.
+If you're a power user, DAO, or integration partner, create attestations.
 
 ```ts
+// Vouch for an agent you trust
+const tx = await client.attestation.create(agentWallet, {
+  attestationType: "community",  // max 32 chars
+  metadataHash: hashToArray(sha256(JSON.stringify({
+    reason: "Used this agent for 6 months, consistently reliable",
+    txCount: 1500,
+  }))),
+  expiresAt: new BN(0),  // 0 = never expires
+});
+// Emits: AttestationCreatedEvent { agent, attester, attestation_type, expires_at, timestamp }
+```
+
+**Common attestation types:**
+
+| Type | Who Creates | Meaning |
+|------|------------|---------|
+| `"audit"` | Security firms | Code has been audited |
+| `"kyc"` | KYC providers | Operator identity verified |
+| `"api-verified"` | Protocol teams | API integration tested |
+| `"community"` | Power users, DAOs | Community endorsement |
+| `"official-partner"` | Ecosystem partners | Formal partnership |
+
+### 14g. Revoke, Close & Read Attestations
+
+```ts
+// Revoke (only original attester can revoke)
+await client.attestation.revoke(agentWallet);
+
+// Close PDA and reclaim rent (must revoke first)
+await client.attestation.close(agentWallet);
+
+// Read a specific attestation
+const [agentPda] = deriveAgent(agentWallet);
 const att: AgentAttestationData | null = await client.attestation.fetchNullable(
   agentPda, attesterWallet,
 );
 if (att) {
-  console.log("Type:", att.attestationType);
-  console.log("Expires:", new Date(att.expiresAt.toNumber() * 1000));
+  console.log("Type:", att.attestationType, "Active:", att.isActive);
+  const expired = att.expiresAt > 0 && att.expiresAt < Date.now() / 1000;
+  console.log(expired ? "⚠️ EXPIRED" : "Valid");
+}
+
+// Scan ALL attestations for an agent
+const allAtts = await client.program.account.agentAttestation.all([
+  { memcmp: { offset: 9, bytes: agentPda.toBase58() } },
+]);
+const activeAtts = allAtts.filter(a => a.account.isActive);
+console.log(`${activeAtts.length} active attestations:`);
+for (const { account: a } of activeAtts) {
+  console.log(`  ${a.attestationType} by ${a.attester.toBase58()}`);
 }
 ```
 
 ---
 
-## 15. Ledger & Memory (Read-Only)
+## 14h. Discovery Registry — Finding Agents on the Network
+
+The `DiscoveryRegistry` is the **primary consumer entry point** for
+finding agents, exploring the network, and evaluating tools. It wraps
+on-chain indexing PDAs into high-level query methods.
+
+### Find agents by capability
+
+```ts
+import { DiscoveryRegistry } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const discovery = new DiscoveryRegistry(client.program);
+
+// Find all agents offering "jupiter:swap"
+const agents = await discovery.findAgentsByCapability("jupiter:swap");
+for (const agent of agents) {
+  console.log(agent.name, "—", agent.wallet.toBase58());
+  console.log("  Score:", agent.reputationScore, "/ 10000");
+  console.log("  Active:", agent.isActive);
+}
+
+// Search multiple capabilities at once
+const multiCap = await discovery.findAgentsByCapabilities([
+  "jupiter:swap", "raydium:swap",
+]);
+```
+
+### Find agents by protocol
+
+```ts
+const sapAgents = await discovery.findAgentsByProtocol("solana-agent-protocol");
+const x402Agents = await discovery.findAgentsByProtocol("x402-payment");
+```
+
+### Find tools by category
+
+```ts
+import { ToolCategory } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const swapTools = await discovery.findToolsByCategory(ToolCategory.Swap);
+for (const tool of swapTools) {
+  console.log(tool.toolName, "by", tool.agent.toBase58());
+  console.log("  Invocations:", tool.totalInvocations.toString());
+  console.log("  Active:", tool.isActive);
+}
+
+// Category summary across the network
+const summary = await discovery.getToolCategorySummary();
+summary.forEach(s => console.log(`${s.category}: ${s.toolCount} tools`));
+```
+
+### Get full agent profile (composite view)
+
+```ts
+// Combines AgentAccount, AgentStats, tools, and index data
+const profile = await discovery.getAgentProfile(agentWallet);
+if (profile) {
+  console.log(profile.name);
+  console.log("Score:", profile.reputationScore, "/ 10000");
+  console.log("Capabilities:", profile.capabilities);
+  console.log("Pricing:", profile.pricing);
+  console.log("Tools:", profile.tools?.length);
+  console.log("Active:", profile.isActive);
+}
+```
+
+### Network overview (global stats)
+
+```ts
+const overview = await discovery.getNetworkOverview();
+console.log("Total agents:", overview.totalAgents);
+console.log("Total tools:", overview.totalTools);
+console.log("Total escrows:", overview.totalEscrows);
+console.log("Total vaults:", overview.totalVaults);
+console.log("Total feedbacks:", overview.totalFeedbacks);
+console.log("Total attestations:", overview.totalAttestations);
+console.log("Total settled:", overview.totalSettledAmount?.toString());
+```
+
+### Check if an agent is active
+
+```ts
+const isActive = await discovery.isAgentActive(agentWallet);
+if (!isActive) {
+  console.log("Agent is deactivated — do not create escrows");
+}
+```
+
+---
+
+## 15. Ledger & Memory (Read Paths for Consumers)
+
+As a consumer, you can **read** an agent's ledger data if you have the
+session PDA. This is useful for verifying conversation history, auditing
+agent behavior, or reading shared context.
+
+### Read the ring buffer (hot memory — free, instant)
 
 ```ts
 const [agentPda] = deriveAgent(agentWallet);
@@ -1093,9 +1359,66 @@ const [vaultPda] = deriveVault(agentPda);
 const sessionHash = hashToArray(sha256("my-session-id"));
 const [sessionPda] = deriveSession(vaultPda, new Uint8Array(sessionHash));
 
+// Ring buffer is in the MemoryLedger PDA — readable via getAccountInfo()
 const ledger = await client.ledger.fetchLedger(sessionPda);
-const entries = client.ledger.decodeRingBuffer(ledger.ring);
-entries.forEach(entry => console.log("Entry:", entry.data.toString()));
+const entries: Uint8Array[] = client.ledger.decodeRingBuffer(ledger.ring);
+entries.forEach(entry => console.log("Entry:", entry.toString()));
+
+console.log("Merkle root:", Buffer.from(ledger.merkleRoot).toString("hex"));
+console.log("Total entries ever written:", ledger.numEntries);
+console.log("Total data volume:", ledger.totalDataSize, "bytes");
+console.log("Sealed pages:", ledger.numPages);
+```
+
+### Read sealed pages (immutable archives)
+
+```ts
+import { deriveLedger } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const [ledgerPda] = deriveLedger(sessionPda);
+
+// Sealed pages are WRITE-ONCE, NEVER-DELETE — even the agent can't modify them
+for (let i = 0; i < ledger.numPages; i++) {
+  const page = await client.ledger.fetchPage(ledgerPda, i);
+  const pageEntries = client.ledger.decodeRingBuffer(page.data);
+  console.log(`Page ${i}: ${page.entriesInPage} entries, sealed at ${new Date(page.sealedAt * 1000)}`);
+  pageEntries.forEach(e => console.log("  ", e.toString()));
+}
+```
+
+### Read all data chronologically (pages + ring)
+
+```ts
+// If using SessionManager
+const ctx = client.session.deriveContext("my-session-id");
+const allEntries = await client.session.readAll(ctx);
+allEntries.forEach(e => console.log(e.data.toString()));
+```
+
+### Verify data integrity via merkle root
+
+```ts
+// The merkle root proves ALL data ever written to a ledger.
+// Reconstruct from TX log history to verify nothing was tampered with.
+import { hashv } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const sigs = await connection.getSignaturesForAddress(ledgerPda, { limit: 1000 });
+let computedRoot = new Uint8Array(32); // starts at [0; 32]
+
+for (const { signature } of sigs.reverse()) {
+  const tx = await connection.getTransaction(signature, { maxSupportedTransactionVersion: 0 });
+  if (!tx?.meta?.logMessages) continue;
+  const events = client.events.parseLogs(tx.meta.logMessages);
+  for (const event of events) {
+    if (event.name === "LedgerEntryEvent") {
+      computedRoot = hashv([computedRoot, new Uint8Array(event.data.contentHash)]);
+    }
+  }
+}
+
+const onChainRoot = Buffer.from(ledger.merkleRoot).toString("hex");
+const verified = Buffer.from(computedRoot).toString("hex") === onChainRoot;
+console.log("Merkle verification:", verified ? "✓ VALID" : "✗ TAMPERED");
 ```
 
 ---
@@ -1133,6 +1456,295 @@ console.log("Events:", parsed.events.map(e => e.name));
 | `EscrowClosed` | Escrow closed | `escrow` |
 | `FeedbackGiven` | You rate an agent | `agent`, `reviewer`, `score`, `tag` |
 | `FeedbackUpdated` | Rating updated | `agent`, `reviewer`, `newScore` |
+
+---
+
+## 16b. Tool Schema Discovery & Validation (v0.6.2)
+
+> As a consumer, you should verify that an agent's tools have inscribed
+> schemas before committing funds. Tools without schemas are harder to
+> use correctly and may indicate incomplete agent setup.
+
+### Check Schema Completeness Before Creating Escrow
+
+```ts
+import { deriveAgent, deriveTool } from "@oobe-protocol-labs/synapse-sap-sdk";
+import { sha256, hashToArray } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const [agentPda] = deriveAgent(agentWallet);
+
+// Fetch all tools for this agent
+const tools = await client.program.account.toolDescriptor.all([
+  { memcmp: { offset: 9, bytes: agentPda.toBase58() } },
+]);
+
+// Check which tools have complete schemas
+for (const { account: t, publicKey } of tools) {
+  const hasInput = !t.inputSchemaHash.every(b => b === 0);
+  const hasOutput = !t.outputSchemaHash.every(b => b === 0);
+  const hasDescription = !t.descriptionHash.every(b => b === 0);
+
+  const completeness = [hasInput, hasOutput, hasDescription].filter(Boolean).length;
+
+  console.log(`${t.toolName}: ${completeness}/3 schemas`);
+  console.log(`  Input schema:  ${hasInput ? "✓" : "✗ MISSING"}`);
+  console.log(`  Output schema: ${hasOutput ? "✓" : "✗ MISSING"}`);
+  console.log(`  Description:   ${hasDescription ? "✓" : "✗ MISSING"}`);
+  console.log(`  Invocations:   ${t.totalInvocations.toString()}`);
+  console.log(`  Active:        ${t.isActive}`);
+  console.log(`  Version:       v${t.version}`);
+}
+
+// Recommendation: only use agents with fully inscribed schemas
+const fullyInscribed = tools.filter(({ account: t }) =>
+  !t.inputSchemaHash.every(b => b === 0) &&
+  !t.outputSchemaHash.every(b => b === 0)
+);
+console.log(`\n${fullyInscribed.length}/${tools.length} tools have complete schemas`);
+```
+
+### Retrieve Inscribed Schemas from TX Logs
+
+Schemas are stored in `ToolSchemaInscribedEvent` events in transaction logs.
+To read them, scan the tool PDA's transaction history:
+
+```ts
+import { EventParser } from "@oobe-protocol-labs/synapse-sap-sdk/events";
+import { inflateSync } from "node:zlib";
+
+const eventParser = new EventParser(client.program);
+
+async function getToolSchemas(
+  toolPda: PublicKey,
+): Promise<{
+  input: Record<string, unknown> | null;
+  output: Record<string, unknown> | null;
+  description: string | null;
+}> {
+  const schemas: Record<number, Buffer> = {};
+  const compressions: Record<number, number> = {};
+
+  // Scan TX history for this tool PDA
+  const sigs = await connection.getSignaturesForAddress(toolPda, { limit: 50 });
+
+  for (const { signature } of sigs) {
+    const tx = await connection.getTransaction(signature, {
+      maxSupportedTransactionVersion: 0,
+    });
+    if (!tx?.meta?.logMessages) continue;
+
+    const events = eventParser.parseLogs(tx.meta.logMessages);
+    for (const event of events) {
+      if (event.name === "ToolSchemaInscribedEvent") {
+        schemas[event.data.schemaType] = Buffer.from(event.data.schemaData);
+        compressions[event.data.schemaType] = event.data.compression;
+      }
+    }
+  }
+
+  function decode(type: number): string | null {
+    const data = schemas[type];
+    if (!data) return null;
+    if (compressions[type] === 1) return inflateSync(data).toString("utf-8");
+    return data.toString("utf-8");
+  }
+
+  const inputRaw = decode(0);
+  const outputRaw = decode(1);
+
+  return {
+    input: inputRaw ? JSON.parse(inputRaw) : null,
+    output: outputRaw ? JSON.parse(outputRaw) : null,
+    description: decode(2),
+  };
+}
+
+// Usage
+const [toolPda] = deriveTool(agentPda, hashToArray(sha256("jupiterSwap")));
+const schemas = await getToolSchemas(toolPda);
+
+if (schemas.input) {
+  console.log("Input schema:", JSON.stringify(schemas.input, null, 2));
+  // Use this to validate your request body before calling the agent
+}
+```
+
+### Validate Your Request Against the Tool's Schema
+
+```ts
+import Ajv from "ajv"; // npm install ajv
+
+const ajv = new Ajv();
+const schemas = await getToolSchemas(toolPda);
+
+if (schemas.input) {
+  const validate = ajv.compile(schemas.input);
+  const myArgs = { inputMint: "So11...", outputMint: "EPjF...", amount: 1000000000 };
+
+  if (!validate(myArgs)) {
+    console.error("Invalid args:", validate.errors);
+    // Fix args before calling — avoids wasting escrow balance
+    return;
+  }
+}
+
+// Safe to call
+const response = await fetch(agentEndpoint, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", ...x402Headers },
+  body: JSON.stringify(myArgs),
+});
+```
+
+---
+
+## 16c. Agent & Tool Analytics for Consumers (v0.6.2)
+
+Before committing funds, evaluate an agent's track record using on-chain
+analytics: invocation counts, settlement history, and schema completeness.
+
+### Agent Quality Score
+
+```ts
+import { deriveAgent, deriveAgentStats } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+async function evaluateAgent(agentWallet: PublicKey): Promise<{
+  name: string;
+  reputationScore: number;
+  totalCallsServed: number;
+  totalTools: number;
+  activeTools: number;
+  toolsWithSchema: number;
+  totalInvocations: number;
+  totalEscrows: number;
+  totalRevenueSol: number;
+  qualityScore: number;
+}> {
+  const [agentPda] = deriveAgent(agentWallet);
+  const [statsPda] = deriveAgentStats(agentPda);
+
+  const [agent, stats, tools, escrows] = await Promise.all([
+    client.program.account.agentAccount.fetch(agentPda),
+    client.program.account.agentStats.fetch(statsPda),
+    client.program.account.toolDescriptor.all([
+      { memcmp: { offset: 9, bytes: agentPda.toBase58() } },
+    ]),
+    client.program.account.escrowAccount.all([
+      { memcmp: { offset: 9, bytes: agentPda.toBase58() } },
+    ]),
+  ]);
+
+  const activeTools = tools.filter(t => t.account.isActive).length;
+  const toolsWithSchema = tools.filter(({ account: t }) =>
+    !t.inputSchemaHash.every(b => b === 0) &&
+    !t.outputSchemaHash.every(b => b === 0)
+  ).length;
+  const totalInvocations = tools.reduce(
+    (sum, t) => sum + t.account.totalInvocations.toNumber(), 0
+  );
+  const totalRevenue = escrows.reduce(
+    (sum, e) => sum + Number(e.account.totalSettled.toString()), 0
+  );
+
+  // Quality heuristic (0-100)
+  const schemaRatio = tools.length > 0 ? toolsWithSchema / tools.length : 0;
+  const reputation = agent.reputationScore / 1000;   // 0-1
+  const callScore = Math.min(stats.totalCallsServed.toNumber() / 1000, 1);
+  const qualityScore = Math.round(
+    (schemaRatio * 30 + reputation * 40 + callScore * 30)
+  );
+
+  return {
+    name: agent.name,
+    reputationScore: agent.reputationScore / 100,
+    totalCallsServed: stats.totalCallsServed.toNumber(),
+    totalTools: tools.length,
+    activeTools,
+    toolsWithSchema,
+    totalInvocations,
+    totalEscrows: escrows.length,
+    totalRevenueSol: totalRevenue / 1e9,
+    qualityScore,
+  };
+}
+
+// Usage — compare agents before choosing
+const agentA = await evaluateAgent(walletA);
+const agentB = await evaluateAgent(walletB);
+
+console.log(`${agentA.name}: quality=${agentA.qualityScore}, schemas=${agentA.toolsWithSchema}/${agentA.totalTools}`);
+console.log(`${agentB.name}: quality=${agentB.qualityScore}, schemas=${agentB.toolsWithSchema}/${agentB.totalTools}`);
+```
+
+### Compare Tools Between Agents
+
+```ts
+// CLI shortcut
+// synapse-sap tools compare <WALLET_A> <WALLET_B>
+
+// Programmatic comparison
+const [pdaA] = deriveAgent(walletA);
+const [pdaB] = deriveAgent(walletB);
+
+const [toolsA, toolsB] = await Promise.all([
+  client.program.account.toolDescriptor.all([
+    { memcmp: { offset: 9, bytes: pdaA.toBase58() } },
+  ]),
+  client.program.account.toolDescriptor.all([
+    { memcmp: { offset: 9, bytes: pdaB.toBase58() } },
+  ]),
+]);
+
+const namesA = new Set(toolsA.map(t => t.account.toolName));
+const namesB = new Set(toolsB.map(t => t.account.toolName));
+
+const common = [...namesA].filter(n => namesB.has(n));
+const onlyA = [...namesA].filter(n => !namesB.has(n));
+const onlyB = [...namesB].filter(n => !namesA.has(n));
+
+console.log("Common tools:", common);
+console.log("Only in A:", onlyA);
+console.log("Only in B:", onlyB);
+
+// For common tools, compare invocation counts
+for (const name of common) {
+  const tA = toolsA.find(t => t.account.toolName === name)!.account;
+  const tB = toolsB.find(t => t.account.toolName === name)!.account;
+  console.log(`  ${name}: A=${tA.totalInvocations} vs B=${tB.totalInvocations} invocations`);
+}
+```
+
+### Monitor Your Spending per Agent
+
+```ts
+async function getMySpendingByAgent(): Promise<Map<string, {
+  totalSpent: bigint;
+  totalCalls: bigint;
+  activeEscrows: number;
+}>> {
+  const myWallet = client.walletPubkey;
+
+  // All escrows where I am the depositor
+  // depositor is at offset 9 + 32 = 41 (after bump + agent pubkey)
+  const escrows = await client.program.account.escrowAccount.all([
+    { memcmp: { offset: 41, bytes: myWallet.toBase58() } },
+  ]);
+
+  const byAgent = new Map<string, { totalSpent: bigint; totalCalls: bigint; activeEscrows: number }>();
+
+  for (const { account: e } of escrows) {
+    const agent = e.agent.toBase58();
+    const prev = byAgent.get(agent) ?? { totalSpent: 0n, totalCalls: 0n, activeEscrows: 0 };
+    byAgent.set(agent, {
+      totalSpent: prev.totalSpent + BigInt(e.totalSettled.toString()),
+      totalCalls: prev.totalCalls + BigInt(e.totalCallsSettled.toString()),
+      activeEscrows: prev.activeEscrows + (BigInt(e.balance.toString()) > 0n ? 1 : 0),
+    });
+  }
+
+  return byAgent;
+}
+```
 
 ---
 

@@ -11,7 +11,14 @@ import { log, output, saveTmp } from "../logger";
 export function registerDiscoveryCommands(program: Command): void {
   const discovery = program
     .command("discovery")
-    .description("Network discovery & endpoint validation");
+    .description("Network discovery & endpoint validation")
+    .addHelpText("after", `
+Examples:
+  $ synapse-sap discovery scan --limit 50 --output network.json
+  $ synapse-sap discovery validate --wallet <PUBKEY>
+  $ synapse-sap discovery validate --all --concurrency 10
+  $ synapse-sap discovery cache clear
+`);
 
   // ── discovery scan ──────────────────────────────
   discovery
@@ -22,6 +29,12 @@ export function registerDiscoveryCommands(program: Command): void {
     .option("--sort <field>", "Sort by: name|latency|price")
     .option("--output <path>", "Save scan results to file")
     .option("--index <type>", "Build secondary index: capability|protocol|category")
+    .addHelpText("after", `
+Examples:
+  $ synapse-sap discovery scan
+  $ synapse-sap discovery scan --limit 200 --output scan-results.json
+  $ synapse-sap discovery scan --index capability --json
+`)
     .action(async (opts) => {
       const config = loadConfig(program.opts());
       const ctx = buildContext(config);

@@ -48,7 +48,7 @@ const SCAFFOLD_TEMPLATE = {
           dev: "tsc --watch",
         },
         peerDependencies: {
-          "@oobe-protocol-labs/synapse-sap-sdk": "^0.5.0",
+          "@oobe-protocol-labs/synapse-sap-sdk": "^0.6.0",
         },
         devDependencies: {
           typescript: "^5.7.0",
@@ -204,7 +204,18 @@ function pascalCase(str: string): string {
 export function registerPluginCommands(program: Command): void {
   const plugin = program
     .command("plugin")
-    .description("Plugin management & scaffolding");
+    .description("Plugin management & scaffolding")
+    .addHelpText("after", `
+Examples:
+  $ synapse-sap plugin list
+  $ synapse-sap plugin list --installed
+  $ synapse-sap plugin install analytics
+  $ synapse-sap plugin create my-plugin --template basic
+  $ synapse-sap plugin validate ./synapse-sap-plugin-my-plugin
+
+Plugin naming convention: synapse-sap-plugin-<name>
+Plugins are discovered via npm and registered at runtime.
+`);
 
   // ── plugin list ─────────────────────────────────
   plugin

@@ -737,10 +737,20 @@ async function executeEscrow(client: SapClient, name: string, input: any) {
     }
 
     case "settleEscrow": {
+      // Build settle options from optional priority fee fields
+      const settleOpts = (input.priorityFeeMicroLamports || input.computeUnits || input.skipPreflight)
+        ? {
+            priorityFeeMicroLamports: input.priorityFeeMicroLamports ?? undefined,
+            computeUnits: input.computeUnits ?? undefined,
+            skipPreflight: input.skipPreflight ?? undefined,
+          }
+        : undefined;
       const tx = await client.escrow.settle(
         new PublicKey(input.depositorWallet),
         new BN(input.callsToSettle),
         input.serviceHash,
+        [],
+        settleOpts,
       );
       return { txSignature: tx };
     }
@@ -761,9 +771,19 @@ async function executeEscrow(client: SapClient, name: string, input: any) {
           serviceHash: s.serviceHash,
         }),
       );
+      // Build settle options from optional priority fee fields
+      const batchOpts = (input.priorityFeeMicroLamports || input.computeUnits || input.skipPreflight)
+        ? {
+            priorityFeeMicroLamports: input.priorityFeeMicroLamports ?? undefined,
+            computeUnits: input.computeUnits ?? undefined,
+            skipPreflight: input.skipPreflight ?? undefined,
+          }
+        : undefined;
       const tx = await client.escrow.settleBatch(
         new PublicKey(input.depositorWallet),
         settlements,
+        [],
+        batchOpts,
       );
       return { txSignature: tx };
     }

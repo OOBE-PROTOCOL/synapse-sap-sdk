@@ -12,7 +12,17 @@ import { log, output, saveTmp } from "../logger";
 export function registerX402Commands(program: Command): void {
   const x402 = program
     .command("x402")
-    .description("x402 micropayment operations");
+    .description("x402 micropayment operations")
+    .addHelpText("after", `
+Examples:
+  $ synapse-sap x402 headers <WALLET>
+  $ synapse-sap x402 call <WALLET> generate-image --args '{"prompt":"sunset"}'
+  $ synapse-sap x402 call <WALLET> analyze --args @input.json --save full
+  $ synapse-sap x402 sign <WALLET>
+  $ synapse-sap x402 verify <TX_SIGNATURE>
+  $ synapse-sap x402 settle <WALLET> --calls 10
+  $ synapse-sap x402 replay artifacts/x402-call-*.json
+`);
 
   // ── x402 headers ────────────────────────────────
   x402
@@ -64,6 +74,13 @@ export function registerX402Commands(program: Command): void {
     .option("--save <type>", "Save response: body|headers|full")
     .option("--retries <n>", "Number of retries", "2")
     .option("--timeout <ms>", "Request timeout", "30000")
+    .addHelpText("after", `
+Examples:
+  $ synapse-sap x402 call <WALLET> generate --args '{"prompt":"hello"}'
+  $ synapse-sap x402 call <WALLET> analyze --args @data.json --save body
+  $ synapse-sap x402 call <WALLET> search --endpoint https://custom.api --retries 3
+  $ synapse-sap x402 call <WALLET> tool --skip-payment --json
+`)
     .action(async (walletStr: string, tool: string, opts) => {
       const config = loadConfig(program.opts());
       const ctx = buildContext(config);

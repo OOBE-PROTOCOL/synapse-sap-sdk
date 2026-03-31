@@ -56,6 +56,7 @@ export type {
   EscrowBalance,
   SettlementResult,
   BatchSettlementResult,
+  SettleOptions,
 } from "./x402";
 
 export { SessionManager } from "./session";

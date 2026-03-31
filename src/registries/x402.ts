@@ -84,6 +84,13 @@ import type {
   VolumeCurveBreakpoint,
   Settlement,
 } from "../types";
+import {
+  buildPriorityFeeIxs,
+  buildRpcOptions,
+} from "../utils/priority-fee";
+import type { SettleOptions } from "../utils/priority-fee";
+
+export type { SettleOptions } from "../utils/priority-fee";
 
 // ═══════════════════════════════════════════════════════════════════
 //  Public Types
@@ -702,13 +709,33 @@ export class X402Registry {
    * @param depositorWallet - The client wallet that funded the escrow.
    * @param callsToSettle - Number of calls to settle.
    * @param serviceData - Raw service data (auto-hashed to `service_hash`).
+   * @param opts - Optional {@link SettleOptions} for priority fees and RPC tuning.
    * @returns A {@link SettlementResult} with transaction details and amount.
    * @since v0.1.0
+   * @updated v0.6.2 — Added optional `opts` parameter for priority fees.
+   *
+   * @example
+   * ```ts
+   * // Default (no priority fee)
+   * const receipt = await x402.settle(depositor, 1, "data");
+   *
+   * // Fast settlement with priority fee
+   * import { FAST_SETTLE_OPTIONS } from "@synapse-sap/sdk";
+   * const receipt = await x402.settle(depositor, 1, "data", FAST_SETTLE_OPTIONS);
+   *
+   * // Custom priority fee
+   * const receipt = await x402.settle(depositor, 1, "data", {
+   *   priorityFeeMicroLamports: 10_000,
+   *   computeUnits: 100_000,
+   *   skipPreflight: true,
+   * });
+   * ```
    */
   async settle(
     depositorWallet: PublicKey,
     callsToSettle: number,
     serviceData: string | Buffer | Uint8Array,
+    opts?: SettleOptions,
   ): Promise<SettlementResult> {
     const serviceHash = hashToArray(
       sha256(typeof serviceData === "string" ? serviceData : Buffer.from(serviceData)),
@@ -730,7 +757,11 @@ export class X402Registry {
       callsToSettle,
     );
 
-    const txSignature = await this.methods
+    // Build priority fee instructions (empty array if no opts)
+    const preIxs = buildPriorityFeeIxs(opts);
+    const rpcOpts = buildRpcOptions(opts);
+
+    let builder = this.methods
       .settleCalls(new BN(callsToSettle), serviceHash)
       .accounts({
         wallet: this.wallet,
@@ -738,8 +769,13 @@ export class X402Registry {
         agentStats: statsPda,
         escrow: escrowPda,
         systemProgram: SystemProgram.programId,
-      })
-      .rpc();
+      });
+
+    if (preIxs.length > 0) {
+      builder = builder.preInstructions(preIxs);
+    }
+
+    const txSignature = await builder.rpc(rpcOpts);
 
     return {
       txSignature,
@@ -755,10 +791,21 @@ export class X402Registry {
    * Must be called by the agent owner wallet. More gas-efficient than
    * individual settlements.
    *
+   * Optionally accepts {@link SettleOptions} to configure priority fees,
+   * compute budget, and RPC behavior for faster confirmation.
+   *
    * @param depositorWallet - The client wallet that funded the escrow.
    * @param entries - Array of `{ calls, serviceData }` settlement entries.
+   * @param opts - Optional {@link SettleOptions} for priority fees and RPC tuning.
    * @returns A {@link BatchSettlementResult} with aggregated totals.
    * @since v0.1.0
+   * @updated v0.6.2 — Added optional `opts` parameter for priority fees.
+   *
+   * @example
+   * ```ts
+   * import { FAST_BATCH_SETTLE_OPTIONS } from "@synapse-sap/sdk";
+   * const receipt = await x402.settleBatch(depositor, entries, FAST_BATCH_SETTLE_OPTIONS);
+   * ```
    */
   async settleBatch(
     depositorWallet: PublicKey,
@@ -766,6 +813,7 @@ export class X402Registry {
       calls: number;
       serviceData: string | Buffer | Uint8Array;
     }>,
+    opts?: SettleOptions,
   ): Promise<BatchSettlementResult> {
     const settlements: Settlement[] = entries.map((e) => ({
       callsToSettle: new BN(e.calls),
@@ -792,7 +840,11 @@ export class X402Registry {
       totalCalls,
     );
 
-    const txSignature = await this.methods
+    // Build priority fee instructions (empty array if no opts)
+    const preIxs = buildPriorityFeeIxs(opts);
+    const rpcOpts = buildRpcOptions(opts);
+
+    let builder = this.methods
       .settleBatch(settlements)
       .accounts({
         wallet: this.wallet,
@@ -800,8 +852,13 @@ export class X402Registry {
         agentStats: statsPda,
         escrow: escrowPda,
         systemProgram: SystemProgram.programId,
-      })
-      .rpc();
+      });
+
+    if (preIxs.length > 0) {
+      builder = builder.preInstructions(preIxs);
+    }
+
+    const txSignature = await builder.rpc(rpcOpts);
 
     return {
       txSignature,

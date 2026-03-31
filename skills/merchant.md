@@ -1,8 +1,8 @@
 # SAP SDK — Merchant (Agent / Seller) Skill Guide
 
-> **Version:** v0.6.0
+> **Version:** v0.6.2
 > **Role:** You are a merchant (agent/seller) that registers on-chain, publishes
-> tools, receives x402 micropayments, and manages sessions.
+> tools, inscribes schemas, receives x402 micropayments, and manages sessions.
 > **Companion:** For the client/consumer perspective see [client.md](./client.md)
 > **Parent Reference:** For the full Synapse Client SDK (RPC, DAS, AI tools, plugins, MCP, gateway, x402, Next.js) see [skills.md](./skills.md)
 > **CLI Access:** All merchant operations (register, publish, settle, memory) are also available via the `synapse-sap` CLI — see [cli/README.md](../cli/README.md)
@@ -68,6 +68,8 @@ synapse-sap config set rpcUrl "https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=
 6. [Endpoint Descriptors & Agent Manifest (v0.6.0)](#6-endpoint-descriptors--agent-manifest-v060)
 7. [Publishing Tools](#7-publishing-tools)
 8. [Tool Lifecycle](#8-tool-lifecycle)
+8b. [Tool Schema Inscription — Complete Pipeline (v0.6.2)](#8b-tool-schema-inscription--complete-pipeline-v062)
+8c. [Tool Analytics & Invocation Tracking (v0.6.2)](#8c-tool-analytics--invocation-tracking-v062)
 9. [Discovery Indexing (Be Found)](#9-discovery-indexing-be-found)
 10. [Network Normalization (v0.6.0)](#10-network-normalization-v060)
 11. [Settling Payments (x402)](#11-settling-payments-x402)
@@ -838,6 +840,456 @@ console.log(tool.version);          // number
 
 ---
 
+## 8b. Tool Schema Inscription — Complete Pipeline (v0.6.2)
+
+> **⚠ Many agents register tools but never inscribe their schemas.**
+> Without schemas, clients cannot validate inputs or discover your tool's
+> API surface. Inscribing schemas is zero-rent (stored in TX logs) and
+> makes your tools machine-readable by other AI agents.
+
+### Why Schemas Matter
+
+| Without Schema | With Schema |
+|----------------|-------------|
+| Clients guess input format | Clients auto-validate via JSON Schema |
+| No discovery by structure | AI agents can compose multi-tool pipelines |
+| No version tracking | `version` field enables safe upgrades |
+| Invisible to explorers | Explorers display full input/output contracts |
+
+### Full Publish + Inscribe Pipeline
+
+This is the **correct 3-step sequence** the protocol expects:
+
+```ts
+import {
+  SchemaType,
+  CompressionType,
+  ToolHttpMethod,
+  ToolCategory,
+  sha256,
+  hashToArray,
+} from "@oobe-protocol-labs/synapse-sap-sdk";
+import type { InscribeToolSchemaArgs } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+// ── Step 1: Define your JSON schemas ────────────────────────
+const inputSchema = JSON.stringify({
+  type: "object",
+  properties: {
+    inputMint:  { type: "string", description: "Source token mint address" },
+    outputMint: { type: "string", description: "Target token mint address" },
+    amount:     { type: "number", description: "Amount in base units (lamports)" },
+    slippageBps: { type: "number", description: "Max slippage in basis points", default: 50 },
+  },
+  required: ["inputMint", "outputMint", "amount"],
+});
+
+const outputSchema = JSON.stringify({
+  type: "object",
+  properties: {
+    txSignature:  { type: "string" },
+    inputAmount:  { type: "number" },
+    outputAmount: { type: "number" },
+    priceImpact:  { type: "number" },
+    route:        { type: "string" },
+  },
+  required: ["txSignature", "outputAmount"],
+});
+
+const description = "Execute a token swap via Jupiter aggregator with optimal routing";
+
+// ── Step 2: Publish the tool descriptor (hashes go on-chain) ─
+const txPublish = await client.tools.publishByName(
+  "jupiterSwap",          // toolName (max 64 chars)
+  "jupiter",              // protocolId
+  description,            // description
+  inputSchema,            // inputSchema JSON string → SDK computes sha256(inputSchema)
+  outputSchema,           // outputSchema JSON string → SDK computes sha256(outputSchema)
+  ToolHttpMethod.Post,    // HTTP method
+  ToolCategory.Swap,      // category for discovery indexes
+  4,                      // total input parameters
+  3,                      // required input parameters
+  false,                  // isCompound
+);
+console.log("Tool published:", txPublish);
+
+// ── Step 3: Inscribe full schemas into TX logs (zero rent) ──
+// You MUST inscribe all three: input, output, and description.
+// The on-chain program verifies sha256(schemaData) === stored hash.
+
+// 3a. Input schema
+await client.tools.inscribeSchema("jupiterSwap", {
+  schemaType: SchemaType.Input,           // 0
+  schemaData: Buffer.from(inputSchema),
+  schemaHash: hashToArray(sha256(inputSchema)),
+  compression: CompressionType.None,      // 0 = None, 1 = Deflate
+});
+
+// 3b. Output schema
+await client.tools.inscribeSchema("jupiterSwap", {
+  schemaType: SchemaType.Output,          // 1
+  schemaData: Buffer.from(outputSchema),
+  schemaHash: hashToArray(sha256(outputSchema)),
+  compression: CompressionType.None,
+});
+
+// 3c. Description (full text)
+await client.tools.inscribeSchema("jupiterSwap", {
+  schemaType: SchemaType.Description,     // 2
+  schemaData: Buffer.from(description),
+  schemaHash: hashToArray(sha256(description)),
+  compression: CompressionType.None,
+});
+
+console.log("All 3 schemas inscribed — tool is fully discoverable");
+```
+
+### Compressed Schema Inscription (Large Schemas)
+
+For schemas larger than 500 bytes, use deflate compression to save TX space:
+
+```ts
+import { deflateSync } from "node:zlib";
+
+const largeSchema = JSON.stringify(myLargeJsonSchema); // e.g. 2KB+
+const compressed = deflateSync(Buffer.from(largeSchema));
+
+await client.tools.inscribeSchema("myTool", {
+  schemaType: SchemaType.Input,
+  schemaData: compressed,                            // compressed bytes
+  schemaHash: hashToArray(sha256(largeSchema)),      // hash of UNCOMPRESSED
+  compression: CompressionType.Deflate,              // 1
+});
+```
+
+### Builder Pattern: Register + Publish + Inscribe in One Flow
+
+```ts
+// Step 1: Register agent + publish tools
+const result = await client.builder
+  .agent("SwapAgent")
+  .description("Jupiter swap executor")
+  .addCapability("jupiter:swap")
+  .addPricingTier({ tierId: "default", pricePerCall: 100_000, rateLimit: 60 })
+  .addTool({
+    toolName: "jupiterSwap",
+    protocolId: "jupiter",
+    description,
+    inputSchema,
+    outputSchema,
+    httpMethod: ToolHttpMethod.Post,
+    category: ToolCategory.Swap,
+    paramsCount: 4,
+    requiredParams: 3,
+    isCompound: false,
+  })
+  .registerWithTools();
+
+// Step 2: Inscribe schemas for each tool (must be after publish)
+for (const tool of result.tools) {
+  await client.tools.inscribeSchema(tool.toolName, {
+    schemaType: SchemaType.Input,
+    schemaData: Buffer.from(inputSchema),
+    schemaHash: hashToArray(sha256(inputSchema)),
+    compression: CompressionType.None,
+  });
+  await client.tools.inscribeSchema(tool.toolName, {
+    schemaType: SchemaType.Output,
+    schemaData: Buffer.from(outputSchema),
+    schemaHash: hashToArray(sha256(outputSchema)),
+    compression: CompressionType.None,
+  });
+  await client.tools.inscribeSchema(tool.toolName, {
+    schemaType: SchemaType.Description,
+    schemaData: Buffer.from(description),
+    schemaHash: hashToArray(sha256(description)),
+    compression: CompressionType.None,
+  });
+}
+
+console.log("Agent registered, tools published, schemas inscribed");
+```
+
+### CLI: Publish from Manifest (includes schemas)
+
+```bash
+# Generate manifest from on-chain data (or create manually)
+synapse-sap tools manifest generate <WALLET> --out manifest.json --include-schema
+
+# Validate the manifest
+synapse-sap tools manifest validate manifest.json
+
+# Publish all tools + inscribe schemas
+synapse-sap tools publish manifest.json
+
+# Generate TypeScript types from your tools
+synapse-sap tools typify manifest.json --out src/generated/agent.ts
+```
+
+### Schema Type Reference
+
+| Value | Constant | On-Chain Hash Field | Purpose |
+|-------|----------|-------------------|---------|
+| `0` | `SchemaType.Input` | `input_schema_hash` | JSON Schema for tool input parameters |
+| `1` | `SchemaType.Output` | `output_schema_hash` | JSON Schema for tool response |
+| `2` | `SchemaType.Description` | `description_hash` | Full text description of the tool |
+
+### Verifying Schema Inscription
+
+After inscribing, verify the hashes match:
+
+```ts
+const [agentPda] = deriveAgent(client.walletPubkey);
+const tool = await client.tools.fetch(agentPda, "jupiterSwap");
+
+const expectedInputHash = hashToArray(sha256(inputSchema));
+const onChainInputHash = tool.inputSchemaHash;
+
+const match = expectedInputHash.every((b, i) => b === onChainInputHash[i]);
+console.log("Input schema hash match:", match); // should be true
+```
+
+---
+
+## 8c. Tool Analytics & Invocation Tracking (v0.6.2)
+
+Track how many times each tool is called and correlate with settlements
+to build per-tool revenue analytics.
+
+### Report Tool Invocations
+
+The protocol provides a self-reporting mechanism. Call this after serving
+requests to keep your tool's on-chain analytics accurate:
+
+```ts
+// Report 1 invocation per call (in your x402 handler)
+await client.tools.reportInvocations("jupiterSwap", 1);
+
+// Or batch report periodically (e.g. every 100 calls)
+let pendingInvocations = 0;
+async function onToolCall(toolName: string, args: any): Promise<any> {
+  const result = await executeTool(toolName, args);
+  pendingInvocations++;
+
+  if (pendingInvocations >= 100) {
+    await client.tools.reportInvocations(toolName, pendingInvocations);
+    pendingInvocations = 0;
+  }
+  return result;
+}
+```
+
+### Tool-Level Analytics from On-Chain Data
+
+```ts
+const [agentPda] = deriveAgent(client.walletPubkey);
+
+// Fetch all your tools
+const allTools = await client.program.account.toolDescriptor.all([
+  { memcmp: { offset: 9, bytes: agentPda.toBase58() } },
+]);
+
+// Build analytics dashboard
+const toolAnalytics = allTools.map(({ account: t, publicKey }) => ({
+  pda: publicKey.toBase58(),
+  name: t.toolName,
+  category: t.category,
+  httpMethod: t.httpMethod,
+  totalInvocations: t.totalInvocations.toNumber(),
+  isActive: t.isActive,
+  version: t.version,
+  paramsCount: t.paramsCount,
+  requiredParams: t.requiredParams,
+  isCompound: t.isCompound,
+  createdAt: new Date(t.createdAt.toNumber() * 1000),
+  updatedAt: new Date(t.updatedAt.toNumber() * 1000),
+  hasInputSchema: !t.inputSchemaHash.every(b => b === 0),
+  hasOutputSchema: !t.outputSchemaHash.every(b => b === 0),
+  hasDescription: !t.descriptionHash.every(b => b === 0),
+  schemaCompleteness: [
+    !t.inputSchemaHash.every(b => b === 0),
+    !t.outputSchemaHash.every(b => b === 0),
+    !t.descriptionHash.every(b => b === 0),
+  ].filter(Boolean).length,  // 0-3 (3 = fully inscribed)
+}));
+
+console.table(toolAnalytics);
+```
+
+### AgentStats: Global Call Counter
+
+`AgentStats` is a hot-path account (106 bytes) updated on every settlement.
+It provides the **authoritative** total call count across all tools:
+
+```ts
+import { deriveAgentStats } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const [agentPda] = deriveAgent(client.walletPubkey);
+const [statsPda] = deriveAgentStats(agentPda);
+
+const stats: AgentStatsData = await client.program.account.agentStats.fetch(statsPda);
+
+console.log("Total calls served (all tools):", stats.totalCallsServed.toString());
+console.log("Active:", stats.isActive);
+console.log("Last updated:", new Date(stats.updatedAt.toNumber() * 1000));
+```
+
+### Correlating Invocations with Settlements
+
+Tool invocations (`total_invocations` on `ToolDescriptor`) and settlements
+(`PaymentSettledEvent`) are tracked separately:
+
+- **`tool.totalInvocations`** — self-reported by `reportInvocations()`. Shows how
+  many times the tool was actually called.
+- **`escrow.totalCallsSettled`** — on-chain counter incremented by `settle_calls`
+  and `settle_batch`. Shows how many calls were billed.
+- **`stats.totalCallsServed`** — authoritative counter on `AgentStats`, updated
+  by settlement instructions. Matches `totalCallsSettled` sum across all escrows.
+
+Use `service_hash` in `PaymentSettledEvent` to link settlements to specific tools:
+
+```ts
+// In your x402 handler, encode the tool name in service_hash
+const serviceData = JSON.stringify({
+  tool: "jupiterSwap",
+  args: { inputMint, outputMint, amount },
+  resultHash: sha256(JSON.stringify(result)).slice(0, 32),
+});
+
+const receipt = await client.x402.settle(
+  depositorWallet,
+  1,
+  serviceData,  // hashed to service_hash — links settlement to specific tool
+);
+```
+
+### Per-Tool Revenue Query (PostgreSQL)
+
+If you use the PostgreSQL indexer, query per-tool revenue by decoding
+`service_hash` from your settlement events:
+
+```sql
+-- Assuming you store decoded service_data alongside settlements
+SELECT
+  tool_name,
+  COUNT(*) AS settlements,
+  SUM(amount_lamports) / 1e9 AS revenue_sol,
+  SUM(calls_settled) AS total_calls,
+  AVG(amount_lamports) / 1e9 AS avg_settlement_sol,
+  MIN(block_time) AS first_settlement,
+  MAX(block_time) AS last_settlement
+FROM sap_settlement_ledger
+WHERE agent_pda = $1
+GROUP BY tool_name
+ORDER BY revenue_sol DESC;
+```
+
+### Event Listeners for Tool Analytics
+
+```ts
+import { EventParser } from "@oobe-protocol-labs/synapse-sap-sdk/events";
+
+const eventParser = new EventParser(client.program);
+
+connection.onLogs(SAP_PROGRAM_ID, (logInfo) => {
+  if (logInfo.err) return;
+  const events = eventParser.parseLogs(logInfo.logs);
+
+  for (const event of events) {
+    switch (event.name) {
+      case "ToolInvocationReportedEvent":
+        console.log(
+          `Tool ${event.data.tool.toBase58()}: ` +
+          `+${event.data.invocationsReported} invocations ` +
+          `(total: ${event.data.totalInvocations})`
+        );
+        break;
+
+      case "PaymentSettledEvent":
+        console.log(
+          `Settlement: ${event.data.callsSettled} calls, ` +
+          `${event.data.amount} lamports from ${event.data.depositor.toBase58()}`
+        );
+        break;
+
+      case "ToolSchemaInscribedEvent":
+        const types = ["input", "output", "description"];
+        console.log(
+          `Schema inscribed: ${event.data.toolName} ` +
+          `(${types[event.data.schemaType]}, v${event.data.version})`
+        );
+        break;
+    }
+  }
+}, "confirmed");
+```
+
+### Complete Merchant Analytics Dashboard
+
+```ts
+async function getMerchantDashboard(client: SapClient) {
+  const [agentPda] = deriveAgent(client.walletPubkey);
+  const [statsPda] = deriveAgentStats(agentPda);
+
+  const [agent, stats, tools, escrows] = await Promise.all([
+    client.program.account.agentAccount.fetch(agentPda),
+    client.program.account.agentStats.fetch(statsPda),
+    client.program.account.toolDescriptor.all([
+      { memcmp: { offset: 9, bytes: agentPda.toBase58() } },
+    ]),
+    client.program.account.escrowAccount.all([
+      { memcmp: { offset: 9, bytes: agentPda.toBase58() } },
+    ]),
+  ]);
+
+  // Aggregate escrow revenue
+  let totalRevenue = 0n;
+  let totalDeposited = 0n;
+  let activeEscrows = 0;
+
+  for (const { account: e } of escrows) {
+    totalRevenue += BigInt(e.totalSettled.toString());
+    totalDeposited += BigInt(e.totalDeposited.toString());
+    if (BigInt(e.balance.toString()) > 0n) activeEscrows++;
+  }
+
+  // Tool completeness check
+  const toolsWithFullSchema = tools.filter(({ account: t }) =>
+    !t.inputSchemaHash.every(b => b === 0) &&
+    !t.outputSchemaHash.every(b => b === 0) &&
+    !t.descriptionHash.every(b => b === 0)
+  ).length;
+
+  return {
+    agent: {
+      name: agent.name,
+      reputation: agent.reputationScore / 100,
+      isActive: agent.isActive,
+    },
+    stats: {
+      totalCallsServed: stats.totalCallsServed.toString(),
+    },
+    tools: {
+      total: tools.length,
+      active: tools.filter(t => t.account.isActive).length,
+      withFullSchema: toolsWithFullSchema,
+      missingSchema: tools.length - toolsWithFullSchema,
+      totalInvocations: tools.reduce(
+        (sum, t) => sum + t.account.totalInvocations.toNumber(), 0
+      ),
+    },
+    revenue: {
+      totalSettledLamports: totalRevenue.toString(),
+      totalSettledSol: Number(totalRevenue) / 1e9,
+      totalDepositedSol: Number(totalDeposited) / 1e9,
+      activeEscrows,
+      totalEscrows: escrows.length,
+    },
+  };
+}
+```
+
+---
+
 ## 9. Discovery Indexing (Be Found)
 
 Register your agent in on-chain indexes so clients can discover you.
@@ -1064,6 +1516,72 @@ const estimate2 = client.x402.calculateCost(
 );
 ```
 
+### Priority Fees for Settlement Transactions (v0.6.2)
+
+Settlement transactions on Solana mainnet can take 35–40 s at base fee.
+When the **consumer** (e.g. Kamiyo, AceDataCloud) imposes a synchronous
+HTTP timeout ≤ 30 s, the settle tx gets dropped and you receive
+`HTTP 402 — payment confirmation timeout`.
+
+The SDK now ships **priority-fee helpers** that push settle txs through
+Solana's scheduler in ~5–10 s:
+
+```ts
+import {
+  FAST_SETTLE_OPTIONS,
+  FAST_BATCH_SETTLE_OPTIONS,
+} from "@oobe-protocol-labs/synapse-sap-sdk";
+
+// Single settlement — ~5 000 µL priority, 100 k CU
+const receipt = await client.x402.settle(
+  depositorWallet, 1, serviceDataHash,
+  FAST_SETTLE_OPTIONS,        // ← adds ComputeBudget ixs automatically
+);
+
+// Batch settlement
+const receipts = await client.x402.settleBatch(
+  settlements,
+  FAST_BATCH_SETTLE_OPTIONS,  // ← 5 000 µL, 300 k CU
+);
+```
+
+Or pass custom values:
+
+```ts
+await client.x402.settle(depositorWallet, 1, serviceDataHash, {
+  priorityFeeMicroLamports: 10_000,  // higher tip for congested slots
+  computeUnits: 150_000,
+  skipPreflight: true,
+  commitment: "confirmed",
+  maxRetries: 3,
+});
+```
+
+> **⚠️ Timeout advice for merchants WITHOUT a dedicated RPC**
+>
+> If you are running on the **public Solana mainnet RPC**
+> (`https://api.mainnet-beta.solana.com`) — which is **rate-limited to
+> ~10 req/s** — settlement confirmation can be significantly slower and
+> retries may get throttled.
+>
+> **Recommended default**: set your HTTP server / x402 handler timeout to
+> **at least 60 seconds** when using the public RPC. This gives the
+> transaction enough room to land even under congestion + rate limiting.
+>
+> If you use **OOBE Protocol RPC**, **Helius**, or any dedicated RPC with
+> higher rate limits, 30 s is usually sufficient with `FAST_SETTLE_OPTIONS`.
+>
+> ```ts
+> // Example: Express middleware timeout for settlement endpoint
+> app.post("/x402/settle", timeout("60s"), async (req, res) => {
+>   const receipt = await client.x402.settle(
+>     depositorWallet, 1, serviceDataHash,
+>     FAST_SETTLE_OPTIONS,
+>   );
+>   res.json({ receipt });
+> });
+> ```
+
 ---
 
 ## 12. Zod Schema Validation (v0.6.0)
@@ -1245,167 +1763,739 @@ app.post("/x402/:tool", async (req, res) => {
 
 ---
 
-## 15. Memory Vault and Ledger
+## 15. Memory Systems — Vault & Ledger
 
-Merchants use encrypted memory to persist session state between calls.
+Synapse provides **two memory systems** that serve different purposes.
+Choose the right one — or combine them — based on your use case.
 
-### Using SessionManager (Recommended)
+| System | Data Location | Rent | Readable via | Best For |
+|--------|--------------|------|-------------|----------|
+| **Vault (inscriptions)** | TX logs (permanent) | ZERO — only TX fee | `getTransaction()` on epoch/session PDAs | Encrypted conversation history, large archives, multi-agent context |
+| **Ledger (ring buffer)** | PDA account (4 KB) + TX logs | ~0.032 SOL (reclaimable) | `getAccountInfo()` (free, instant) | Hot memory, recent context window, fast reads without RPC history |
+
+> **Rule of thumb**: Use the **Ledger** for data your agent needs to read
+> on every request (recent conversation). Use the **Vault** for long-term
+> archive and encrypted data you reconstruct on demand.
+
+### 15a. Vault Architecture — How It Works
+
+The vault system stores **encrypted data inside TX logs** (zero rent).
+On-chain PDAs track only metadata and counters — never the data itself.
+
+```
+┌─────────────────────────────────────────────────┐
+│  MemoryVault PDA  ["sap_vault", agent_pda]      │
+│  ~165 bytes, ~0.002 SOL rent (reclaimable)      │
+│  Fields: vault_nonce, nonce_version,            │
+│          total_sessions, total_inscriptions,     │
+│          total_bytes_inscribed                   │
+├─────────────────────────────────────────────────┤
+│  SessionLedger PDA  ["sap_session", vault, hash]│
+│  ~150 bytes, ~0.002 SOL rent (reclaimable)      │
+│  Fields: sequence_counter, merkle_root,         │
+│          tip_hash, current_epoch, is_closed      │
+├─────────────────────────────────────────────────┤
+│  EpochPage PDA  ["sap_epoch", session, index]   │
+│  ~100 bytes, ~0.001 SOL per epoch               │
+│  Groups 1000 inscriptions for O(1) navigation   │
+└─────────────────────────────────────────────────┘
+         │ inscribe_memory emits:
+         ▼
+  MemoryInscribedEvent in TX log (PERMANENT, ZERO RENT)
+  Contains: encrypted_data, nonce, content_hash,
+            sequence, epoch_index, compression,
+            total_fragments, fragment_index, nonce_version
+```
+
+**Key concepts:**
+- **Epoch system**: every 1000 inscriptions auto-create a new EpochPage PDA.
+  `getSignaturesForAddress(epochPagePDA)` returns only that epoch's TXs → O(1) random access.
+- **Merkle accumulator**: `new_root = sha256(prev_root || content_hash)` — proves data integrity.
+- **tip_hash**: tracks the most recent content_hash for O(1) change detection.
+- **nonce_version**: included in every event — clients know which vault_nonce decrypts each inscription.
+
+### 15b. SessionManager — High-Level API (Recommended)
+
+The `SessionManager` wraps vault + ledger + PDA derivation into a single
+idempotent interface. Use this unless you need low-level control.
 
 ```ts
-// Start a session (creates vault + session + ledger idempotently)
+import { SapClient } from "@oobe-protocol-labs/synapse-sap-sdk";
+import type { SessionContext, WriteResult, SealResult, RingBufferEntry, SessionStatus }
+  from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const client = SapClient.from(provider);
+
+// ── Start a session (creates vault + session + ledger idempotently) ──
 const ctx: SessionContext = await client.session.start("conversation-abc-123");
 
-// Write data to the ring buffer
+// ── Write data to the ring buffer (max 750 bytes per write) ──
 const result: WriteResult = await client.session.write(ctx, "user said hello");
+console.log("Entry index:", result.entryIndex);
+console.log("Merkle root:", result.merkleRoot);
 
-// Read current ring buffer
+// ── Read the current ring buffer (hot memory — free, instant) ──
 const entries: RingBufferEntry[] = await client.session.readLatest(ctx);
 entries.forEach(e => console.log(e.data.toString()));
 
-// Seal into a permanent page when ring is full
+// ── Seal the ring into a permanent, immutable LedgerPage ──
+// Cost: ~0.031 SOL per page (WRITE-ONCE, NEVER-DELETE)
+// Even the authority cannot delete a sealed page.
 const seal: SealResult = await client.session.seal(ctx);
+console.log("Sealed page:", seal.pageIndex, "entries:", seal.entriesInPage);
 
-// Read a sealed archive page
+// ── Read sealed pages ──
 const page0: RingBufferEntry[] = await client.session.readPage(ctx, 0);
 
-// Read ALL data (pages + ring, chronological)
+// ── Read ALL data (pages + current ring, chronological) ──
 const all: RingBufferEntry[] = await client.session.readAll(ctx);
 
-// Session status
+// ── Check session status ──
 const status: SessionStatus = await client.session.getStatus(ctx);
+console.log("Entries:", status.numEntries, "Pages:", status.numPages);
 
-// Teardown (close ledger then session)
+// ── Teardown (close ledger → close session, reclaim ~0.032 SOL) ──
 await client.session.close(ctx);
 ```
 
-### Using VaultModule + LedgerModule (Low-Level)
+### 15c. VaultModule — Low-Level Vault Operations
+
+Use the VaultModule directly when you need full control over encryption,
+epochs, fragments, and delegated writes.
+
+#### Initialize vault and open session
 
 ```ts
-// Init vault
-const [agentPda] = deriveAgent(client.walletPubkey);
-await client.vault.initVault(Array.from(crypto.getRandomValues(new Uint8Array(32))));
+import { deriveAgent, deriveVault, deriveSession, deriveEpochPage }
+  from "@oobe-protocol-labs/synapse-sap-sdk";
+import { sha256, hashToArray } from "@oobe-protocol-labs/synapse-sap-sdk";
+import { CompressionType } from "@oobe-protocol-labs/synapse-sap-sdk";
+import type { InscribeMemoryArgs } from "@oobe-protocol-labs/synapse-sap-sdk";
 
-// Open session
+const [agentPda] = deriveAgent(client.walletPubkey);
+
+// 1. Init vault (one-time, ~0.002 SOL rent)
+const vaultNonce = Array.from(crypto.getRandomValues(new Uint8Array(32)));
+await client.vault.initVault(vaultNonce);
+
+// 2. Open a session (one per conversation/context)
 const sessionHash = hashToArray(sha256("my-session-id"));
 await client.vault.openSession(sessionHash);
+```
 
-// Inscribe encrypted data
+#### Inscribe encrypted memory (full 8-arg path with epochs)
+
+```ts
+// Encrypt client-side with AES-256-GCM
+const key = await deriveEncryptionKey(vaultNonce, agentKeypair);
+const nonce12 = crypto.getRandomValues(new Uint8Array(12));
+const plaintext = JSON.stringify({ role: "user", content: "Hello" });
+const encrypted = await encrypt(key, nonce12, plaintext);
+
+const [vaultPda] = deriveVault(agentPda);
+const sessionHashBytes = new Uint8Array(hashToArray(sha256("my-session-id")));
+const [sessionPda] = deriveSession(vaultPda, sessionHashBytes);
+
+// Calculate epoch: epoch_index = sequence / 1000
+const sequence = 0;
+const epochIndex = Math.floor(sequence / 1000);
+const [epochPda] = deriveEpochPage(sessionPda, epochIndex);
+
 const args: InscribeMemoryArgs = {
-  sequence: 0,
+  sequence,
   encryptedData: Buffer.from(encrypted),
-  nonce: Array.from(nonce12bytes),
+  nonce: Array.from(nonce12),
   contentHash: hashToArray(sha256(plaintext)),
   totalFragments: 1,
   fragmentIndex: 0,
   compression: CompressionType.None,
-  epochIndex: 0,
+  epochIndex,
 };
-const [vaultPda] = deriveVault(agentPda);
-const sessionHashBytes = new Uint8Array(hashToArray(sha256("my-session-id")));
-const [sessionPda] = deriveSession(vaultPda, sessionHashBytes);
-const [epochPda] = deriveEpochPage(sessionPda, 0);
 
 await client.vault.inscribeWithAccounts(sessionPda, epochPda, vaultPda, args);
-
-// Ledger operations
-const [ledgerPda] = deriveLedger(sessionPda);
-await client.ledger.init(sessionPda);
-await client.ledger.write(sessionPda, Buffer.from("data"), hashToArray(sha256("data")));
-await client.ledger.seal(sessionPda); // seal into permanent page
-
-// Read ring buffer (decoded)
-const ledger = await client.ledger.fetchLedger(sessionPda);
-const entries = client.ledger.decodeRingBuffer(ledger.ring);
+// Cost: ~0.000005 SOL (TX fee only — ZERO rent for data)
+// Data lives permanently in MemoryInscribedEvent in the TX log
 ```
+
+#### Compact inscribe (simplified 4-arg path — no epochs)
+
+```ts
+// For sessions with <1000 inscriptions, skip epoch pages entirely
+await client.vault.compactInscribe(sessionPda, vaultPda, {
+  sequence: 0,
+  encryptedData: Buffer.from(encrypted),
+  nonce: Array.from(nonce12),
+  contentHash: hashToArray(sha256(plaintext)),
+});
+// 4 fewer args → smaller TX → lower priority fees
+// No epoch_page account → saves ~0.001 SOL per epoch
+// Same MemoryInscribedEvent format (backward compatible)
+```
+
+#### Multi-fragment for large payloads (>750 bytes)
+
+```ts
+// On-chain max is 750 bytes per inscription.
+// Split large data into fragments sharing the same content_hash.
+const MAX_FRAGMENT = 750;
+const bigData = Buffer.from(JSON.stringify(largeConversation));
+const totalFragments = Math.ceil(bigData.length / MAX_FRAGMENT);
+const contentHash = hashToArray(sha256(bigData));
+
+for (let i = 0; i < totalFragments; i++) {
+  const chunk = bigData.subarray(i * MAX_FRAGMENT, (i + 1) * MAX_FRAGMENT);
+  const nonce = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await encrypt(key, nonce, chunk);
+  const seq = currentSequence + i;
+  const epochIdx = Math.floor(seq / 1000);
+  const [epochPda] = deriveEpochPage(sessionPda, epochIdx);
+
+  await client.vault.inscribeWithAccounts(sessionPda, epochPda, vaultPda, {
+    sequence: seq,
+    encryptedData: Buffer.from(encrypted),
+    nonce: Array.from(nonce),
+    contentHash,
+    totalFragments,
+    fragmentIndex: i,
+    compression: CompressionType.None,
+    epochIndex: epochIdx,
+  });
+}
+```
+
+#### Nonce rotation (key rotation for forward secrecy)
+
+```ts
+// Rotate encryption nonce periodically. Old nonce is emitted in
+// VaultNonceRotatedEvent so historical inscriptions remain decryptable.
+// nonce_version increments and is included in every subsequent event.
+const newNonce = Array.from(crypto.getRandomValues(new Uint8Array(32)));
+await client.vault.rotateNonce(newNonce);
+
+// Future inscriptions will include the incremented nonce_version
+// Clients reading old inscriptions use the nonce_version from
+// MemoryInscribedEvent to find the correct decryption nonce
+```
+
+#### Close lifecycle (reclaim all rent)
+
+```ts
+// Close order matters:
+// 1. Close epoch pages (each ~0.001 SOL)
+// 2. Close session (marks is_closed = true)
+// 3. Close session PDA (reclaims rent)
+// 4. Close vault (reclaims ~0.002 SOL)
+
+// Step 1: close all epoch pages
+const session = await client.vault.fetchSessionByPda(sessionPda);
+for (let i = 0; i <= session.currentEpoch; i++) {
+  await client.vault.closeEpochPage(sessionPda, i);
+}
+
+// Step 2: mark session closed (no more writes allowed)
+await client.vault.closeSession(vaultPda, sessionPda);
+
+// Step 3: actually close the SessionLedger PDA
+await client.vault.closeSessionPda(vaultPda, sessionPda);
+
+// Step 4: close the vault itself
+await client.vault.closeVault();
+// All inscribed data remains permanently in TX logs
+```
+
+### 15d. LedgerModule — Ring Buffer Memory
+
+The ledger provides a 4 KB ring buffer for **hot memory** that's instantly
+readable via `getAccountInfo()` on any free RPC. Evicted entries remain
+permanently in TX logs.
+
+```
+┌────────────────────────────────────────────────────┐
+│  MemoryLedger PDA  ["sap_ledger", session_pda]     │
+│  Fixed ~4 KB, ~0.032 SOL rent (reclaimable)        │
+│                                                    │
+│  Ring buffer wire format:                          │
+│    [data_len: u16 LE][data: u8 × data_len]         │
+│    [data_len: u16 LE][data: u8 × data_len]         │
+│    ... (oldest evicted when full)                  │
+│                                                    │
+│  Also tracks: merkle_root, latest_hash,            │
+│               num_entries, total_data_size,         │
+│               num_pages                            │
+├────────────────────────────────────────────────────┤
+│  LedgerPage PDA  ["sap_page", ledger, page_index]  │
+│  WRITE-ONCE, NEVER-DELETE  (~0.031 SOL each)       │
+│  Even the authority cannot delete sealed pages.    │
+│  Protocol-level guarantee of immutability.         │
+└────────────────────────────────────────────────────┘
+```
+
+#### Full ledger lifecycle
+
+```ts
+import { deriveLedger, deriveLedgerPage } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+// 1. Init ledger (~0.032 SOL, reclaimable)
+await client.ledger.init(sessionPda);
+
+// 2. Write data (max 750 bytes per write, ~0.000005 SOL TX fee)
+// Each write does THREE things:
+//   a) Emits LedgerEntryEvent to TX log (permanent, zero rent)
+//   b) Updates rolling merkle root in PDA
+//   c) Writes data into ring buffer (evicts oldest if full)
+const contentHash = hashToArray(sha256("user said hello"));
+await client.ledger.write(sessionPda, Buffer.from("user said hello"), contentHash);
+
+// 3. Read the ring buffer (hot path — instant, free)
+const ledger = await client.ledger.fetchLedger(sessionPda);
+const entries: Uint8Array[] = client.ledger.decodeRingBuffer(ledger.ring);
+entries.forEach(e => console.log(e.toString()));
+
+// 4. Seal ring into permanent page (~0.031 SOL, IRREVOCABLE)
+await client.ledger.seal(sessionPda);
+
+// 5. Read sealed pages
+const [ledgerPda] = deriveLedger(sessionPda);
+const page = await client.ledger.fetchPage(ledgerPda, 0);
+const pageEntries = client.ledger.decodeRingBuffer(page.data);
+
+// 6. Close ledger (reclaim ~0.032 SOL)
+// Sealed pages remain permanently. TX log entries remain permanently.
+await client.ledger.close(sessionPda);
+```
+
+#### Cost model
+
+| Operation | Cost | Notes |
+|-----------|------|-------|
+| `init_ledger` | ~0.032 SOL | Fixed, reclaimable via `close_ledger` |
+| `write_ledger` | ~0.000005 SOL | TX fee only, ZERO additional rent |
+| `seal_ledger` | ~0.031 SOL | Write-once, never-delete — the price of permanence |
+| 1K writes | ~0.037 SOL | 0.032 init + ~0.005 fees |
+| 10K writes | ~0.082 SOL | 0.032 init + ~0.050 fees |
+| `close_ledger` | Reclaim ~0.032 SOL | Pages and TX logs remain permanently |
 
 ---
 
 ## 16. Delegate Hot-Wallet Access
 
+Delegates let you authorize a **hot wallet** (e.g., a server signer) to
+perform vault operations without exposing your agent owner keypair.
+This is critical for automated services that inscribe memory on every request.
+
+### Permission Bitmask
+
+| Bit | Value | Permission | Use Case |
+|-----|-------|-----------|----------|
+| 0 | `1` | `INSCRIBE` | Write encrypted memory to vault |
+| 1 | `2` | `CLOSE_SESSION` | Close sessions when done |
+| 2 | `4` | `OPEN_SESSION` | Create new sessions |
+| ALL | `7` | All permissions | Full hot wallet access |
+
 ```ts
+import { DelegatePermission } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+// DelegatePermission.Inscribe     = 1
+// DelegatePermission.CloseSession = 2
+// DelegatePermission.OpenSession  = 4
+// DelegatePermission.All          = 7
+```
+
+### PDA Derivation
+
+```
+Seeds: ["sap_delegate", vault_pda, delegate_pubkey]
+One VaultDelegate PDA per (vault, delegate) pair.
+```
+
+### Add a delegate with specific permissions and expiry
+
+```ts
+// Authorize a hot wallet for inscribe + open session (but not close)
+// Delegate PDA rent is paid by the vault owner (~0.001 SOL, reclaimable)
 await client.vault.addDelegate(
   hotWalletPubkey,
-  DelegatePermission.Inscribe | DelegatePermission.OpenSession,
-  Math.floor(Date.now() / 1000) + 86400, // expires in 24h
+  DelegatePermission.Inscribe | DelegatePermission.OpenSession,  // bitmask = 5
+  Math.floor(Date.now() / 1000) + 86400, // expires in 24 hours
 );
 
-// Later: revoke
+// expires_at = 0 means NEVER expires (use with caution)
+await client.vault.addDelegate(
+  trustedServerPubkey,
+  DelegatePermission.All,  // bitmask = 7
+  0,  // never expires
+);
+```
+
+### Inscribe memory via delegate (auth chain)
+
+The delegate signs the transaction instead of the vault owner.
+Auth chain: `delegate signer → VaultDelegate PDA → MemoryVault → SessionLedger`
+
+```ts
+// On the hot wallet server:
+const delegateKeypair = loadKeypair("./hot-wallet.json");
+
+// The delegate calls inscribeDelegated — the program verifies:
+//   1. VaultDelegate PDA exists for this (vault, signer) pair
+//   2. permissions bitmask has INSCRIBE bit set
+//   3. expires_at is 0 OR in the future
+await client.vault.inscribeDelegated(
+  delegateKeypair.publicKey,
+  vaultPda,
+  sessionPda,
+  epochPda,
+  {
+    sequence: currentSequence,
+    encryptedData: Buffer.from(encrypted),
+    nonce: Array.from(nonce12),
+    contentHash: hashToArray(sha256(plaintext)),
+    totalFragments: 1,
+    fragmentIndex: 0,
+    compression: CompressionType.None,
+    epochIndex: Math.floor(currentSequence / 1000),
+  },
+);
+```
+
+### Revoke delegate (reclaim rent)
+
+```ts
+// Immediately revokes access — PDA is closed, rent returned to owner
 await client.vault.revokeDelegate(hotWalletPubkey);
+```
+
+### Fetch delegate info
+
+```ts
+const del = await client.vault.fetchDelegate(vaultPda, hotWalletPubkey);
+console.log("Permissions:", del.permissions);  // bitmask
+console.log("Expires:", del.expiresAt === 0 ? "never" : new Date(del.expiresAt * 1000));
+console.log("Created:", new Date(del.createdAt * 1000));
+```
+
+### Hot wallet pattern for production
+
+```ts
+// In your agent's startup:
+const DELEGATE_TTL = 7 * 86400; // 7 days
+
+// 1. Check if delegate exists
+const existing = await client.vault.fetchDelegate(vaultPda, serverKeypair.publicKey)
+  .catch(() => null);
+
+if (!existing || (existing.expiresAt > 0 && existing.expiresAt < Date.now() / 1000)) {
+  // 2. Revoke expired delegate (if exists)
+  if (existing) await client.vault.revokeDelegate(serverKeypair.publicKey);
+
+  // 3. Create fresh delegate with new expiry
+  await client.vault.addDelegate(
+    serverKeypair.publicKey,
+    DelegatePermission.Inscribe | DelegatePermission.OpenSession,
+    Math.floor(Date.now() / 1000) + DELEGATE_TTL,
+  );
+}
+
+// 4. Use server keypair for all inscriptions (fast, no cold wallet needed)
 ```
 
 ---
 
 ## 17. Attestations (Web of Trust)
 
-Issue attestations for other agents (KYC, audit, quality), or receive them.
+Attestations are **institutional trust signals** from third parties.
+Unlike feedback (score-based user reviews), attestations represent
+**identity-level trust**: "Jupiter verified this API", "OtterSec audited
+this code", "Solana Foundation: official partner".
+
+Trust comes from **WHO** is attesting (their wallet identity), not from
+the attestation itself. Anyone can create attestations — the value is in
+the attester's reputation.
+
+### PDA Derivation and Constraints
+
+```
+Seeds: ["sap_attest", agent_pda, attester_wallet]
+One attestation per (agent, attester) pair.
+Self-attestation blocked: attester.key() != agent.wallet
+Lifecycle: create → (optional) revoke → close
+Must revoke before closing (rent reclaim requires is_active = false)
+```
+
+### Create an attestation
 
 ```ts
-// Create an attestation for another agent
+import { sha256, hashToArray } from "@oobe-protocol-labs/synapse-sap-sdk";
+import { BN } from "@coral-xyz/anchor";
+
+// As a project/auditor, vouch for an agent
 const tx = await client.attestation.create(targetAgentWallet, {
+  // attestation_type: max 32 chars — describes the type of trust signal
   attestationType: "audit",
-  metadataHash: hashToArray(sha256(JSON.stringify(auditReport))),
-  expiresAt: new BN(Math.floor(Date.now() / 1000) + 365 * 86400),
+
+  // metadata_hash: SHA-256 of off-chain evidence (audit report, KYC doc, etc.)
+  metadataHash: hashToArray(sha256(JSON.stringify({
+    auditor: "OtterSec",
+    report: "https://example.com/audit-report.pdf",
+    score: "pass",
+    date: "2025-01-15",
+  }))),
+
+  // expires_at: 0 = never expires, > 0 = unix timestamp (must be in the future)
+  expiresAt: new BN(Math.floor(Date.now() / 1000) + 365 * 86400), // 1 year
 });
+```
 
-// Revoke / close
+### Common attestation types
+
+| Type | Meaning | Who Attests |
+|------|---------|-------------|
+| `"audit"` | Code has been audited | Security firms (OtterSec, Neodyme, etc.) |
+| `"kyc"` | Agent operator identity verified | KYC providers, foundations |
+| `"api-verified"` | API integration tested and working | Protocol teams (Jupiter, Raydium, etc.) |
+| `"official-partner"` | Official partnership | Ecosystem partners |
+| `"data-certified"` | Data feed quality certified | Data providers (Chainlink, Pyth, etc.) |
+| `"community"` | Community endorsement | DAOs, governance bodies |
+
+### Revoke an attestation
+
+Only the original attester can revoke. Revocation sets `is_active = false`
+on-chain and emits `AttestationRevokedEvent`.
+
+```ts
+// Revoke your attestation for an agent
 await client.attestation.revoke(targetAgentWallet);
-await client.attestation.close(targetAgentWallet);
+// Emits: AttestationRevokedEvent { agent, attester, attestation_type, timestamp }
+```
 
-// Fetch attestation data
+### Close attestation PDA (reclaim rent)
+
+Must be revoked first — the on-chain constraint enforces this:
+`constraint = !attestation.is_active @ SapError::AttestationNotRevoked`
+
+```ts
+// Close the PDA and reclaim rent (sent back to attester)
+await client.attestation.close(targetAgentWallet);
+// GlobalRegistry.total_attestations decremented
+```
+
+### Fetch and verify attestations
+
+```ts
+import { deriveAgent } from "@oobe-protocol-labs/synapse-sap-sdk";
+import type { AgentAttestationData } from "@oobe-protocol-labs/synapse-sap-sdk";
+
 const [targetAgentPda] = deriveAgent(targetAgentWallet);
+
+// Fetch a specific attestation
 const att: AgentAttestationData | null = await client.attestation.fetchNullable(
   targetAgentPda,
-  client.walletPubkey,
+  attesterWallet,
 );
+
+if (att) {
+  console.log("Type:", att.attestationType);       // e.g. "audit"
+  console.log("Active:", att.isActive);             // true until revoked
+  console.log("Attester:", att.attester.toBase58());
+  console.log("Metadata hash:", Buffer.from(att.metadataHash).toString("hex"));
+  console.log("Created:", new Date(att.createdAt * 1000));
+
+  // Check expiry
+  if (att.expiresAt > 0 && att.expiresAt < Date.now() / 1000) {
+    console.log("⚠️ EXPIRED — this attestation is no longer valid");
+  } else if (att.expiresAt === 0) {
+    console.log("Never expires");
+  } else {
+    console.log("Expires:", new Date(att.expiresAt * 1000));
+  }
+}
+```
+
+### Scan all attestations for an agent
+
+```ts
+// Find all attestation PDAs for a given agent using memcmp filter
+const [agentPda] = deriveAgent(agentWallet);
+const allAttestations = await client.program.account.agentAttestation.all([
+  { memcmp: { offset: 9, bytes: agentPda.toBase58() } },  // agent field
+]);
+
+const active = allAttestations.filter(a => a.account.isActive);
+const expired = active.filter(a =>
+  a.account.expiresAt > 0 && a.account.expiresAt < Date.now() / 1000
+);
+
+console.log(`${active.length} active attestations (${expired.length} expired)`);
+for (const { account: a } of active) {
+  console.log(`  ${a.attestationType} by ${a.attester.toBase58()}`);
+}
 ```
 
 ---
 
-## 18. Reputation and Metrics
+## 18. Reputation, Feedback & Metrics
 
-### Self-Report Metrics
+The SAP protocol distinguishes between **two independent reputation signals**:
+
+| Signal | Source | Updated By | Field on AgentAccount |
+|--------|--------|-----------|----------------------|
+| **Reputation score** | Other users' on-chain feedback | `give_feedback` / `update_feedback` / `revoke_feedback` instructions | `reputation_score` (0-10000) |
+| **Self-reported metrics** | The agent itself | `report_calls` / `update_reputation` instructions | `total_calls_served`, `avg_latency_ms`, `uptime_percent` |
+
+> **Critical distinction**: `reputation_score` is **trustless** — it can only
+> change via on-chain feedback from other wallets. Self-reported metrics
+> (`avg_latency_ms`, `uptime_percent`) are **informational** — the agent
+> owner sets them. Consumers should weight these differently.
+
+### 18a. Reputation Score Formula
+
+```
+reputation_score = (reputation_sum × 10) / total_feedbacks
+```
+
+- Each feedback `score` is 0-1000 (where 1000 = perfect)
+- `reputation_sum` accumulates all active feedback scores
+- `reputation_score` range is 0-10000 (2 decimal precision: 8547 = 85.47%)
+- When feedback is revoked, its score is subtracted from `reputation_sum`
+  and `total_feedbacks` is decremented
+
+**Examples:**
+- 1 feedback at 850 → `(850 × 10) / 1 = 8500` (85.00%)
+- 3 feedbacks at 900, 800, 950 → `(2650 × 10) / 3 = 8833` (88.33%)
+- After revoking the 800 → `(1850 × 10) / 2 = 9250` (92.50%)
+
+### 18b. Feedback Lifecycle (give → update → revoke → close)
+
+Feedback is **one PDA per (agent, reviewer) pair**. A reviewer can only
+have one active feedback per agent. Self-review is blocked on-chain
+(`SelfReviewNotAllowed`).
+
+```
+Seeds: ["sap_feedback", agent_pda, reviewer_wallet]
+Constraint: reviewer.key() != agent.wallet (no self-review)
+Constraint: agent.is_active (can't review inactive agents)
+Lifecycle: give → (optional) update → (optional) revoke → close
+```
+
+#### Give feedback
 
 ```ts
-// Report calls served (updates AgentStats hot-path PDA)
+// Score: 0-1000 (0 = terrible, 1000 = perfect)
+// Tag: short label (max 32 chars) — e.g. "fast", "reliable", "inaccurate"
+// comment_hash: optional SHA-256 of an off-chain detailed review
+await client.feedback.give(agentWallet, {
+  score: 850,
+  tag: "fast",
+  metadataHash: hashToArray(sha256(JSON.stringify({
+    comment: "Excellent response time, accurate swap execution",
+    latency: 45,
+    successRate: 0.99,
+  }))),
+});
+// Emits: FeedbackEvent { agent, reviewer, score, tag, timestamp }
+// Agent's reputation_score is immediately recalculated on-chain
+```
+
+#### Update feedback (same reviewer)
+
+```ts
+// Change your score/tag for the same agent
+await client.feedback.update(agentWallet, {
+  score: 900,       // new score
+  tag: "reliable",  // new tag (optional — omit to keep existing)
+});
+// Emits: FeedbackUpdatedEvent { agent, reviewer, old_score, new_score, timestamp }
+// reputation_sum: old_score subtracted, new_score added
+// reputation_score recalculated immediately
+```
+
+#### Revoke feedback
+
+```ts
+// Remove your feedback entirely — score removed from reputation calculation
+await client.feedback.revoke(agentWallet);
+// Emits: FeedbackRevokedEvent { agent, reviewer, timestamp }
+// reputation_sum -= score, total_feedbacks -= 1
+// If no feedbacks remain, reputation_score = 0
+```
+
+#### Close feedback PDA (reclaim rent)
+
+```ts
+// Must revoke first — on-chain constraint:
+// constraint = feedback.is_revoked @ SapError::FeedbackNotRevoked
+await client.feedback.close(agentWallet);
+// GlobalRegistry.total_feedbacks decremented
+// Rent returned to the reviewer
+```
+
+### 18c. Self-Reported Metrics
+
+These metrics are set by the agent owner and appear on the AgentAccount.
+They are **NOT trustless** — consumers should treat them as claims.
+
+```ts
+// Report total calls served (updates AgentStats PDA)
 await client.agent.reportCalls(1500);
 
-// Update latency / uptime
+// Update latency and uptime
 await client.agent.updateReputation(
-  45,   // avgLatencyMs
-  99,   // uptimePercent (0-100)
+  45,   // avgLatencyMs — average response time
+  99,   // uptimePercent — 0-100
 );
 ```
 
-### Read Your Reputation
+### 18d. Read Your Full Reputation Profile
 
 ```ts
 const agent: AgentAccountData = await client.agent.fetch();
-console.log("Score:", agent.reputationScore);      // 0-100
+
+// Trustless reputation (from on-chain feedback)
+console.log("Reputation score:", agent.reputationScore);       // 0-10000
 console.log("Total feedbacks:", agent.totalFeedbacks);
-console.log("Total calls:", agent.totalCallsServed.toString());
-console.log("Latency:", agent.avgLatencyMs, "ms");
+console.log("Reputation sum:", agent.reputationSum);
+
+// Self-reported metrics (set by agent owner)
+console.log("Avg latency:", agent.avgLatencyMs, "ms");
 console.log("Uptime:", agent.uptimePercent, "%");
+
+// Usage stats
+console.log("Total calls:", agent.totalCallsServed.toString());
 ```
 
-### Read Feedbacks Received
+### 18e. Read Feedbacks You've Received
 
 ```ts
 const [agentPda] = deriveAgent(client.walletPubkey);
+
+// Fetch a specific reviewer's feedback
 const feedback: FeedbackAccountData | null = await client.feedback.fetchNullable(
   agentPda,
   reviewerWallet,
 );
 if (feedback) {
   console.log("Score:", feedback.score, "Tag:", feedback.tag);
+  console.log("Revoked:", feedback.isRevoked);
+  console.log("Updated:", new Date(feedback.updatedAt * 1000));
+}
+
+// Scan all feedbacks for your agent
+const allFeedbacks = await client.program.account.feedbackAccount.all([
+  { memcmp: { offset: 9, bytes: agentPda.toBase58() } },
+]);
+const activeFeedbacks = allFeedbacks.filter(f => !f.account.isRevoked);
+console.log(`${activeFeedbacks.length} active feedbacks`);
+for (const { account: f } of activeFeedbacks) {
+  console.log(`  ${f.reviewer.toBase58()}: ${f.score}/1000 [${f.tag}]`);
 }
 ```
 
-### Agent Profile (Full Composite View)
+### 18f. Agent Profile (Full Composite View)
 
 ```ts
 const profile: AgentProfile | null = await client.discovery.getAgentProfile(agentWallet);
 if (profile) {
-  console.log(profile.name, profile.reputationScore);
+  console.log(profile.name, "—", profile.reputationScore, "/ 10000");
   console.log("Capabilities:", profile.capabilities);
   console.log("Pricing:", profile.pricing);
   console.log("Active:", profile.isActive);

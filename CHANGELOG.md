@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-03-29
+
+### Added — Priority Fee Support for x402 Settlement
+
+Solves the 30-second confirmation timeout observed with Kamiyo's synchronous
+x402 settlement flow.  Priority fees push settle transactions through Solana's
+scheduler in ~5-10 s instead of 35-40 s at base fee.
+
+- **`PriorityFeeConfig` interface** — `priorityFeeMicroLamports`, `computeUnits`
+- **`SettleOptions` interface** — extends `PriorityFeeConfig` with `skipPreflight`, `commitment`, `maxRetries`
+- **`buildPriorityFeeIxs(config)`** — returns `ComputeBudgetProgram` instructions
+- **`buildRpcOptions(opts)`** — returns `{ skipPreflight, commitment, maxRetries }` for `sendTransaction`
+- **Presets**: `FAST_SETTLE_OPTIONS` (5 000 µL, 100 k CU), `FAST_BATCH_SETTLE_OPTIONS` (5 000 µL, 300 k CU)
+- **Constants**: `DEFAULT_SETTLE_PRIORITY_FEE`, `DEFAULT_SETTLE_COMPUTE_UNITS`, `DEFAULT_BATCH_SETTLE_COMPUTE_UNITS`
+- `X402Registry.settle()` / `settleBatch()` accept optional `SettleOptions` param
+- `EscrowModule.settle()` / `settleBatch()` accept optional `SettleOptions` param
+- Plugin schemas (`settleEscrow`, `batchSettle`) expose `priorityFeeMicroLamports`, `computeUnits`, `skipPreflight` fields for LLM tool calls
+- Plugin executor wires priority fee options through to underlying SDK methods
+- All new exports added to barrel files (`src/index.ts`, `src/utils/index.ts`, `src/registries/index.ts`)
+
 ## [0.6.0] - 2026-03-28
 
 ### Added — SDK Hardening (Kamiyo / AceDataCloud feedback)
