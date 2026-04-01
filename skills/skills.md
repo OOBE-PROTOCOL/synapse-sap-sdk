@@ -1,7 +1,7 @@
 # Synapse Client SDK — Agent Skills Reference
 
 > **Package**: `@oobe-protocol-labs/synapse-client-sdk`  
-> **Version**: 2.0.2  
+> **Version**: 2.0.5  
 > **Runtime**: Node.js ≥ 18 · TypeScript ≥ 5.0  
 > **License**: MIT
 
@@ -2278,6 +2278,77 @@ import { GeyserParser, GrpcTransport } from '@oobe-protocol-labs/synapse-client-
 | `stream(filter, callback)` | Stream parsed updates |
 
 **80+ known programs** recognized — Jupiter, Raydium, Metaplex, Orca, Meteora, Marinade, SPL programs, and more.
+
+### SAP Yellowstone gRPC Event Streaming (v0.6.3)
+
+The SAP SDK provides a dedicated `GeyserEventStream` wrapper for real-time
+on-chain event streaming via Yellowstone gRPC. This is the recommended
+approach for production indexers, explorers, and monitoring dashboards.
+
+```ts
+import { GeyserEventStream, EventParser } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const stream = new GeyserEventStream({
+  endpoint: "https://us-1-mainnet.oobeprotocol.ai",
+  token:    process.env.OOBE_API_KEY!,  // sent as x-token automatically
+});
+
+const parser = new EventParser(program);
+
+stream.on("logs", (logs, signature, slot) => {
+  const events = parser.parseLogs(logs);
+  for (const e of events) {
+    console.log(e.name, e.data);
+  }
+});
+
+stream.on("connected", () => console.log("gRPC connected"));
+stream.on("reconnecting", (n) => console.log(`Reconnecting #${n}...`));
+
+await stream.connect();
+```
+
+**Using the raw Yellowstone client directly:**
+
+```ts
+import Client from "@triton-one/yellowstone-grpc";
+
+const client = new Client(
+  "https://us-1-mainnet.oobeprotocol.ai",
+  process.env.OOBE_API_KEY!   // sent as x-token automatically
+);
+
+const stream = await client.subscribe();
+
+stream.on("data", (data) => {
+  console.log("Received:", data);
+});
+
+// Subscribe to all SAP program transactions
+await stream.write({
+  accounts: {},
+  slots: {},
+  transactions: {
+    sapFilter: {
+      accountInclude: ["SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ"],
+      accountExclude: [],
+      accountRequired: [],
+    },
+  },
+  blocks: {},
+  blocksMeta: {},
+  entry: {},
+  accountsDataSlice: [],
+  commitment: 1, // CONFIRMED
+});
+```
+
+**OOBE Protocol gRPC Endpoint:**
+| Endpoint | Network | Auth |
+|----------|---------|------|
+| `https://us-1-mainnet.oobeprotocol.ai` | Mainnet | API key as `x-token` |
+
+**Install:** `npm i @triton-one/yellowstone-grpc` (optional peer dependency)
 
 ---
 

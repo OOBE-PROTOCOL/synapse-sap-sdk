@@ -1,6 +1,6 @@
 {
   "name": "@oobe-protocol-labs/synapse-sap-sdk",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "TypeScript SDK for the Synapse Agent Protocol (SAP v2) on Solana",
   "license": "MIT",
   "main": "dist/cjs/index.js",
@@ -166,6 +166,7 @@
   "peerDependencies": {
     "@coral-xyz/anchor": ">=0.30.0",
     "@solana/web3.js": ">=1.90.0",
+    "@triton-one/yellowstone-grpc": ">=1.0.0",
     "zod": ">=3.20.0",
     "pg": ">=8.0.0"
   },
@@ -174,6 +175,9 @@
       "optional": true
     },
     "pg": {
+      "optional": true
+    },
+    "@triton-one/yellowstone-grpc": {
       "optional": true
     }
   },

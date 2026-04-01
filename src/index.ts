@@ -240,6 +240,10 @@ export type {
   LedgerEntryEventData,
 } from "./events";
 
+// ── Geyser (Yellowstone gRPC) ────────────────────────
+export { GeyserEventStream } from "./events/geyser";
+export type { GeyserConfig, GeyserStreamEvents } from "./events/geyser";
+
 // ── Modules (for advanced usage / tree-shaking) ──────
 export {
   AgentModule,

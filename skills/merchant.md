@@ -1,6 +1,6 @@
 # SAP SDK — Merchant (Agent / Seller) Skill Guide
 
-> **Version:** v0.6.2
+> **Version:** v0.6.3
 > **Role:** You are a merchant (agent/seller) that registers on-chain, publishes
 > tools, inscribes schemas, receives x402 micropayments, and manages sessions.
 > **Companion:** For the client/consumer perspective see [client.md](./client.md)
@@ -2540,6 +2540,101 @@ for (const event of events) {
 // Filter specific event
 const settlements = client.events.filterByName(events, "PaymentSettled");
 ```
+
+### Real-time Event Streaming via Yellowstone gRPC (v0.6.3)
+
+For production indexers and explorers, use the `GeyserEventStream` instead of
+WebSocket `onLogs()`. It provides sub-second latency, automatic reconnection,
+and zero missed events.
+
+**Install the optional dependency:**
+
+```bash
+npm i @triton-one/yellowstone-grpc
+```
+
+**Option A — Standalone (without PostgreSQL):**
+
+```ts
+import { GeyserEventStream, EventParser } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const stream = new GeyserEventStream({
+  endpoint: "https://us-1-mainnet.oobeprotocol.ai",
+  token:    process.env.OOBE_API_KEY!,   // sent as x-token automatically
+});
+
+const parser = new EventParser(program);
+
+stream.on("logs", (logs, signature, slot) => {
+  const events = parser.parseLogs(logs);
+  for (const e of events) {
+    if (e.name === "PaymentSettledEvent") {
+      console.log(`Settled ${e.data.callsSettled} calls, amount: ${e.data.amount}`);
+    }
+  }
+});
+
+stream.on("error", (err) => console.error("gRPC error:", err));
+stream.on("reconnecting", (n) => console.log(`Reconnecting attempt ${n}...`));
+
+await stream.connect();
+```
+
+**Option B — With PostgreSQL sync engine:**
+
+```ts
+// Drop-in replacement for sync.startEventStream()
+await sync.startGeyserStream({
+  endpoint: "https://us-1-mainnet.oobeprotocol.ai",
+  token:    process.env.OOBE_API_KEY!,
+});
+```
+
+**Using the raw Yellowstone client directly (advanced):**
+
+```ts
+import Client from "@triton-one/yellowstone-grpc";
+
+const client = new Client(
+  "https://us-1-mainnet.oobeprotocol.ai",
+  process.env.OOBE_API_KEY!   // sent as x-token automatically
+);
+
+const stream = await client.subscribe();
+
+stream.on("data", (data) => {
+  console.log("Received:", data);
+});
+
+// Subscribe to all SAP program transactions
+await stream.write({
+  accounts: {},
+  slots: {},
+  transactions: {
+    sapFilter: {
+      accountInclude: ["SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ"],
+      accountExclude: [],
+      accountRequired: [],
+    },
+  },
+  blocks: {},
+  blocksMeta: {},
+  entry: {},
+  accountsDataSlice: [],
+  commitment: 1, // CONFIRMED
+});
+```
+
+**WSS vs gRPC comparison:**
+
+| Feature | WebSocket (`onLogs`) | Yellowstone gRPC |
+|---------|---------------------|------------------|
+| Latency | ~1-2s | ~200-500ms |
+| Missed events | Possible under load | Zero (backpressure) |
+| Reconnect | Manual | Built-in auto |
+| Filtering | Program ID only | Account include/exclude |
+| Backfill | Not supported | Replay from slot |
+| Dependency | None (web3.js built-in) | `@triton-one/yellowstone-grpc` |
 
 ---
 
