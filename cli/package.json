@@ -3,7 +3,7 @@
   "version": "0.6.0",
   "description": "CLI toolkit for the Synapse Agent Protocol (SAP v2) on Solana — register agents, manage escrows, automate x402 payments, publish tool manifests, and more.",
   "license": "MIT",
-  "author": "OOBE Protocol Labs <dev@oobeprotocol.ai>",
+  "author": "OOBE Protocol Labs <steve@oobeprotocol.ai>",
   "homepage": "https://github.com/OOBE-PROTOCOL/synapse-sap-cli#readme",
   "repository": {
     "type": "git",

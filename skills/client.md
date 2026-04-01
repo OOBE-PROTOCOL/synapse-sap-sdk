@@ -1,6 +1,6 @@
 # SAP SDK — Client / Consumer Skill Guide
 
-> **Version:** v0.6.2
+> **Version:** v0.6.3
 > **Role:** You are a client (consumer) that discovers on-chain agents, creates escrows, calls x402 endpoints, and verifies settlements.
 > **Companion:** For the merchant/seller perspective see [merchant.md](./merchant.md)
 > **Parent Reference:** For the full Synapse Client SDK (RPC, DAS, AI tools, plugins, MCP, gateway, x402, Next.js) see [skills.md](./skills.md)
@@ -1858,6 +1858,89 @@ from `deriveEscrow(yourAgentPda, clientWallet)`.
 14. Refill or withdraw         -> client.x402.addFunds() / withdrawFunds()
 15. Give feedback              -> client.feedback.give(agentWallet, ...)
 16. Close escrow (cleanup)     -> client.x402.closeEscrow(agentWallet)
+```
+
+---
+
+---
+
+## 17. Real-time Event Streaming via Yellowstone gRPC (v0.6.3)
+
+As a consumer, you can monitor your escrows, settlements, and feedback in
+real-time using the Yellowstone gRPC stream instead of WebSocket polling.
+
+**Install the optional dependency:**
+
+```bash
+npm i @triton-one/yellowstone-grpc
+```
+
+**Stream SAP events for your escrows:**
+
+```ts
+import { GeyserEventStream, EventParser } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const stream = new GeyserEventStream({
+  endpoint: "https://us-1-mainnet.oobeprotocol.ai",
+  token:    process.env.OOBE_API_KEY!,   // sent as x-token automatically
+});
+
+const parser = new EventParser(program);
+
+stream.on("logs", (logs, signature, slot) => {
+  const events = parser.parseLogs(logs);
+  for (const e of events) {
+    switch (e.name) {
+      case "PaymentSettledEvent":
+        console.log(`Agent settled ${e.data.callsSettled} calls`);
+        console.log(`Remaining balance: ${e.data.remainingBalance}`);
+        break;
+      case "FeedbackEvent":
+        console.log(`New feedback: score=${e.data.score}`);
+        break;
+      case "EscrowDepositedEvent":
+        console.log(`Deposit confirmed: ${e.data.amount}`);
+        break;
+    }
+  }
+});
+
+await stream.connect();
+```
+
+**Using the raw Yellowstone client directly:**
+
+```ts
+import Client from "@triton-one/yellowstone-grpc";
+
+const client = new Client(
+  "https://us-1-mainnet.oobeprotocol.ai",
+  process.env.OOBE_API_KEY!   // sent as x-token automatically
+);
+
+const stream = await client.subscribe();
+
+stream.on("data", (data) => {
+  console.log("Received:", data);
+});
+
+// Subscribe to all SAP program transactions
+await stream.write({
+  accounts: {},
+  slots: {},
+  transactions: {
+    sapFilter: {
+      accountInclude: ["SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ"],
+      accountExclude: [],
+      accountRequired: [],
+    },
+  },
+  blocks: {},
+  blocksMeta: {},
+  entry: {},
+  accountsDataSlice: [],
+  commitment: 1, // CONFIRMED
+});
 ```
 
 ---

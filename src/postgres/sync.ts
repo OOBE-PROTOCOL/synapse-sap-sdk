@@ -35,6 +35,7 @@
 
 import type { SapClient } from "../core/client";
 import { EventParser } from "../events";
+import { GeyserEventStream, type GeyserConfig } from "../events/geyser";
 import type { SapPostgres, SyncAllResult } from "./adapter";
 import type { SyncOptions } from "./types";
 
@@ -67,6 +68,7 @@ export class SapSyncEngine {
 
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private logSubId: number | null = null;
+  private geyserStream: GeyserEventStream | null = null;
   private running = false;
 
   constructor(pg: SapPostgres, client: SapClient, debug = false) {
@@ -208,7 +210,7 @@ export class SapSyncEngine {
 
   /**
    * @name stopEventStream
-   * @description Unsubscribe from the program log stream.
+   * @description Unsubscribe from the program log stream (WebSocket or Geyser).
    * @since v0.1.0
    */
   async stopEventStream(): Promise<void> {
@@ -216,8 +218,92 @@ export class SapSyncEngine {
       const connection = this.client.program.provider.connection;
       await connection.removeOnLogsListener(this.logSubId);
       this.logSubId = null;
-      this.log("Event stream stopped");
+      this.log("WebSocket event stream stopped");
     }
+    if (this.geyserStream) {
+      await this.geyserStream.disconnect();
+      this.geyserStream = null;
+      this.log("Geyser event stream stopped");
+    }
+  }
+
+  // ═════════════════════════════════════════════
+  //  Geyser gRPC Event Stream
+  // ═════════════════════════════════════════════
+
+  /**
+   * @name startGeyserStream
+   * @description Subscribe to SAP program transactions via Yellowstone gRPC
+   * and insert parsed events into the `sap_events` table in real-time.
+   *
+   * Drop-in replacement for {@link startEventStream} with lower latency,
+   * no missed events, and automatic reconnection.
+   *
+   * Requires `@triton-one/yellowstone-grpc` to be installed.
+   *
+   * @param geyserConfig - Yellowstone gRPC connection config.
+   * @since v0.6.3
+   *
+   * @example
+   * ```ts
+   * await sync.startGeyserStream({
+   *   endpoint: "https://grpc.triton.one",
+   *   token:    process.env.GEYSER_TOKEN!,
+   * });
+   * ```
+   */
+  async startGeyserStream(geyserConfig: GeyserConfig): Promise<void> {
+    if (this.geyserStream) {
+      this.log("Geyser stream already running");
+      return;
+    }
+
+    const eventParser = new EventParser(this.client.program);
+    const stream = new GeyserEventStream(geyserConfig);
+
+    stream.on("logs", async (logs: string[], signature: string, slot: number) => {
+      try {
+        const events = eventParser.parseLogs(logs);
+        for (const event of events) {
+          const data = event.data as Record<string, unknown>;
+          const agentPda =
+            (data.agent as string) ?? (data.agentPda as string) ?? undefined;
+          const wallet =
+            (data.wallet as string) ?? (data.owner as string) ?? undefined;
+
+          await this.pg.syncEvent(
+            event.name,
+            signature,
+            slot,
+            data,
+            agentPda,
+            wallet,
+          );
+        }
+      } catch (err) {
+        this.log(`Geyser event parse error: ${err}`);
+      }
+    });
+
+    stream.on("connected", () => {
+      this.log("Geyser gRPC connected");
+    });
+
+    stream.on("disconnected", (reason: string) => {
+      this.log(`Geyser gRPC disconnected: ${reason}`);
+    });
+
+    stream.on("error", (err: Error) => {
+      this.log(`Geyser error: ${err.message}`);
+    });
+
+    stream.on("reconnecting", (attempt: number) => {
+      this.log(`Geyser reconnecting (attempt ${attempt})...`);
+    });
+
+    await stream.connect();
+    this.geyserStream = stream;
+    this.log("Geyser event stream started");
   }
 
   // ═════════════════════════════════════════════
@@ -235,11 +321,11 @@ export class SapSyncEngine {
 
   /**
    * @name isStreaming
-   * @description Check whether the event stream is active.
+   * @description Check whether the event stream is active (WebSocket or Geyser).
    * @since v0.1.0
    */
   isStreaming(): boolean {
-    return this.logSubId !== null;
+    return this.logSubId !== null || this.geyserStream?.connected === true;
   }
 
   // ═════════════════════════════════════════════

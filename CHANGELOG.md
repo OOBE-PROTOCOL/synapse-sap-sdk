@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-04-01
+
+### Added — Yellowstone gRPC (Geyser) Event Streaming
+
+Drop-in alternative to the WebSocket `connection.onLogs()` pipeline for
+real-time SAP event streaming. Uses Triton / Helius / OOBE Protocol
+Yellowstone-compatible gRPC endpoints with sub-second latency, automatic
+reconnection, and zero missed events.
+
+- **`GeyserEventStream` class** (`src/events/geyser.ts`) — typed EventEmitter with `logs`, `connected`, `disconnected`, `error`, `reconnecting` events
+- **`GeyserConfig` interface** — `endpoint`, `token`, `commitment`, `autoReconnect`, `reconnectDelayMs`, `maxReconnectAttempts`, `includeFailedTxs`
+- **`SapSyncEngine.startGeyserStream(config)`** — Yellowstone gRPC alternative to `startEventStream()` for PostgreSQL sync
+- **OOBE Protocol gRPC endpoint**: `https://us-1-mainnet.oobeprotocol.ai` with API key as `x-token`
+- **Optional peer dependency**: `@triton-one/yellowstone-grpc >= 1.0.0`
+- Dynamic import — developers not using gRPC pay zero dependency cost
+- Ping keepalive to prevent idle disconnections
+- All exports added to barrel: `GeyserEventStream`, `GeyserConfig`, `GeyserStreamEvents`
+
 ## [0.6.2] - 2026-03-29
 
 ### Added — Priority Fee Support for x402 Settlement
