@@ -1,6 +1,6 @@
 # SAP SDK — Client / Consumer Skill Guide
 
-> **Version:** v0.6.3
+> **Version:** v0.6.4
 > **Role:** You are a client (consumer) that discovers on-chain agents, creates escrows, calls x402 endpoints, and verifies settlements.
 > **Companion:** For the merchant/seller perspective see [merchant.md](./merchant.md)
 > **Parent Reference:** For the full Synapse Client SDK (RPC, DAS, AI tools, plugins, MCP, gateway, x402, Next.js) see [skills.md](./skills.md)
@@ -1941,6 +1941,80 @@ await stream.write({
   accountsDataSlice: [],
   commitment: 1, // CONFIRMED
 });
+```
+
+---
+
+## 18. Escrow Validation & x402 Direct Payment Recognition (v0.6.4)
+
+Client-side utilities for validating escrow state before calling an agent,
+and for scanning your ATA for x402 direct payment history.
+
+### 18a. Pre-Flight Escrow Validation
+
+Before making a paid API call, validate that your escrow is in a valid state:
+
+```ts
+import { validateEscrowState } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const result = await validateEscrowState(
+  connection,
+  agentWallet,
+  myWallet,  // depositor
+  (pda) => client.escrow.fetchByPda(pda).catch(() => null),
+  { callsToSettle: 1 },
+);
+
+if (!result.valid) {
+  console.error("Escrow issues:", result.errors);
+  // ["Insufficient balance: 500 < 1000 (1 calls × 1000)"]
+  // ["Escrow expired at 1711929600"]
+  // ["Depositor ATA does not exist: 7xK9..."]
+}
+
+if (result.isSplEscrow) {
+  console.log("SPL escrow — token accounts:", result.splAccounts);
+}
+```
+
+### 18b. Scanning for x402 Direct Payment History
+
+View your past x402 direct payments to an agent:
+
+```ts
+import { getX402DirectPayments, findATA } from "@oobe-protocol-labs/synapse-sap-sdk";
+import { PublicKey } from "@solana/web3.js";
+
+const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+const agentAta = findATA(agentWallet, USDC_MINT);
+
+// Scan agent's ATA for payments from my wallet
+const myPayments = await getX402DirectPayments(connection, agentAta, {
+  limit: 100,
+  filterPayer: findATA(myWallet, USDC_MINT), // only my payments
+});
+
+console.log(`Found ${myPayments.length} x402 payments`);
+for (const p of myPayments) {
+  console.log(`  ${p.signature}: ${p.amount} lamports, memo: ${p.memo ?? "none"}`);
+}
+```
+
+### 18c. Building Typed SPL Account Metas
+
+When creating SPL token escrows, use `attachSplAccounts()` for correct ATA derivation:
+
+```ts
+import { attachSplAccounts, toAccountMetas } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const splMetas = attachSplAccounts(escrowPda, myWallet, usdcMint);
+const accountMetas = toAccountMetas(splMetas);
+
+// Use in escrow creation
+await client.escrow.create(agentWallet, escrowArgs, accountMetas);
+
+// Or in deposits
+await client.escrow.deposit(agentWallet, depositAmount, accountMetas);
 ```
 
 ---

@@ -1,6 +1,6 @@
 # SAP SDK — Merchant (Agent / Seller) Skill Guide
 
-> **Version:** v0.6.3
+> **Version:** v0.6.4
 > **Role:** You are a merchant (agent/seller) that registers on-chain, publishes
 > tools, inscribes schemas, receives x402 micropayments, and manages sessions.
 > **Companion:** For the client/consumer perspective see [client.md](./client.md)
@@ -2841,6 +2841,182 @@ you are the agent (`deriveEscrow(yourAgent, clientWallet)`).
 18. Receive feedbacks          -> client.feedback.fetchNullable(...)
 19. Issue attestations         -> client.attestation.create(...)
 ```
+
+---
+
+## 25. Server-Side Escrow Validation & Merchant Middleware (v0.6.4)
+
+New modular pipeline for robust escrow validation before settlement.
+Prevents generic program crashes by catching missing ATAs, expired escrows,
+and balance issues with explicit error types.
+
+### 25a. `SapMerchantValidator` — Standard Middleware
+
+Drop-in middleware that reads `X-Payment-*` headers, validates escrow state on-chain,
+and auto-generates the correct `AccountMeta[]` for SPL token escrows.
+
+```ts
+import {
+  SapMerchantValidator,
+  MissingEscrowAtaError,
+} from "@oobe-protocol-labs/synapse-sap-sdk";
+
+// Create validator (once at app startup)
+const validator = new SapMerchantValidator(
+  connection,
+  (pda) => client.escrow.fetchByPda(pda).catch(() => null),
+);
+
+// Express.js middleware
+app.post("/api/v1/chat", async (req, res) => {
+  try {
+    // Full pipeline: parse headers → fetch escrow → validate → build AccountMeta[]
+    const validation = await validator.validateRequest(req.headers, {
+      callsToSettle: 1,
+      throwOnMissingAta: true, // throws MissingEscrowAtaError instead of generic crash
+    });
+
+    if (!validation.valid) {
+      return res.status(402).json({
+        error: "payment_required",
+        details: validation.errors,
+      });
+    }
+
+    // ... process the request ...
+
+    // Settle with pre-built account metas (handles SOL + SPL automatically)
+    await client.escrow.settle(
+      validation.headers.depositorWallet,
+      1,
+      serviceHash,
+      validation.accountMetas, // already built correctly for SOL or SPL
+    );
+
+    res.json({ result: "..." });
+  } catch (err) {
+    if (err instanceof MissingEscrowAtaError) {
+      return res.status(402).json({
+        error: "missing_ata",
+        side: err.side,       // "depositor" | "escrow"
+        ata: err.ataAddress,
+        message: err.message, // human-readable explanation
+      });
+    }
+    throw err;
+  }
+});
+```
+
+### 25b. `validateEscrowState()` — Low-Level Validation
+
+Standalone function for programmatic escrow validation without HTTP headers.
+
+```ts
+import { validateEscrowState } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const result = await validateEscrowState(
+  connection,
+  agentWallet,
+  depositorWallet,
+  (pda) => client.escrow.fetchByPda(pda).catch(() => null),
+  { callsToSettle: 5 },
+);
+
+// result.valid          — boolean
+// result.escrow         — EscrowAccountData | null
+// result.escrowPda      — PublicKey
+// result.agentPda       — PublicKey
+// result.isSplEscrow    — boolean
+// result.splAccounts    — SplAccountMeta[] (typed: kind, pubkey, writable)
+// result.errors         — string[] (empty when valid)
+```
+
+### 25c. `attachSplAccounts()` — Typed SPL AccountMeta Builder
+
+Build the correct `[depositorAta, escrowAta, tokenMint, tokenProgram]` without
+manual ATA derivation.
+
+```ts
+import { attachSplAccounts, toAccountMetas } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+// Typed SplAccountMeta[]
+const splMetas = attachSplAccounts(escrowPda, depositorWallet, usdcMint);
+// [
+//   { kind: "depositorAta", pubkey: ..., writable: true },
+//   { kind: "escrowAta",    pubkey: ..., writable: true },
+//   { kind: "tokenMint",    pubkey: ..., writable: false },
+//   { kind: "tokenProgram", pubkey: ..., writable: false },
+// ]
+
+// Convert to Anchor-compatible AccountMeta[] for .remainingAccounts()
+const accountMetas = toAccountMetas(splMetas);
+await client.escrow.settle(depositor, calls, hash, accountMetas);
+```
+
+### 25d. `parseX402Headers()` — Header Parsing
+
+Parse and validate all 8 required `X-Payment-*` headers into a typed object.
+
+```ts
+import { parseX402Headers } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const parsed = parseX402Headers(req.headers);
+// parsed.protocol         — "SAP-x402"
+// parsed.escrowPda        — PublicKey
+// parsed.agentPda         — PublicKey
+// parsed.depositorWallet  — PublicKey
+// parsed.maxCalls         — BN
+// parsed.pricePerCall     — BN
+// parsed.programId        — PublicKey
+// parsed.network          — string (e.g. "solana:mainnet-beta")
+```
+
+Throws `SapValidationError` if any required header is missing or malformed.
+
+### 25e. Recognizing x402 Direct Payments
+
+Scan an agent's ATA for x402 direct SPL transfers (non-escrow payments).
+
+```ts
+import { getX402DirectPayments, findATA } from "@oobe-protocol-labs/synapse-sap-sdk";
+import { PublicKey } from "@solana/web3.js";
+
+const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+const payToAta = findATA(agentWallet, USDC_MINT);
+
+const payments = await getX402DirectPayments(connection, payToAta, {
+  limit: 50,
+  requireMemo: false,        // include transfers without x402 memo
+  knownSettlements: [],      // match against server-side PAYMENT-RESPONSE logs
+  filterPayer: clientWallet,  // only from this payer
+});
+
+for (const p of payments) {
+  console.log(`TX: ${p.signature}`);
+  console.log(`  Amount: ${p.amount}`);
+  console.log(`  Payer ATA: ${p.payerAta.toBase58()}`);
+  console.log(`  Memo: ${p.memo}`);
+  if (p.settlement) {
+    console.log(`  Matched settlement hash: ${p.settlement.serviceHash}`);
+  }
+}
+```
+
+**Pattern matching logic:**
+1. Memo has recognized prefix (`x402:`, `SAP-x402:`, `x402-direct:`) → match
+2. Memo is base64 JSON with `protocol: "x402"` → match
+3. Transfer matches known settlement via deterministic hash `sha256(agent+depositor+amount+ts)` → match with full `SettlementPayload`
+4. `requireMemo: false` → any SPL transfer to the ATA is included
+
+**Types:**
+
+| Type | Key Fields |
+|------|------------|
+| `X402DirectPayment` | `signature`, `amount` (bigint), `payerAta`, `payeeAta`, `mint`, `memo`, `settlement`, `blockTime`, `slot` |
+| `SettlementPayload` | `serviceHash`, `resource`, `agentWallet`, `depositorWallet`, `amount`, `timestamp` |
+| `SplAccountMeta` | `kind` (`escrowAta \| depositorAta \| tokenMint \| tokenProgram`), `pubkey`, `writable` |
+| `MissingEscrowAtaError` | extends `SapError`, `ataAddress`, `side` (`depositor \| escrow`), code `SAP_MISSING_ESCROW_ATA` |
 
 ---
 
