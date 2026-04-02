@@ -71,3 +71,31 @@ export type {
   PriorityFeeConfig,
   SettleOptions,
 } from "./priority-fee";
+
+// ── v0.6.4  Escrow Validation & Merchant Middleware ──
+export {
+  validateEscrowState,
+  attachSplAccounts,
+  toAccountMetas,
+  MissingEscrowAtaError,
+} from "./escrow-validation";
+export type {
+  SplAccountMeta,
+  EscrowValidationResult,
+} from "./escrow-validation";
+
+export {
+  SapMerchantValidator,
+  parseX402Headers,
+} from "./merchant-validator";
+export type {
+  ParsedX402Headers,
+  MerchantValidationResult,
+} from "./merchant-validator";
+
+export { getX402DirectPayments } from "./x402-direct";
+export type {
+  X402DirectPayment,
+  SettlementPayload,
+  GetX402DirectOptions,
+} from "./x402-direct";

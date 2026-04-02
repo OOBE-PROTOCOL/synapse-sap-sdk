@@ -216,6 +216,26 @@ export type {
   PriorityFeeConfig,
 } from "./utils";
 
+// v0.6.4 — Escrow validation, merchant middleware, x402 direct
+export {
+  validateEscrowState,
+  attachSplAccounts,
+  toAccountMetas,
+  MissingEscrowAtaError,
+  SapMerchantValidator,
+  parseX402Headers,
+  getX402DirectPayments,
+} from "./utils";
+export type {
+  SplAccountMeta,
+  EscrowValidationResult,
+  ParsedX402Headers,
+  MerchantValidationResult,
+  X402DirectPayment,
+  SettlementPayload,
+  GetX402DirectOptions,
+} from "./utils";
+
 // ── Errors ───────────────────────────────────────────
 export {
   SapError,

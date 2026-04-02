@@ -1,7 +1,7 @@
 # Synapse Client SDK — Agent Skills Reference
 
 > **Package**: `@oobe-protocol-labs/synapse-client-sdk`  
-> **Version**: 2.0.5  
+> **Version**: 2.0.6  
 > **Runtime**: Node.js ≥ 18 · TypeScript ≥ 5.0  
 > **License**: MIT
 
@@ -4233,6 +4233,137 @@ Read for: `synapse-sap` CLI — 10 command groups, 40+ subcommands, global flags
 - **For consumer (buyer) flows** — read `skills/client.md` first, it has the complete x402 payment guide with all method signatures
 - **For merchant (seller) flows** — read `skills/merchant.md` first, it has agent registration, tool publishing, settlement, memory management
 - **For CLI operations** — read `cli/README.md` for all 40+ subcommands with flags and examples
+
+---
+
+## 29. Escrow Validation, Merchant Middleware & x402 Direct Payments (v0.6.4)
+
+Modular server-side validation pipeline and x402 direct payment recognition.
+
+### 29a. Server-Side Escrow Validation
+
+```ts
+import {
+  validateEscrowState,
+  attachSplAccounts,
+  toAccountMetas,
+  MissingEscrowAtaError,
+} from "@oobe-protocol-labs/synapse-sap-sdk";
+```
+
+| Function | Signature | Returns |
+|----------|-----------|---------|
+| `validateEscrowState()` | `(connection, agentWallet, depositorWallet, fetchEscrow, opts?) → Promise<EscrowValidationResult>` | `{ valid, escrow, escrowPda, agentPda, isSplEscrow, splAccounts, errors }` |
+| `attachSplAccounts()` | `(escrowPda, depositorWallet, tokenMint) → SplAccountMeta[]` | `[depositorAta, escrowAta, tokenMint, tokenProgram]` |
+| `toAccountMetas()` | `(splMetas) → AccountMeta[]` | Anchor-compatible `AccountMeta[]` |
+
+**`SplAccountMeta` type:**
+
+```ts
+type SplAccountMeta = {
+  kind: "escrowAta" | "depositorAta" | "tokenMint" | "tokenProgram";
+  pubkey: PublicKey;
+  writable: boolean;
+};
+```
+
+**`MissingEscrowAtaError`** — extends `SapError`, code `SAP_MISSING_ESCROW_ATA`:
+- `ataAddress: string` — the ATA that doesn't exist
+- `side: "depositor" | "escrow"` — which side is missing
+
+### 29b. `SapMerchantValidator` — Standard Middleware
+
+```ts
+import { SapMerchantValidator } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const validator = new SapMerchantValidator(
+  connection,
+  (pda) => client.escrow.fetchByPda(pda).catch(() => null),
+);
+```
+
+| Method | Signature | Returns |
+|--------|-----------|---------|
+| `validateRequest()` | `(headers, opts?) → Promise<MerchantValidationResult>` | `{ valid, headers, escrowValidation, accountMetas, errors }` |
+| `validateEscrow()` | `(parsedHeaders, opts?) → Promise<EscrowValidationResult>` | Direct escrow validation from pre-parsed headers |
+
+**`validateRequest()` options:**
+
+```ts
+{
+  callsToSettle?: number;      // default: 1
+  throwOnMissingAta?: boolean; // default: true — throws MissingEscrowAtaError
+}
+```
+
+### 29c. `parseX402Headers()` — Header Parsing
+
+```ts
+import { parseX402Headers } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const parsed = parseX402Headers(req.headers);
+// → ParsedX402Headers { protocol, escrowPda, agentPda, depositorWallet,
+//                        maxCalls, pricePerCall, programId, network }
+```
+
+Validates all 8 required headers: `X-Payment-Protocol`, `X-Payment-Escrow`, `X-Payment-Agent`, `X-Payment-Depositor`, `X-Payment-MaxCalls`, `X-Payment-PricePerCall`, `X-Payment-Program`, `X-Payment-Network`.
+
+Throws `SapValidationError` on missing/malformed headers.
+
+### 29d. `getX402DirectPayments()` — Direct Payment Recognition
+
+```ts
+import { getX402DirectPayments, findATA } from "@oobe-protocol-labs/synapse-sap-sdk";
+```
+
+| Function | Signature |
+|----------|-----------|
+| `getX402DirectPayments()` | `(connection, payToAta, opts?) → Promise<X402DirectPayment[]>` |
+
+**Options (`GetX402DirectOptions`):**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `limit` | `number` | 100 | Max signatures to scan |
+| `filterPayer` | `PublicKey` | — | Only from this payer ATA |
+| `knownSettlements` | `SettlementPayload[]` | `[]` | Match via deterministic hash |
+| `requireMemo` | `boolean` | `false` | Only include x402 memo transfers |
+| `before` | `string` | — | Pagination: before this TX sig |
+| `until` | `string` | — | Pagination: after this TX sig |
+
+**`X402DirectPayment` type:**
+
+```ts
+interface X402DirectPayment {
+  signature: string;
+  amount: bigint;
+  payerAta: PublicKey;
+  payeeAta: PublicKey;
+  mint: PublicKey;
+  memo: string | null;
+  settlement: SettlementPayload | null;
+  blockTime: number | null;
+  slot: number;
+}
+```
+
+**Pattern matching:** memo prefix (`x402:`, `SAP-x402:`, `x402-direct:`), base64 JSON with `protocol: "x402"`, deterministic `sha256(agentWallet + depositor + amount + timestamp)` against `knownSettlements`.
+
+### 29e. Full Export List (v0.6.4)
+
+```ts
+// Values
+export { validateEscrowState, attachSplAccounts, toAccountMetas, MissingEscrowAtaError } from "...";
+export { SapMerchantValidator, parseX402Headers } from "...";
+export { getX402DirectPayments } from "...";
+
+// Types
+export type { SplAccountMeta, EscrowValidationResult } from "...";
+export type { ParsedX402Headers, MerchantValidationResult } from "...";
+export type { X402DirectPayment, SettlementPayload, GetX402DirectOptions } from "...";
+```
+
+---
 
 ### How to read docs
 

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-04-02
+
+### Added — Escrow Validation, Merchant Middleware & x402 Direct Payments
+
+Modular server-side validation pipeline and x402 direct payment recognition
+for merchants (Syra/Invoica) and clients.
+
+- **`validateEscrowState()`** (`src/utils/escrow-validation.ts`) — validates escrow existence, expiry, balance, max calls, and SPL ATA existence + mint match. Returns typed `EscrowValidationResult`
+- **`attachSplAccounts()`** — builds typed `SplAccountMeta[]` (`escrowAta | depositorAta | tokenMint | tokenProgram`) without manual ATA derivation
+- **`toAccountMetas()`** — converts `SplAccountMeta[]` → Anchor-compatible `AccountMeta[]`
+- **`MissingEscrowAtaError`** — explicit error class with `side` (`depositor | escrow`) and `ataAddress` instead of generic program crash
+- **`SapMerchantValidator`** class (`src/utils/merchant-validator.ts`) — reads `X-Payment-*` headers, calls `validateEscrowState()`, auto-generates `AccountMeta[]`, throws `MissingEscrowAtaError` when SPL ATAs are missing
+- **`parseX402Headers()`** — parses + validates all 8 required x402 HTTP headers into typed `ParsedX402Headers`
+- **`getX402DirectPayments()`** (`src/utils/x402-direct.ts`) — scans agent ATA for x402 direct SPL transfers, filters by memo prefix (`x402:`, `SAP-x402:`), base64 JSON payload, deterministic settlement hash, or payer filter
+- **Types**: `SplAccountMeta`, `EscrowValidationResult`, `ParsedX402Headers`, `MerchantValidationResult`, `X402DirectPayment`, `SettlementPayload`, `GetX402DirectOptions`
+- All new exports added to barrel `src/index.ts`
+
 ## [0.6.3] - 2026-04-01
 
 ### Added — Yellowstone gRPC (Geyser) Event Streaming
