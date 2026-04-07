@@ -47,6 +47,7 @@ export const SEEDS = {
   TOOL: "sap_tool",
   CHECKPOINT: "sap_checkpoint",
   ESCROW: "sap_escrow",
+  ESCROW_V2: "sap_escrow_v2",
   STATS: "sap_stats",
   TOOL_CATEGORY: "sap_tool_cat",
   ATTESTATION: "sap_attest",
@@ -54,6 +55,12 @@ export const SEEDS = {
   LEDGER_PAGE: "sap_page",
   BUFFER: "sap_buffer",
   DIGEST: "sap_digest",
+  PENDING: "sap_pending",
+  DISPUTE: "sap_dispute",
+  STAKE: "sap_stake",
+  SUBSCRIPTION: "sap_sub",
+  SHARD: "sap_shard",
+  INDEX_PAGE: "sap_idx_page",
 } as const;
 
 /**

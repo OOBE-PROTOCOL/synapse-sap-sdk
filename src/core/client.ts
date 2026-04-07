@@ -33,6 +33,9 @@ import { IndexingModule } from "../modules/indexing";
 import { ToolsModule } from "../modules/tools";
 import { VaultModule } from "../modules/vault";
 import { EscrowModule } from "../modules/escrow";
+import { EscrowV2Module } from "../modules/escrow-v2";
+import { StakingModule } from "../modules/staking";
+import { SubscriptionModule } from "../modules/subscription";
 import { AttestationModule } from "../modules/attestation";
 import { LedgerModule } from "../modules/ledger";
 import { EventParser } from "../events";
@@ -113,6 +116,9 @@ export class SapClient {
   #tools?: ToolsModule;
   #vault?: VaultModule;
   #escrow?: EscrowModule;
+  #escrowV2?: EscrowV2Module;
+  #staking?: StakingModule;
+  #subscription?: SubscriptionModule;
   #attestation?: AttestationModule;
   #ledger?: LedgerModule;
   #events?: EventParser;
@@ -282,6 +288,45 @@ export class SapClient {
    */
   get escrow(): EscrowModule {
     return (this.#escrow ??= new EscrowModule(this.program));
+  }
+
+  /**
+   * @name escrowV2
+   * @description V2 escrow settlement with dispute windows, co-signing,
+   * pending settlements, and migration from V1.
+   * @returns {EscrowV2Module} The lazily-instantiated `EscrowV2Module` singleton.
+   * @category Modules
+   * @since v0.7.0
+   * @see {@link EscrowV2Module}
+   */
+  get escrowV2(): EscrowV2Module {
+    return (this.#escrowV2 ??= new EscrowV2Module(this.program));
+  }
+
+  /**
+   * @name staking
+   * @description Agent staking: init stake, deposit, request unstake,
+   * and complete unstake.
+   * @returns {StakingModule} The lazily-instantiated `StakingModule` singleton.
+   * @category Modules
+   * @since v0.7.0
+   * @see {@link StakingModule}
+   */
+  get staking(): StakingModule {
+    return (this.#staking ??= new StakingModule(this.program));
+  }
+
+  /**
+   * @name subscription
+   * @description Recurring subscriptions: create, fund, cancel, and close
+   * subscriber-agent subscription accounts.
+   * @returns {SubscriptionModule} The lazily-instantiated `SubscriptionModule` singleton.
+   * @category Modules
+   * @since v0.7.0
+   * @see {@link SubscriptionModule}
+   */
+  get subscription(): SubscriptionModule {
+    return (this.#subscription ??= new SubscriptionModule(this.program));
   }
 
   /**

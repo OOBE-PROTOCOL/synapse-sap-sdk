@@ -59,6 +59,9 @@ export type {
   DelegatePermissionBit,
   SchemaTypeValue,
   CompressionTypeValue,
+  SettlementSecurityKind,
+  DisputeOutcomeKind,
+  BillingIntervalKind,
   // Helper structs
   Capability,
   VolumeCurveBreakpoint,
@@ -83,6 +86,14 @@ export type {
   AgentAttestationData,
   MemoryLedgerData,
   LedgerPageData,
+  // V2.1 account data
+  EscrowAccountV2Data,
+  PendingSettlementData,
+  DisputeRecordData,
+  AgentStakeData,
+  SubscriptionData,
+  CounterShardData,
+  IndexPageData,
   // Instruction args
   RegisterAgentArgs,
   UpdateAgentArgs,
@@ -95,6 +106,9 @@ export type {
   CreateEscrowArgs,
   CreateAttestationArgs,
   InscribeToolSchemaArgs,
+  // V2.1 instruction args
+  CreateEscrowV2Args,
+  CreateSubscriptionArgs,
   // v0.6.0 — Endpoint & Manifest types
   EndpointDescriptor,
   HealthCheckDescriptor,
@@ -112,6 +126,9 @@ export {
   DelegatePermission,
   SchemaType,
   CompressionType,
+  SettlementSecurity,
+  DisputeOutcome,
+  BillingInterval,
 } from "./types";
 
 // ── Constants ────────────────────────────────────────
@@ -151,6 +168,13 @@ export {
   deriveCheckpoint,
   deriveTool,
   deriveEscrow,
+  deriveEscrowV2,
+  derivePendingSettlement,
+  deriveDispute,
+  deriveStake,
+  deriveSubscription,
+  deriveShard,
+  deriveIndexPage,
   deriveAttestation,
   deriveLedger,
   deriveLedgerPage,
@@ -272,6 +296,9 @@ export {
   ToolsModule,
   VaultModule,
   EscrowModule,
+  EscrowV2Module,
+  StakingModule,
+  SubscriptionModule,
   AttestationModule,
   LedgerModule,
   BaseModule,

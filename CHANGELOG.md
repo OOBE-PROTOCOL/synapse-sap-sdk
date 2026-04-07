@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2025-07-17
+
+### Added — V2.1 Protocol: Escrow V2, Staking, Subscriptions
+
+Full SDK support for the V2.1 on-chain protocol expansion.
+
+- **`EscrowV2Module`** (`client.escrowV2`) — V2 escrow lifecycle: `create`, `deposit`, `settleCalls`, `withdraw`, `close`, `openDispute`, `resolveDispute`, `closeDispute`, `closePendingSettlement`
+- **`StakingModule`** (`client.staking`) — agent staking: `initStake`, `deposit`, `requestUnstake`, `completeUnstake`
+- **`SubscriptionModule`** (`client.subscription`) — recurring payments: `create`, `fund`, `cancel`, `close`
+- **V2.1 PDA derivers**: `deriveEscrowV2`, `derivePendingSettlement`, `deriveDispute`, `deriveStake`, `deriveSubscription`, `deriveShard`, `deriveIndexPage`
+- **V2.1 enums**: `SettlementSecurity` (Open/CoSigned/Arbitrated), `DisputeOutcome` (CallerWins/AgentWins/Split), `BillingInterval` (Weekly/Monthly/Quarterly/Yearly)
+- **V2.1 account types**: `EscrowAccountV2Data`, `PendingSettlementData`, `DisputeRecordData`, `AgentStakeData`, `SubscriptionData`, `CounterShardData`, `IndexPageData`
+- **V2.1 instruction args**: `CreateEscrowV2Args`, `CreateSubscriptionArgs`
+- **X402Registry V2-aware**: `getBalance()`, `settle()`, `hasEscrow()` now auto-detect V2 escrows (V2-first, V1-fallback)
+- **X402Registry `resolveEscrow()`**: returns `{ pda, version }` for explicit V1/V2 detection
+- IDL synced to latest on-chain program (86 instructions, 24 accounts, 91 types)
+
+### Deprecated
+
+- **`EscrowModule`** → use `EscrowV2Module` (`client.escrowV2`)
+- **`EscrowAccountData`** → use `EscrowAccountV2Data`
+- **`CreateEscrowArgs`** → use `CreateEscrowV2Args`
+- **`deriveEscrow()`** → use `deriveEscrowV2()`
+- **`X402Registry.preparePayment()`** → use `client.escrowV2.create()` + `.deposit()`
+- **`X402Registry.addFunds()`** → use `client.escrowV2.deposit()`
+- **`X402Registry.withdrawFunds()`** → use `client.escrowV2.withdraw()`
+- **`X402Registry.closeEscrow()`** → use `client.escrowV2.close()`
+
 ## [0.6.4] - 2026-04-02
 
 ### Added — Escrow Validation, Merchant Middleware & x402 Direct Payments

@@ -11,7 +11,7 @@
 
 import type { PublicKey } from "@solana/web3.js";
 import type BN from "bn.js";
-import type { ToolHttpMethodKind, ToolCategoryKind } from "./enums";
+import type { ToolHttpMethodKind, ToolCategoryKind, SettlementSecurityKind, DisputeOutcomeKind, BillingIntervalKind } from "./enums";
 import type { Capability, PricingTier, PluginRef, VolumeCurveBreakpoint } from "./common";
 
 // ═══════════════════════════════════════════════════════════════════
@@ -479,6 +479,8 @@ export interface ToolDescriptorData {
  *
  * @category Types
  * @since v0.1.0
+ * @deprecated Since v0.7.0 — Use {@link EscrowAccountV2Data} for V2 escrows with
+ * settlement security, dispute windows, and co-signing.
  * @see {@link VolumeCurveBreakpoint} for discount curve details.
  */
 export interface EscrowAccountData {
@@ -615,4 +617,193 @@ export interface LedgerPageData {
   readonly merkleRootAtSeal: number[]; // [u8; 32]
   /** Raw archived data bytes. */
   readonly data: number[]; // Vec<u8>
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Escrow V2 (V2.1)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @interface EscrowAccountV2Data
+ * @description V2 escrow with triple-mode settlement security.
+ * @category Types
+ * @since v0.5.0
+ */
+export interface EscrowAccountV2Data {
+  readonly bump: number;
+  readonly version: number;
+  readonly agent: PublicKey;
+  readonly depositor: PublicKey;
+  readonly agentWallet: PublicKey;
+  readonly escrowNonce: BN;
+  readonly balance: BN;
+  readonly totalDeposited: BN;
+  readonly totalSettled: BN;
+  readonly totalCallsSettled: BN;
+  readonly pricePerCall: BN;
+  readonly maxCalls: BN;
+  readonly createdAt: BN;
+  readonly lastSettledAt: BN;
+  readonly expiresAt: BN;
+  readonly volumeCurve: VolumeCurveBreakpoint[];
+  readonly tokenMint: PublicKey | null;
+  readonly tokenDecimals: number;
+  readonly settlementSecurity: SettlementSecurityKind;
+  readonly disputeWindowSlots: BN;
+  readonly settlementIndex: BN;
+  readonly coSigner: PublicKey | null;
+  readonly arbiter: PublicKey | null;
+  readonly pendingAmount: BN;
+  readonly pendingCalls: BN;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Pending Settlement (V2.1)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @interface PendingSettlementData
+ * @description Dispute-window settlement lock PDA.
+ * @category Types
+ * @since v0.5.0
+ */
+export interface PendingSettlementData {
+  readonly bump: number;
+  readonly escrow: PublicKey;
+  readonly agent: PublicKey;
+  readonly agentWallet: PublicKey;
+  readonly depositor: PublicKey;
+  readonly settlementIndex: BN;
+  readonly callsToSettle: BN;
+  readonly amount: BN;
+  readonly serviceHash: number[]; // [u8; 32]
+  readonly createdAt: BN;
+  readonly releaseSlot: BN;
+  readonly isFinalized: boolean;
+  readonly isDisputed: boolean;
+  readonly outcome: DisputeOutcomeKind;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Dispute Record (V2.1)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @interface DisputeRecordData
+ * @description On-chain dispute with arbiter resolution.
+ * @category Types
+ * @since v0.5.0
+ */
+export interface DisputeRecordData {
+  readonly bump: number;
+  readonly pendingSettlement: PublicKey;
+  readonly escrow: PublicKey;
+  readonly depositor: PublicKey;
+  readonly agent: PublicKey;
+  readonly evidenceHash: number[]; // [u8; 32]
+  readonly agentEvidenceHash: number[]; // [u8; 32]
+  readonly arbiter: PublicKey;
+  readonly outcome: DisputeOutcomeKind;
+  readonly createdAt: BN;
+  readonly resolvedAt: BN;
+  readonly resolutionHash: number[]; // [u8; 32]
+  readonly slashAmount: BN;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Agent Stake (V2.1)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @interface AgentStakeData
+ * @description Collateral staking account for honest behavior.
+ * @category Types
+ * @since v0.5.0
+ */
+export interface AgentStakeData {
+  readonly bump: number;
+  readonly agent: PublicKey;
+  readonly wallet: PublicKey;
+  readonly stakedAmount: BN;
+  readonly slashedAmount: BN;
+  readonly lastStakeAt: BN;
+  readonly unstakeRequestedAt: BN;
+  readonly unstakeAmount: BN;
+  readonly unstakeAvailableAt: BN;
+  readonly totalDisputesWon: number;
+  readonly totalDisputesLost: number;
+  readonly createdAt: BN;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Subscription (V2.1)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @interface SubscriptionData
+ * @description Recurring payment subscription PDA.
+ * @category Types
+ * @since v0.5.0
+ */
+export interface SubscriptionData {
+  readonly bump: number;
+  readonly agent: PublicKey;
+  readonly subscriber: PublicKey;
+  readonly agentWallet: PublicKey;
+  readonly subId: BN;
+  readonly pricePerInterval: BN;
+  readonly billingInterval: BillingIntervalKind;
+  readonly tokenMint: PublicKey | null;
+  readonly tokenDecimals: number;
+  readonly balance: BN;
+  readonly totalPaid: BN;
+  readonly intervalsPaid: number;
+  readonly startedAt: BN;
+  readonly lastClaimedAt: BN;
+  readonly cancelledAt: BN;
+  readonly nextDueAt: BN;
+  readonly createdAt: BN;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Counter Shard (V2.1)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @interface CounterShardData
+ * @description Sharded global counter PDA for write throughput.
+ * @category Types
+ * @since v0.5.0
+ */
+export interface CounterShardData {
+  readonly bump: number;
+  readonly shardIndex: number;
+  readonly totalAgents: BN;
+  readonly activeAgents: BN;
+  readonly totalFeedbacks: BN;
+  readonly totalTools: number;
+  readonly totalVaults: number;
+  readonly totalAttestations: number;
+  readonly totalSettlements: BN;
+  readonly totalDisputes: number;
+  readonly totalSubscriptions: number;
+  readonly lastUpdated: BN;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Index Page (V2.1)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @interface IndexPageData
+ * @description Overflow page PDA for discovery indexes.
+ * @category Types
+ * @since v0.5.0
+ */
+export interface IndexPageData {
+  readonly bump: number;
+  readonly parentIndex: PublicKey;
+  readonly pageIndex: number;
+  readonly agents: PublicKey[];
+  readonly lastUpdated: BN;
 }
