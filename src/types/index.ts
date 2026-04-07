@@ -27,6 +27,9 @@ export {
   SettlementMode,
   ToolHttpMethod,
   ToolCategory,
+  SettlementSecurity,
+  DisputeOutcome,
+  BillingInterval,
 } from "./enums";
 
 export type {
@@ -35,6 +38,9 @@ export type {
   SettlementModeKind,
   ToolHttpMethodKind,
   ToolCategoryKind,
+  SettlementSecurityKind,
+  DisputeOutcomeKind,
+  BillingIntervalKind,
 } from "./enums";
 
 // ── Common Structs ───────────────────────────────────
@@ -65,6 +71,13 @@ export type {
   AgentAttestationData,
   MemoryLedgerData,
   LedgerPageData,
+  EscrowAccountV2Data,
+  PendingSettlementData,
+  DisputeRecordData,
+  AgentStakeData,
+  SubscriptionData,
+  CounterShardData,
+  IndexPageData,
 } from "./accounts";
 
 // ── Instruction Args ─────────────────────────────────
@@ -83,6 +96,8 @@ export type {
   DelegatePermissionBit,
   SchemaTypeValue,
   CompressionTypeValue,
+  CreateEscrowV2Args,
+  CreateSubscriptionArgs,
 } from "./instructions";
 
 export {

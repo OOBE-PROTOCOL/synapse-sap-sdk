@@ -74,12 +74,14 @@ import {
   deriveAgent,
   deriveAgentStats,
   deriveEscrow,
+  deriveEscrowV2,
 } from "../pda";
 import { sha256, hashToArray } from "../utils";
 import { SapNetwork } from "../constants/network";
 import type { SapNetworkId } from "../constants/network";
 import type {
   EscrowAccountData,
+  EscrowAccountV2Data,
   AgentAccountData,
   VolumeCurveBreakpoint,
   Settlement,
@@ -371,18 +373,14 @@ export class X402Registry {
       volumeCurve = opts.volumeCurve ?? [];
       totalBefore = opts.totalCallsBefore ?? 0;
     } else {
-      // Try to read from existing escrow
+      // Try to read from existing escrow (V2 first, then V1)
       const [agentPda] = deriveAgent(agentWallet);
-      const [escrowPda] = deriveEscrow(agentPda, this.wallet);
-      const escrow = await this.fetchNullable<EscrowAccountData>(
-        "escrowAccount",
-        escrowPda,
-      );
+      const resolved = await this.resolveEscrow(agentPda, this.wallet);
 
-      if (escrow) {
-        pricePerCall = escrow.pricePerCall;
-        volumeCurve = escrow.volumeCurve ?? [];
-        totalBefore = escrow.totalCallsSettled.toNumber();
+      if (resolved) {
+        pricePerCall = resolved.escrow.pricePerCall;
+        volumeCurve = resolved.escrow.volumeCurve ?? [];
+        totalBefore = resolved.escrow.totalCallsSettled.toNumber();
       } else {
         // Fall back to agent's first pricing tier
         const agent = await this.fetchNullable<AgentAccountData>(
@@ -493,6 +491,8 @@ export class X402Registry {
    * @param opts - Payment options (price, max calls, deposit, etc.).
    * @returns A {@link PaymentContext} with escrow details and transaction signature.
    * @since v0.1.0
+   * @deprecated Since v0.7.0 — Creates a V1 escrow. Use `client.escrowV2.create()` for
+   * V2 escrows with dispute windows, co-signing, and settlement security.
    *
    * @example
    * ```ts
@@ -509,7 +509,6 @@ export class X402Registry {
   ): Promise<PaymentContext> {
     const [agentPda] = deriveAgent(agentWallet);
     const [escrowPda] = deriveEscrow(agentPda, this.wallet);
-    const [statsPda] = deriveAgentStats(agentPda);
 
     const pricePerCall = new BN(opts.pricePerCall.toString());
     const maxCalls = new BN((opts.maxCalls ?? 0).toString());
@@ -536,7 +535,6 @@ export class X402Registry {
       .accounts({
         depositor: this.wallet,
         agent: agentPda,
-        agentStats: statsPda,
         escrow: escrowPda,
         systemProgram: SystemProgram.programId,
       })
@@ -562,6 +560,7 @@ export class X402Registry {
    * @param amount - Amount to deposit in smallest token unit.
    * @returns The transaction signature.
    * @since v0.1.0
+   * @deprecated Since v0.7.0 — Operates on V1 escrows only. Use `client.escrowV2.deposit()` instead.
    */
   async addFunds(
     agentWallet: PublicKey,
@@ -588,6 +587,7 @@ export class X402Registry {
    * @param amount - Amount to withdraw in smallest token unit.
    * @returns The transaction signature.
    * @since v0.1.0
+   * @deprecated Since v0.7.0 — Operates on V1 escrows only. Use `client.escrowV2.withdraw()` instead.
    */
   async withdrawFunds(
     agentWallet: PublicKey,
@@ -614,6 +614,7 @@ export class X402Registry {
    * @param agentWallet - Agent wallet of the escrow.
    * @returns The transaction signature.
    * @since v0.1.0
+   * @deprecated Since v0.7.0 — Operates on V1 escrows only. Use `client.escrowV2.close()` instead.
    */
   async closeEscrow(agentWallet: PublicKey): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(agentWallet);
@@ -678,17 +679,14 @@ export class X402Registry {
     opts?: { network?: SapNetworkId | string },
   ): Promise<X402Headers | null> {
     const [agentPda] = deriveAgent(agentWallet);
-    const [escrowPda] = deriveEscrow(agentPda, this.wallet);
+    const resolved = await this.resolveEscrow(agentPda, this.wallet);
+    if (!resolved) return null;
 
-    const escrow = await this.fetchNullable<EscrowAccountData>(
-      "escrowAccount",
-      escrowPda,
-    );
-    if (!escrow) return null;
+    const escrow = resolved.escrow;
 
     return {
       "X-Payment-Protocol": "SAP-x402",
-      "X-Payment-Escrow": escrowPda.toBase58(),
+      "X-Payment-Escrow": resolved.escrowPda.toBase58(),
       "X-Payment-Agent": agentPda.toBase58(),
       "X-Payment-Depositor": this.wallet.toBase58(),
       "X-Payment-MaxCalls": escrow.maxCalls.toString(),
@@ -742,14 +740,16 @@ export class X402Registry {
     );
 
     const [agentPda] = deriveAgent(this.wallet);
-    const [escrowPda] = deriveEscrow(agentPda, depositorWallet);
     const [statsPda] = deriveAgentStats(agentPda);
 
-    // Prefetch to calculate amount
-    const escrow = await this.fetch<EscrowAccountData>(
-      "escrowAccount",
-      escrowPda,
-    );
+    // Auto-detect escrow version
+    const resolved = await this.resolveEscrow(agentPda, depositorWallet);
+    if (!resolved) {
+      throw new Error("No escrow found for this agent + depositor pair");
+    }
+
+    const escrow = resolved.escrow;
+    const escrowPda = resolved.escrowPda;
     const estimate = this.calculateCost(
       escrow.pricePerCall,
       escrow.volumeCurve,
@@ -761,15 +761,29 @@ export class X402Registry {
     const preIxs = buildPriorityFeeIxs(opts);
     const rpcOpts = buildRpcOptions(opts);
 
-    let builder = this.methods
-      .settleCalls(new BN(callsToSettle), serviceHash)
-      .accounts({
-        wallet: this.wallet,
-        agent: agentPda,
-        agentStats: statsPda,
-        escrow: escrowPda,
-        systemProgram: SystemProgram.programId,
-      });
+    let builder;
+    if (resolved.version === 2) {
+      // V2: settleCallsV2 requires escrow_nonce (default 0)
+      builder = this.methods
+        .settleCallsV2(new BN(0), new BN(callsToSettle), serviceHash)
+        .accounts({
+          wallet: this.wallet,
+          agent: agentPda,
+          agentStats: statsPda,
+          escrow: escrowPda,
+          systemProgram: SystemProgram.programId,
+        });
+    } else {
+      builder = this.methods
+        .settleCalls(new BN(callsToSettle), serviceHash)
+        .accounts({
+          wallet: this.wallet,
+          agent: agentPda,
+          agentStats: statsPda,
+          escrow: escrowPda,
+          systemProgram: SystemProgram.programId,
+        });
+    }
 
     if (preIxs.length > 0) {
       builder = builder.preInstructions(preIxs);
@@ -825,14 +839,16 @@ export class X402Registry {
     const totalCalls = entries.reduce((sum, e) => sum + e.calls, 0);
 
     const [agentPda] = deriveAgent(this.wallet);
-    const [escrowPda] = deriveEscrow(agentPda, depositorWallet);
     const [statsPda] = deriveAgentStats(agentPda);
 
-    // Prefetch for amount estimation
-    const escrow = await this.fetch<EscrowAccountData>(
-      "escrowAccount",
-      escrowPda,
-    );
+    // Auto-detect escrow version
+    const resolved = await this.resolveEscrow(agentPda, depositorWallet);
+    if (!resolved) {
+      throw new Error("No escrow found for this agent + depositor pair");
+    }
+
+    const escrow = resolved.escrow;
+    const escrowPda = resolved.escrowPda;
     const estimate = this.calculateCost(
       escrow.pricePerCall,
       escrow.volumeCurve,
@@ -887,21 +903,17 @@ export class X402Registry {
   ): Promise<EscrowBalance | null> {
     const [agentPda] = deriveAgent(agentWallet);
     const dep = depositor ?? this.wallet;
-    const [escrowPda] = deriveEscrow(agentPda, dep);
 
-    const escrow = await this.fetchNullable<EscrowAccountData>(
-      "escrowAccount",
-      escrowPda,
-    );
-    if (!escrow) return null;
+    const resolved = await this.resolveEscrow(agentPda, dep);
+    if (!resolved) return null;
 
+    const escrow = resolved.escrow;
     const now = Math.floor(Date.now() / 1000);
     const isExpired = escrow.expiresAt.toNumber() > 0 && now >= escrow.expiresAt.toNumber();
     const maxCalls = escrow.maxCalls.toNumber();
     const settled = escrow.totalCallsSettled.toNumber();
     const callsRemaining = maxCalls > 0 ? maxCalls - settled : Infinity;
 
-    // Estimate affordable calls with current balance
     const pricePerCall = escrow.pricePerCall.toNumber();
     const balance = escrow.balance.toNumber();
     const affordableCalls = pricePerCall > 0
@@ -933,9 +945,18 @@ export class X402Registry {
     depositor?: PublicKey,
   ): Promise<boolean> {
     const [agentPda] = deriveAgent(agentWallet);
-    const [escrowPda] = deriveEscrow(agentPda, depositor ?? this.wallet);
-    const info = await this.program.provider.connection.getAccountInfo(escrowPda);
-    return info !== null;
+    const dep = depositor ?? this.wallet;
+    const conn = this.program.provider.connection;
+
+    // Check V2 first (nonce=0)
+    const [v2Pda] = deriveEscrowV2(agentPda, dep, 0);
+    const v2Info = await conn.getAccountInfo(v2Pda);
+    if (v2Info !== null) return true;
+
+    // Fall back to V1
+    const [v1Pda] = deriveEscrow(agentPda, dep);
+    const v1Info = await conn.getAccountInfo(v1Pda);
+    return v1Info !== null;
   }
 
   /**
@@ -950,11 +971,11 @@ export class X402Registry {
   async fetchEscrow(
     agentWallet: PublicKey,
     depositor?: PublicKey,
-  ): Promise<EscrowAccountData | null> {
+  ): Promise<EscrowAccountData | EscrowAccountV2Data | null> {
     const [agentPda] = deriveAgent(agentWallet);
     const dep = depositor ?? this.wallet;
-    const [escrowPda] = deriveEscrow(agentPda, dep);
-    return this.fetchNullable<EscrowAccountData>("escrowAccount", escrowPda);
+    const resolved = await this.resolveEscrow(agentPda, dep);
+    return resolved?.escrow ?? null;
   }
 
   // ── Internals ────────────────────────────────────────
@@ -972,21 +993,6 @@ export class X402Registry {
   }
 
   /**
-   * @name fetch
-   * @description Fetch an on-chain account by name and PDA. Throws if not found.
-   * @param name - Anchor account discriminator name.
-   * @param pda - Account public key to fetch.
-   * @returns The deserialized account data.
-   * @throws If the account does not exist.
-   * @private
-   */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private async fetch<T>(name: string, pda: PublicKey): Promise<T> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
-    return (this.program.account as any)[name].fetch(pda) as Promise<T>;
-  }
-
-  /**
    * @name fetchNullable
    * @description Fetch an on-chain account by name and PDA. Returns `null` if not found.
    * @param name - Anchor account discriminator name.
@@ -998,5 +1004,38 @@ export class X402Registry {
   private async fetchNullable<T>(name: string, pda: PublicKey): Promise<T | null> {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
     return (this.program.account as any)[name].fetchNullable(pda) as Promise<T | null>;
+  }
+
+  /**
+   * @name resolveEscrow
+   * @description Try to find an escrow: V2 (nonce=0) first, then V1 fallback.
+   * Returns the escrow data, PDA, and version indicator.
+   * @private
+   */
+  private async resolveEscrow(
+    agentPda: PublicKey,
+    depositor: PublicKey,
+  ): Promise<{
+    escrow: EscrowAccountData | EscrowAccountV2Data;
+    escrowPda: PublicKey;
+    version: 1 | 2;
+  } | null> {
+    // Try V2 first (nonce=0 is the default)
+    const [v2Pda] = deriveEscrowV2(agentPda, depositor, 0);
+    const v2 = await this.fetchNullable<EscrowAccountV2Data>(
+      "escrowAccountV2",
+      v2Pda,
+    );
+    if (v2) return { escrow: v2, escrowPda: v2Pda, version: 2 };
+
+    // Fall back to V1
+    const [v1Pda] = deriveEscrow(agentPda, depositor);
+    const v1 = await this.fetchNullable<EscrowAccountData>(
+      "escrowAccount",
+      v1Pda,
+    );
+    if (v1) return { escrow: v1, escrowPda: v1Pda, version: 1 };
+
+    return null;
   }
 }

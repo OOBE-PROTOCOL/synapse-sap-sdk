@@ -1324,12 +1324,15 @@ SapClient
 ├── .indexing       → IndexingModule       (capability/protocol/tool category indexes)
 ├── .tools          → ToolsModule          (publish, inscribe, update, deactivate, checkpoints)
 ├── .vault          → VaultModule          (init, sessions, inscribe, delegate, encrypt)
-├── .escrow         → EscrowModule         (create, deposit, settle, batchSettle, withdraw)
+├── .escrow         → EscrowModule         (⚠️ DEPRECATED — use escrowV2)
+├── .escrowV2       → EscrowV2Module       (create, deposit, settle, withdraw, close, disputes) [v0.7.0]
+├── .staking        → StakingModule        (initStake, deposit, requestUnstake, completeUnstake) [v0.7.0]
+├── .subscription   → SubscriptionModule   (create, fund, cancel, close) [v0.7.0]
 ├── .attestation    → AttestationModule    (create, revoke)
 ├── .ledger         → LedgerModule         (init, write, seal, close, fetch pages)
 ├── .discovery      → DiscoveryRegistry    (findByCapability, findByProtocol, profiles, network overview)
 ├── .session        → SessionManager       (start, write, read, seal, close — recommended entry point)
-├── .x402           → X402Registry         (estimateCost, preparePayment, buildPaymentHeaders)
+├── .x402           → X402Registry         (estimateCost, preparePayment ⚠️, buildPaymentHeaders)
 └── .builder        → AgentBuilder         (fluent registration API)
 ```
 
@@ -1340,7 +1343,7 @@ SapClient
 | **Identity** | Agent registration, lifecycle, reputation metrics | `agent`, `feedback`, `attestation` |
 | **Memory** | Conversation storage — ring buffer (Ledger) or encrypted (Vault) | `ledger`, `vault`, `session` |
 | **Reputation** | On-chain feedback (0–1000 score → 0–10000 aggregate), attestations, trust signals | `feedback`, `attestation` |
-| **Commerce** | x402 micropayment escrow — SOL & SPL token, volume curves | `escrow`, `x402` |
+| **Commerce** | x402 micropayment escrow — SOL & SPL token, volume curves, V2 settlement security, disputes, staking, subscriptions | `escrow` (⚠️), `escrowV2`, `staking`, `subscription`, `x402` |
 | **Tools** | On-chain tool descriptors with schema hashing, versioning | `tools` |
 | **Discovery** | Capability/protocol indexes, agent profiles, network overview | `discovery`, `indexing` |
 
@@ -1466,6 +1469,68 @@ await session.close(ctx);  // ring buffer data lost if not sealed
 ### x402 Escrow Payments
 
 > **📚 Docs**: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/blob/main/docs/05-x402-payments.md
+
+#### V2 Escrow (v0.7.0 — Preferred)
+
+V2 escrows introduce **settlement security modes**, **disputes**, **staking**, and **subscriptions**.
+
+```ts
+import { SettlementSecurity, BillingInterval } from '@synapse-sap/sdk';
+
+// Create V2 escrow with settlement security
+await client.escrowV2.create(agentWallet, {
+  deposit: new BN(1_000_000),
+  pricePerCall: new BN(10_000),
+  maxCalls: new BN(100),
+  expiresAt: new BN(Math.floor(Date.now() / 1000) + 3600),
+  securityMode: SettlementSecurity.CoSigned,
+});
+
+// Deposit more funds
+await client.escrowV2.deposit(agentWallet, new BN(500_000));
+
+// Agent settles calls (creates PendingSettlement for CoSigned mode)
+await client.escrowV2.settleCalls(depositorWallet, {
+  callsToSettle: 5,
+  serviceData: "batch-query",
+});
+
+// Withdraw unused funds
+await client.escrowV2.withdraw(agentWallet, new BN(200_000));
+
+// Close escrow
+await client.escrowV2.close(agentWallet);
+```
+
+#### Staking (v0.7.0)
+
+```ts
+// Agent stakes SOL to unlock higher-tier escrow modes
+await client.staking.initStake(agentWallet, new BN(1_000_000_000));
+await client.staking.deposit(agentWallet, new BN(500_000_000));
+await client.staking.requestUnstake(agentWallet, new BN(500_000_000));
+await client.staking.completeUnstake(agentWallet);
+```
+
+#### Subscriptions (v0.7.0)
+
+```ts
+// Recurring payment subscription
+await client.subscription.create(agentWallet, {
+  subId: 1,
+  amount: new BN(100_000),
+  interval: BillingInterval.Monthly,
+});
+await client.subscription.fund(agentWallet, 1, new BN(100_000));
+await client.subscription.cancel(agentWallet, 1);
+await client.subscription.close(agentWallet, 1);
+```
+
+#### V1 Escrow (⚠️ DEPRECATED)
+
+> **⚠️ v0.7.0:** `client.escrow` and `client.x402.preparePayment()` create V1 escrows.
+> Use `client.escrowV2` for new integrations. V1 escrows lack settlement security,
+> disputes, and staking.
 
 #### Consumer Flow (Paying for Agent Services)
 

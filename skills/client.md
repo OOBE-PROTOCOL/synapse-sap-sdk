@@ -1,6 +1,6 @@
 # SAP SDK — Client / Consumer Skill Guide
 
-> **Version:** v0.6.4
+> **Version:** v0.7.0
 > **Role:** You are a client (consumer) that discovers on-chain agents, creates escrows, calls x402 endpoints, and verifies settlements.
 > **Companion:** For the merchant/seller perspective see [merchant.md](./merchant.md)
 > **Parent Reference:** For the full Synapse Client SDK (RPC, DAS, AI tools, plugins, MCP, gateway, x402, Next.js) see [skills.md](./skills.md)
@@ -98,7 +98,14 @@ import {
 import {
   deriveAgent,
   deriveAgentStats,
-  deriveEscrow,
+  deriveEscrow,          // ⚠️ DEPRECATED v0.7.0 — use deriveEscrowV2
+  deriveEscrowV2,        // v0.7.0 — V2 escrow with nonce
+  derivePendingSettlement,// v0.7.0 — pending settlement PDA
+  deriveDispute,         // v0.7.0 — dispute record PDA
+  deriveStake,           // v0.7.0 — agent stake PDA
+  deriveSubscription,    // v0.7.0 — subscription PDA
+  deriveShard,           // v0.7.0 — counter shard PDA
+  deriveIndexPage,       // v0.7.0 — index page PDA
   deriveFeedback,
   deriveTool,
   deriveCapabilityIndex,
@@ -110,7 +117,14 @@ import {
 import type {
   SapNetworkId,
   AgentAccountData,
-  EscrowAccountData,
+  EscrowAccountData,             // ⚠️ DEPRECATED v0.7.0 — use EscrowAccountV2Data
+  EscrowAccountV2Data,           // v0.7.0 — V2 escrow account
+  PendingSettlementData,         // v0.7.0 — pending settlement account
+  DisputeRecordData,             // v0.7.0 — dispute record account
+  AgentStakeData,                // v0.7.0 — agent stake account
+  SubscriptionData,              // v0.7.0 — subscription account
+  CounterShardData,              // v0.7.0 — counter shard account
+  IndexPageData,                 // v0.7.0 — index page account
   FeedbackAccountData,
   ToolDescriptorData,
   AgentStatsData,
@@ -121,6 +135,9 @@ import type {
   ToolManifestEntry,
   AgentManifest,
   EndpointValidationResult,
+  // v0.7.0 — V2 instruction args
+  CreateEscrowV2Args,
+  CreateSubscriptionArgs,
 } from "@oobe-protocol-labs/synapse-sap-sdk";
 
 // ── Registry Types ───────────────────────────────────
@@ -142,6 +159,9 @@ import {
   SettlementMode,
   ToolHttpMethod,
   ToolCategory,
+  SettlementSecurity,  // v0.7.0 — V2 escrow security mode
+  DisputeOutcome,      // v0.7.0 — dispute resolution outcome
+  BillingInterval,     // v0.7.0 — subscription billing interval
 } from "@oobe-protocol-labs/synapse-sap-sdk";
 
 // ── v0.6.0 — Network Normalizer ─────────────────────
@@ -571,6 +591,11 @@ if (agentNetwork && !isNetworkEquivalent(agentNetwork, SapNetwork.SOLANA_MAINNET
 
 ### Step 3 — Prepare Payment (Create Escrow + Deposit)
 
+> **⚠️ v0.7.0 Deprecation:** `preparePayment()` creates a **V1 escrow**.
+> For new integrations, use `client.escrowV2.create()` + `client.escrowV2.deposit()`
+> directly. V1 escrows remain functional but will not receive new features
+> (settlement security, disputes, staking).
+
 ```ts
 const ctx: PaymentContext = await client.x402.preparePayment(agentWallet, {
   pricePerCall: agent.basePricePerCall.toNumber(),  // lamports per call
@@ -667,6 +692,9 @@ const receipt = await agentClient.x402.settle(clientWallet, 1, "search-query");
 ```
 
 ### Step 6 — Verify Settlement (Optional)
+
+> **v0.7.0:** `getBalance()` now auto-detects V2 escrows first (via `deriveEscrowV2`),
+> falling back to V1 (`deriveEscrow`). No code changes needed.
 
 ```ts
 const balance: EscrowBalance | null = await client.x402.getBalance(
@@ -783,7 +811,14 @@ const [escrowPda, escrowBump] = deriveEscrow(agentPda, myWallet);
 |----------|-------|-------------|
 | `deriveAgent(wallet)` | `["agent", wallet]` | Agent account |
 | `deriveAgentStats(agentPda)` | `["agent_stats", agentPda]` | Performance metrics |
-| `deriveEscrow(agentPda, depositor)` | `["escrow", agentPda, depositor]` | Payment escrow |
+| `deriveEscrow(agentPda, depositor)` | `["escrow", agentPda, depositor]` | **⚠️ DEPRECATED** V1 escrow |
+| `deriveEscrowV2(agentPda, depositor, nonce)` | `["sap_escrow_v2", agentPda, depositor, nonce]` | V2 escrow (v0.7.0) |
+| `derivePendingSettlement(escrowV2Pda, nonce)` | `["sap_pending", escrowV2Pda, nonce]` | Pending settlement (v0.7.0) |
+| `deriveDispute(pendingPda)` | `["sap_dispute", pendingPda]` | Dispute record (v0.7.0) |
+| `deriveStake(agentPda)` | `["sap_stake", agentPda]` | Agent stake (v0.7.0) |
+| `deriveSubscription(agentPda, subscriber, subId)` | `["sap_sub", agentPda, subscriber, subId]` | Subscription (v0.7.0) |
+| `deriveShard(basePda, shardId)` | `["sap_shard", basePda, shardId]` | Counter shard (v0.7.0) |
+| `deriveIndexPage(indexPda, page)` | `["sap_page", indexPda, page]` | Index page (v0.7.0) |
 | `deriveFeedback(agentPda, reviewer)` | `["feedback", agentPda, reviewer]` | Rating |
 | `deriveTool(agentPda, hash)` | `["tool_descriptor", agentPda, hash]` | Tool metadata |
 | `deriveVault(agentPda)` | `["memory_vault", agentPda]` | Encrypted memory |
@@ -799,6 +834,17 @@ const [escrowPda, escrowBump] = deriveEscrow(agentPda, myWallet);
 ### Verifying an Escrow On-Chain
 
 ```ts
+// V2 escrow (preferred)
+const [escrowV2Pda] = deriveEscrowV2(agentPda, myWallet, 0);
+const escrowV2: EscrowAccountV2Data | null = await client.escrowV2.fetchNullable(escrowV2Pda);
+
+if (escrowV2) {
+  console.log("Balance:", escrowV2.balance.toString());
+  console.log("Settlement security:", escrowV2.securityMode);
+  console.log("Calls settled:", escrowV2.callsSettled.toString());
+}
+
+// V1 escrow (⚠️ DEPRECATED)
 const [escrowPda] = deriveEscrow(agentPda, myWallet);
 const escrow: EscrowAccountData | null = await client.escrow.fetchNullable(escrowPda);
 
@@ -873,6 +919,72 @@ const ctx2 = await client.x402.preparePayment(agentWallet, {
 ---
 
 ## 9. Escrow Lifecycle Management
+
+### V2 Escrow (v0.7.0 — Preferred)
+
+```ts
+// Create a V2 escrow with settlement security
+await client.escrowV2.create(agentWallet, {
+  deposit: new BN(100_000),
+  pricePerCall: new BN(1000),
+  maxCalls: new BN(100),
+  expiresAt: new BN(Math.floor(Date.now() / 1000) + 86400),
+  securityMode: SettlementSecurity.CoSigned, // or .Open, .Arbitrated
+});
+
+// Deposit more funds
+await client.escrowV2.deposit(agentWallet, new BN(50_000));
+
+// Withdraw unused funds
+await client.escrowV2.withdraw(agentWallet, new BN(30_000));
+
+// Close escrow (reclaim rent)
+await client.escrowV2.close(agentWallet);
+
+// Close pending settlement (after dispute resolution)
+await client.escrowV2.closePendingSettlement(pendingSettlementPda);
+```
+
+### V2 Staking (v0.7.0)
+
+```ts
+// Initialize agent stake
+await client.staking.initStake(agentWallet, new BN(1_000_000));
+
+// Deposit more stake
+await client.staking.deposit(agentWallet, new BN(500_000));
+
+// Request unstake (begins cooldown)
+await client.staking.requestUnstake(agentWallet, new BN(500_000));
+
+// Complete unstake (after cooldown)
+await client.staking.completeUnstake(agentWallet);
+```
+
+### V2 Subscriptions (v0.7.0)
+
+```ts
+// Create a subscription
+await client.subscription.create(agentWallet, {
+  subId: 1,
+  amount: new BN(100_000),
+  interval: BillingInterval.Monthly,
+});
+
+// Fund subscription
+await client.subscription.fund(agentWallet, 1, new BN(100_000));
+
+// Cancel subscription
+await client.subscription.cancel(agentWallet, 1);
+
+// Close subscription (reclaim rent)
+await client.subscription.close(agentWallet, 1);
+```
+
+### V1 Escrow (⚠️ DEPRECATED — use V2 above)
+
+> **⚠️ v0.7.0:** These methods create V1 escrows. Use `client.escrowV2` for
+> new integrations. V1 escrows lack settlement security, disputes, and staking.
 
 ### Add Funds to Existing Escrow
 
@@ -1784,6 +1896,9 @@ from `deriveEscrow(yourAgentPda, clientWallet)`.
 | `ToolHttpMethod` | `Get`, `Post`, `Put`, `Delete`, `Compound` |
 | `ToolCategory` | `Swap`, `Lend`, `Stake`, `Nft`, `Payment`, `Data`, `Governance`, `Bridge`, `Analytics`, `Custom` |
 | `SapNetwork` | `SOLANA_MAINNET`, `SOLANA_MAINNET_GENESIS`, `SOLANA_DEVNET`, `SOLANA_DEVNET_NAMED` |
+| `SettlementSecurity` | `Open`, `CoSigned`, `Arbitrated` | v0.7.0 |
+| `DisputeOutcome` | `CallerWins`, `AgentWins`, `Split` | v0.7.0 |
+| `BillingInterval` | `Weekly`, `Monthly`, `Quarterly`, `Yearly` | v0.7.0 |
 
 ### Type-Level Unions
 
@@ -1801,7 +1916,14 @@ from `deriveEscrow(yourAgentPda, clientWallet)`.
 |------|------------|-------------|
 | `AgentAccountData` | `deriveAgent(wallet)` | Agent profile, pricing, capabilities |
 | `AgentStatsData` | `deriveAgentStats(agentPda)` | Reputation (hot-path PDA) |
-| `EscrowAccountData` | `deriveEscrow(agentPda, depositor)` | Escrow balance, calls, expiry |
+| `EscrowAccountData` | `deriveEscrow(agentPda, depositor)` | **⚠️ DEPRECATED** V1 escrow |
+| `EscrowAccountV2Data` | `deriveEscrowV2(agentPda, depositor, nonce)` | V2 escrow (v0.7.0) |
+| `PendingSettlementData` | `derivePendingSettlement(escrowV2, nonce)` | Pending settlement (v0.7.0) |
+| `DisputeRecordData` | `deriveDispute(pendingPda)` | Dispute record (v0.7.0) |
+| `AgentStakeData` | `deriveStake(agentPda)` | Agent stake (v0.7.0) |
+| `SubscriptionData` | `deriveSubscription(agentPda, subscriber, subId)` | Subscription (v0.7.0) |
+| `CounterShardData` | `deriveShard(basePda, shardId)` | Counter shard (v0.7.0) |
+| `IndexPageData` | `deriveIndexPage(indexPda, page)` | Index page (v0.7.0) |
 | `FeedbackAccountData` | `deriveFeedback(agentPda, reviewer)` | Rating per (agent, reviewer) |
 | `ToolDescriptorData` | `deriveTool(agentPda, hash)` | Tool metadata + schema hashes |
 | `AgentAttestationData` | `deriveAttestation(agentPda, attester)` | Trust attestation |
@@ -1850,15 +1972,20 @@ from `deriveEscrow(yourAgentPda, clientWallet)`.
  6. Check network compat      -> isNetworkEquivalent(agentNet, myNet)      [v0.6.0]
  7. Estimate cost             -> client.x402.estimateCost(agentWallet, calls)
  8. Validate payment params   -> createPreparePaymentSchema().parse(...)   [v0.6.0]
- 9. Prepare payment           -> client.x402.preparePayment(agentWallet, opts)
-10. Build x402 headers        -> client.x402.buildPaymentHeaders(ctx)
-11. Call agent endpoint        -> fetch(url, { headers: { ...x402Headers } })
-12. Handle errors              -> classifyAnchorError() for messages       [v0.6.0]
-13. Monitor escrow             -> client.x402.getBalance(agentWallet)
-14. Refill or withdraw         -> client.x402.addFunds() / withdrawFunds()
-15. Give feedback              -> client.feedback.give(agentWallet, ...)
-16. Close escrow (cleanup)     -> client.x402.closeEscrow(agentWallet)
+ 9. Create V2 escrow          -> client.escrowV2.create(agentWallet, opts) [v0.7.0]
+10. Deposit funds             -> client.escrowV2.deposit(agentWallet, amt) [v0.7.0]
+11. Build x402 headers        -> client.x402.buildPaymentHeaders(ctx)
+12. Call agent endpoint        -> fetch(url, { headers: { ...x402Headers } })
+13. Handle errors              -> classifyAnchorError() for messages       [v0.6.0]
+14. Monitor escrow             -> client.x402.getBalance(agentWallet)       [V2-aware]
+15. Refill escrow              -> client.escrowV2.deposit()                [v0.7.0]
+16. Give feedback              -> client.feedback.give(agentWallet, ...)
+17. Close escrow (cleanup)     -> client.escrowV2.close(agentWallet)       [v0.7.0]
 ```
+
+> **⚠️ Migration note:** Steps 9, 10, 15, 17 replace the deprecated
+> `preparePayment()`, `addFunds()`, `withdrawFunds()`, `closeEscrow()`
+> from `X402Registry`. Those methods still work but create V1 escrows.
 
 ---
 

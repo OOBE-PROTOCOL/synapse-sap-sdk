@@ -79,6 +79,22 @@ const u32le = (n: number): Buffer => {
   return buf;
 };
 
+/**
+ * Encode an unsigned 64-bit integer as a little-endian `Buffer`.
+ *
+ * @name u64le
+ * @description Produces an 8-byte LE buffer for u64 PDA seed segments (e.g., escrow nonce, sub_id).
+ * @param n - The number or bigint to encode.
+ * @returns {Buffer} 8-byte little-endian buffer.
+ * @category PDA
+ * @since v0.5.0
+ */
+const u64le = (n: number | bigint): Buffer => {
+  const buf = Buffer.alloc(8);
+  buf.writeBigUInt64LE(BigInt(n), 0);
+  return buf;
+};
+
 // ═════════════════════════════════════════════
 //  Core PDAs
 // ═════════════════════════════════════════════
@@ -421,6 +437,7 @@ export const deriveTool = (
  * @returns {PdaResult} `[pda, bump]` tuple.
  * @category PDA
  * @since v0.1.0
+ * @deprecated Since v0.7.0 — Use {@link deriveEscrowV2} for V2 escrows with nonce support.
  * @see EscrowAccount
  */
 export const deriveEscrow = (
@@ -647,6 +664,185 @@ export const deriveMemoryChunk = (
       toSeedBuf(SEEDS.MEMORY_CHUNK),
       memoryEntryPda.toBuffer(),
       Buffer.from([chunkIndex]),
+    ],
+    programId,
+  );
+
+// ═════════════════════════════════════════════
+//  Escrow V2
+// ═════════════════════════════════════════════
+
+/**
+ * Derive the **EscrowAccountV2** PDA.
+ *
+ * Seeds: `["sap_escrow_v2", agent_pda, depositor_wallet, nonce_u64_le]`
+ *
+ * @name deriveEscrowV2
+ * @description Computes the V2 escrow PDA supporting nonce-based multi-escrow.
+ * @param agentPda  - The agent's PDA.
+ * @param depositor - The depositor's wallet.
+ * @param nonce     - Escrow nonce (u64) allowing multiple escrows per pair.
+ * @param programId - Override program ID.
+ * @returns {PdaResult} `[pda, bump]` tuple.
+ * @category PDA
+ * @since v0.5.0
+ */
+export const deriveEscrowV2 = (
+  agentPda: PublicKey,
+  depositor: PublicKey,
+  nonce: number | bigint = 0,
+  programId = SAP_PROGRAM_ID,
+): PdaResult =>
+  findPda(
+    [
+      toSeedBuf(SEEDS.ESCROW_V2),
+      agentPda.toBuffer(),
+      depositor.toBuffer(),
+      u64le(nonce),
+    ],
+    programId,
+  );
+
+/**
+ * Derive the **PendingSettlement** PDA.
+ *
+ * Seeds: `["sap_pending", escrow_v2_pda, settlement_index_u64_le]`
+ *
+ * @name derivePendingSettlement
+ * @param escrowV2Pda     - The parent V2 escrow PDA.
+ * @param settlementIndex - The monotonic settlement index (u64).
+ * @param programId       - Override program ID.
+ * @returns {PdaResult} `[pda, bump]` tuple.
+ * @category PDA
+ * @since v0.5.0
+ */
+export const derivePendingSettlement = (
+  escrowV2Pda: PublicKey,
+  settlementIndex: number | bigint,
+  programId = SAP_PROGRAM_ID,
+): PdaResult =>
+  findPda(
+    [
+      toSeedBuf(SEEDS.PENDING),
+      escrowV2Pda.toBuffer(),
+      u64le(settlementIndex),
+    ],
+    programId,
+  );
+
+/**
+ * Derive the **DisputeRecord** PDA.
+ *
+ * Seeds: `["sap_dispute", pending_settlement_pda]`
+ *
+ * @name deriveDispute
+ * @param pendingSettlementPda - The parent pending settlement PDA.
+ * @param programId            - Override program ID.
+ * @returns {PdaResult} `[pda, bump]` tuple.
+ * @category PDA
+ * @since v0.5.0
+ */
+export const deriveDispute = (
+  pendingSettlementPda: PublicKey,
+  programId = SAP_PROGRAM_ID,
+): PdaResult =>
+  findPda(
+    [toSeedBuf(SEEDS.DISPUTE), pendingSettlementPda.toBuffer()],
+    programId,
+  );
+
+/**
+ * Derive the **AgentStake** PDA.
+ *
+ * Seeds: `["sap_stake", agent_pda]`
+ *
+ * @name deriveStake
+ * @param agentPda  - The agent's PDA.
+ * @param programId - Override program ID.
+ * @returns {PdaResult} `[pda, bump]` tuple.
+ * @category PDA
+ * @since v0.5.0
+ */
+export const deriveStake = (
+  agentPda: PublicKey,
+  programId = SAP_PROGRAM_ID,
+): PdaResult =>
+  findPda([toSeedBuf(SEEDS.STAKE), agentPda.toBuffer()], programId);
+
+/**
+ * Derive the **Subscription** PDA.
+ *
+ * Seeds: `["sap_sub", agent_pda, subscriber_wallet, sub_id_u64_le]`
+ *
+ * @name deriveSubscription
+ * @param agentPda   - The agent's PDA.
+ * @param subscriber - The subscriber's wallet.
+ * @param subId      - Subscription ID (u64).
+ * @param programId  - Override program ID.
+ * @returns {PdaResult} `[pda, bump]` tuple.
+ * @category PDA
+ * @since v0.5.0
+ */
+export const deriveSubscription = (
+  agentPda: PublicKey,
+  subscriber: PublicKey,
+  subId: number | bigint = 0,
+  programId = SAP_PROGRAM_ID,
+): PdaResult =>
+  findPda(
+    [
+      toSeedBuf(SEEDS.SUBSCRIPTION),
+      agentPda.toBuffer(),
+      subscriber.toBuffer(),
+      u64le(subId),
+    ],
+    programId,
+  );
+
+/**
+ * Derive the **CounterShard** PDA.
+ *
+ * Seeds: `["sap_shard", shard_index_u8]`
+ *
+ * @name deriveShard
+ * @param shardIndex - The shard index (0–7).
+ * @param programId  - Override program ID.
+ * @returns {PdaResult} `[pda, bump]` tuple.
+ * @category PDA
+ * @since v0.5.0
+ */
+export const deriveShard = (
+  shardIndex: number,
+  programId = SAP_PROGRAM_ID,
+): PdaResult =>
+  findPda(
+    [toSeedBuf(SEEDS.SHARD), Buffer.from([shardIndex])],
+    programId,
+  );
+
+/**
+ * Derive the **IndexPage** PDA.
+ *
+ * Seeds: `["sap_idx_page", parent_index_pda, page_index_u8]`
+ *
+ * @name deriveIndexPage
+ * @param parentIndexPda - The parent index PDA (CapabilityIndex, ProtocolIndex, etc.).
+ * @param pageIndex      - The page index (0–255).
+ * @param programId      - Override program ID.
+ * @returns {PdaResult} `[pda, bump]` tuple.
+ * @category PDA
+ * @since v0.5.0
+ */
+export const deriveIndexPage = (
+  parentIndexPda: PublicKey,
+  pageIndex: number,
+  programId = SAP_PROGRAM_ID,
+): PdaResult =>
+  findPda(
+    [
+      toSeedBuf(SEEDS.INDEX_PAGE),
+      parentIndexPda.toBuffer(),
+      Buffer.from([pageIndex]),
     ],
     programId,
   );

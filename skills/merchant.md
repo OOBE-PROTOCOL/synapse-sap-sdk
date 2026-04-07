@@ -1,6 +1,6 @@
 # SAP SDK — Merchant (Agent / Seller) Skill Guide
 
-> **Version:** v0.6.4
+> **Version:** v0.7.0
 > **Role:** You are a merchant (agent/seller) that registers on-chain, publishes
 > tools, inscribes schemas, receives x402 micropayments, and manages sessions.
 > **Companion:** For the client/consumer perspective see [client.md](./client.md)
@@ -132,6 +132,9 @@ import {
   SchemaType,         // Input=0, Output=1, Description=2
   CompressionType,    // None=0, Deflate=1, Gzip=2, Brotli=3
   SapNetwork,         // v0.6.0 — Network identifiers
+  SettlementSecurity, // v0.7.0 — Open | CoSigned | Arbitrated
+  DisputeOutcome,     // v0.7.0 — CallerWins | AgentWins | Split
+  BillingInterval,    // v0.7.0 — Weekly | Monthly | Quarterly | Yearly
 } from "@oobe-protocol-labs/synapse-sap-sdk";
 
 // ── Type-level imports ───────────────────────────────
@@ -157,7 +160,14 @@ import type {
   // Account data (deserialized on-chain PDAs)
   AgentAccountData,
   AgentStatsData,
-  EscrowAccountData,
+  EscrowAccountData,             // ⚠️ DEPRECATED v0.7.0 — use EscrowAccountV2Data
+  EscrowAccountV2Data,           // v0.7.0 — V2 escrow account
+  PendingSettlementData,         // v0.7.0 — pending settlement
+  DisputeRecordData,             // v0.7.0 — dispute record
+  AgentStakeData,                // v0.7.0 — agent stake
+  SubscriptionData,              // v0.7.0 — subscription
+  CounterShardData,              // v0.7.0 — counter shard
+  IndexPageData,                 // v0.7.0 — index page
   FeedbackAccountData,
   ToolDescriptorData,
   MemoryVaultData,
@@ -189,6 +199,8 @@ import type {
   InscribeMemoryArgs,
   CompactInscribeArgs,
   CreateEscrowArgs,
+  CreateEscrowV2Args,            // v0.7.0
+  CreateSubscriptionArgs,        // v0.7.0
   CreateAttestationArgs,
   GiveFeedbackArgs,
   UpdateFeedbackArgs,
@@ -224,6 +236,13 @@ import {
   deriveAgent,
   deriveAgentStats,
   deriveEscrow,
+  deriveEscrowV2,        // v0.7.0 — V2 escrow with nonce
+  derivePendingSettlement,// v0.7.0
+  deriveDispute,         // v0.7.0
+  deriveStake,           // v0.7.0
+  deriveSubscription,    // v0.7.0
+  deriveShard,           // v0.7.0
+  deriveIndexPage,       // v0.7.0
   deriveTool,
   deriveVault,
   deriveSession,
@@ -1444,6 +1463,50 @@ app.post("/x402/:tool", async (req, res) => {
 ## 11. Settling Payments (x402)
 
 As a merchant you **settle** funds from client escrows after serving calls.
+
+### V2 Settlement (v0.7.0 — Preferred)
+
+V2 escrows support **settlement security modes**: `Open`, `CoSigned`, `Arbitrated`.
+With `CoSigned` or `Arbitrated`, settlements go through a pending phase that
+allows disputes.
+
+```ts
+// Settle calls on a V2 escrow
+await client.escrowV2.settleCalls(depositorWallet, {
+  callsToSettle: 5,
+  serviceData: "search-query-batch",
+});
+
+// For CoSigned escrows: settlement goes to PendingSettlement
+// The depositor must co-sign or the dispute window must expire
+
+// Close pending settlement after dispute window
+await client.escrowV2.closePendingSettlement(pendingSettlementPda);
+```
+
+### V2 Staking (v0.7.0)
+
+Agents can stake SOL to signal commitment and eligibility for higher-tier
+escrow modes.
+
+```ts
+// Initialize stake for your agent
+await client.staking.initStake(agentWallet, new BN(1_000_000_000)); // 1 SOL
+
+// Add more stake
+await client.staking.deposit(agentWallet, new BN(500_000_000));
+
+// Request unstake (starts cooldown)
+await client.staking.requestUnstake(agentWallet, new BN(500_000_000));
+
+// Complete unstake after cooldown
+await client.staking.completeUnstake(agentWallet);
+```
+
+### V1 Settlement (⚠️ DEPRECATED — use V2 above)
+
+> **⚠️ v0.7.0:** `client.escrow.settle()` and `client.x402.settle()` create V1
+> settlements. For new integrations, use `client.escrowV2.settleCalls()`.
 
 ### Single Settlement
 
@@ -2723,6 +2786,9 @@ you are the agent (`deriveEscrow(yourAgent, clientWallet)`).
 | `SchemaType` | `Input=0`, `Output=1`, `Description=2` |
 | `CompressionType` | `None=0`, `Deflate=1`, `Gzip=2`, `Brotli=3` |
 | `SapNetwork` | `SOLANA_MAINNET`, `SOLANA_MAINNET_GENESIS`, `SOLANA_DEVNET`, `SOLANA_DEVNET_NAMED` |
+| `SettlementSecurity` | `Open`, `CoSigned`, `Arbitrated` | v0.7.0 |
+| `DisputeOutcome` | `CallerWins`, `AgentWins`, `Split` | v0.7.0 |
+| `BillingInterval` | `Weekly`, `Monthly`, `Quarterly`, `Yearly` | v0.7.0 |
 
 ### Type-Level Unions (for Function Signatures)
 
@@ -2744,7 +2810,14 @@ you are the agent (`deriveEscrow(yourAgent, clientWallet)`).
 |------|----------------|
 | `AgentAccountData` | `deriveAgent(wallet)` |
 | `AgentStatsData` | `deriveAgentStats(agentPda)` |
-| `EscrowAccountData` | `deriveEscrow(agentPda, depositor)` |
+| `EscrowAccountData` | `deriveEscrow(agentPda, depositor)` | **⚠️ DEPRECATED** V1 escrow |
+| `EscrowAccountV2Data` | `deriveEscrowV2(agentPda, depositor, nonce)` | V2 escrow (v0.7.0) |
+| `PendingSettlementData` | `derivePendingSettlement(escrowV2, nonce)` | Pending settlement (v0.7.0) |
+| `DisputeRecordData` | `deriveDispute(pendingPda)` | Dispute record (v0.7.0) |
+| `AgentStakeData` | `deriveStake(agentPda)` | Agent stake (v0.7.0) |
+| `SubscriptionData` | `deriveSubscription(agentPda, subscriber, subId)` | Subscription (v0.7.0) |
+| `CounterShardData` | `deriveShard(basePda, shardId)` | Counter shard (v0.7.0) |
+| `IndexPageData` | `deriveIndexPage(indexPda, page)` | Index page (v0.7.0) |
 | `FeedbackAccountData` | `deriveFeedback(agentPda, reviewer)` |
 | `ToolDescriptorData` | `deriveTool(agentPda, toolNameHash)` |
 | `MemoryVaultData` | `deriveVault(agentPda)` |
@@ -2781,7 +2854,9 @@ you are the agent (`deriveEscrow(yourAgent, clientWallet)`).
 | `InscribeToolSchemaArgs` | `inscribeToolSchema` |
 | `InscribeMemoryArgs` | `inscribeMemory` |
 | `CompactInscribeArgs` | `compactInscribe` |
-| `CreateEscrowArgs` | `createEscrow` |
+| `CreateEscrowArgs` | `createEscrow` | **⚠️ DEPRECATED** V1 |
+| `CreateEscrowV2Args` | `createEscrowV2` | v0.7.0 |
+| `CreateSubscriptionArgs` | `createSubscription` | v0.7.0 |
 | `CreateAttestationArgs` | `createAttestation` |
 | `GiveFeedbackArgs` | `giveFeedback` |
 | `UpdateFeedbackArgs` | `updateFeedback` |
@@ -2833,14 +2908,20 @@ you are the agent (`deriveEscrow(yourAgent, clientWallet)`).
 10. Index capabilities         -> client.indexing.initCapabilityIndex(...)
 11. Index protocols            -> client.indexing.initProtocolIndex(...)
 12. Index tool categories      -> client.indexing.addToToolCategory(...)
-13. Serve requests             -> receive x402 headers, validate network     [v0.6.0]
-14. Settle payments            -> client.x402.settle(...) or settleBatch(...)
-15. Classify errors            -> classifyAnchorError() for clear messages   [v0.6.0]
-16. Report metrics             -> client.agent.reportCalls() / updateReputation()
-17. Persist state              -> client.session.start() / .write() / .seal()
-18. Receive feedbacks          -> client.feedback.fetchNullable(...)
-19. Issue attestations         -> client.attestation.create(...)
+13. Init agent stake           -> client.staking.initStake(wallet, amt)      [v0.7.0]
+14. Serve requests             -> receive x402 headers, validate network     [v0.6.0]
+15. Settle payments (V2)       -> client.escrowV2.settleCalls(...)           [v0.7.0]
+16. Close pending settlements  -> client.escrowV2.closePendingSettlement()   [v0.7.0]
+17. Classify errors            -> classifyAnchorError() for clear messages   [v0.6.0]
+18. Report metrics             -> client.agent.reportCalls() / updateReputation()
+19. Persist state              -> client.session.start() / .write() / .seal()
+20. Receive feedbacks          -> client.feedback.fetchNullable(...)
+21. Issue attestations         -> client.attestation.create(...)
 ```
+
+> **⚠️ Migration note:** Steps 13, 15, 16 are new in v0.7.0. Step 15 replaces
+> the deprecated `client.x402.settle()` / `client.escrow.settle()` for new
+> integrations. Existing V1 settle calls continue to work.
 
 ---
 

@@ -59,6 +59,10 @@ import type { SettleOptions } from "../utils/priority-fee";
  *   tokenDecimals: null,
  * });
  * ```
+ *
+ * @deprecated Since v0.7.0 — Use {@link EscrowV2Module} (`client.escrowV2`) instead.
+ * V1 escrows lack settlement security, dispute resolution, and staking integration.
+ * Existing V1 escrows can be migrated via `client.escrowV2.migrateFromV1()`.
  */
 export class EscrowModule extends BaseModule {
   // ── PDA helpers ──────────────────────────────────────

@@ -269,6 +269,7 @@ export interface CompactInscribeArgs {
  *
  * @category Types
  * @since v0.1.0
+ * @deprecated Since v0.7.0 — Use {@link CreateEscrowV2Args} for V2 escrows.
  * @see {@link VolumeCurveBreakpoint} for discount curve details.
  */
 export interface CreateEscrowArgs {
@@ -411,3 +412,42 @@ export const CompressionType = {
  */
 export type CompressionTypeValue =
   (typeof CompressionType)[keyof typeof CompressionType];
+
+// ═══════════════════════════════════════════════════════════════════
+//  Escrow V2 Instructions (V2.1)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @interface CreateEscrowV2Args
+ * @description Arguments for the `createEscrowV2` instruction.
+ * @category Types
+ * @since v0.5.0
+ */
+export interface CreateEscrowV2Args {
+  readonly escrowNonce: BN;
+  readonly pricePerCall: BN;
+  readonly maxCalls: BN;
+  readonly initialDeposit: BN;
+  readonly expiresAt: BN;
+  readonly volumeCurve: VolumeCurveBreakpoint[];
+  readonly tokenMint: PublicKey | null;
+  readonly tokenDecimals: number;
+  /** 0=SelfReport, 1=CoSigned, 2=DisputeWindow */
+  readonly settlementSecurity: number;
+  readonly disputeWindowSlots: BN;
+  readonly coSigner: PublicKey | null;
+  readonly arbiter: PublicKey | null;
+}
+
+/**
+ * @interface CreateSubscriptionArgs
+ * @description Arguments for the `createSubscription` instruction.
+ * @category Types
+ * @since v0.5.0
+ */
+export interface CreateSubscriptionArgs {
+  readonly subId: BN;
+  readonly pricePerInterval: BN;
+  readonly billingInterval: number;
+  readonly initialFund: BN;
+}

@@ -212,3 +212,68 @@ export const ToolCategory = {
  */
 export type ToolCategoryKind =
   (typeof ToolCategory)[keyof typeof ToolCategory];
+
+// ═══════════════════════════════════════════════════════════════════
+//  Settlement Security (V2.1)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @name SettlementSecurity
+ * @description Anchor-compatible enum variants for V2 escrow settlement security levels.
+ *
+ * - `SelfReport` — Agent settles unilaterally (v1 compatible).
+ * - `CoSigned` — Agent + client must co-sign every settlement.
+ * - `DisputeWindow` — Settlement enters pending state, depositor can dispute.
+ *
+ * @category Types
+ * @since v0.5.0
+ */
+export const SettlementSecurity = {
+  SelfReport: { selfReport: {} },
+  CoSigned: { coSigned: {} },
+  DisputeWindow: { disputeWindow: {} },
+} as const;
+
+export type SettlementSecurityKind =
+  (typeof SettlementSecurity)[keyof typeof SettlementSecurity];
+
+// ═══════════════════════════════════════════════════════════════════
+//  Dispute Outcome (V2.1)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @name DisputeOutcome
+ * @description Anchor-compatible enum variants for dispute resolution outcomes.
+ *
+ * @category Types
+ * @since v0.5.0
+ */
+export const DisputeOutcome = {
+  Pending: { pending: {} },
+  AutoReleased: { autoReleased: {} },
+  DepositorWins: { depositorWins: {} },
+  AgentWins: { agentWins: {} },
+} as const;
+
+export type DisputeOutcomeKind =
+  (typeof DisputeOutcome)[keyof typeof DisputeOutcome];
+
+// ═══════════════════════════════════════════════════════════════════
+//  Billing Interval (V2.1)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @name BillingInterval
+ * @description Anchor-compatible enum variants for subscription billing intervals.
+ *
+ * @category Types
+ * @since v0.5.0
+ */
+export const BillingInterval = {
+  Daily: { daily: {} },
+  Weekly: { weekly: {} },
+  Monthly: { monthly: {} },
+} as const;
+
+export type BillingIntervalKind =
+  (typeof BillingInterval)[keyof typeof BillingInterval];
