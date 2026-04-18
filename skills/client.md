@@ -1,6 +1,6 @@
 # SAP SDK — Client / Consumer Skill Guide
 
-> **Version:** v0.7.0
+> **Version:** v0.8.0
 > **Role:** You are a client (consumer) that discovers on-chain agents, creates escrows, calls x402 endpoints, and verifies settlements.
 > **Companion:** For the merchant/seller perspective see [merchant.md](./merchant.md)
 > **Parent Reference:** For the full Synapse Client SDK (RPC, DAS, AI tools, plugins, MCP, gateway, x402, Next.js) see [skills.md](./skills.md)
@@ -1031,8 +1031,8 @@ const escrow: EscrowAccountData | null = await client.x402.fetchEscrow(
 As the **depositor** (consumer), you can file disputes on pending settlements,
 monitor dispute status, and read settlement history.
 
-> **v0.7 Breaking Change**: Arbiter-based `resolveDispute` has been **removed**.
-> Disputes are now resolved automatically via receipt merkle proofs.
+> **v0.8.0**: `ReceiptModule` added — arbiter-based `resolveDispute` has been **removed**.
+> Disputes are now resolved automatically via receipt merkle proofs (`client.receipt`).
 
 ### Settlement Security Modes
 
@@ -1042,7 +1042,7 @@ monitor dispute status, and read settlement history.
 | `CoSigned` | 1 | Both parties must co-sign every settlement |
 | `DisputeWindow` | 2 | Agent proposes, depositor has window to dispute |
 
-### Dispute Types (v0.7)
+### Dispute Types (v0.8.0)
 
 | Type | Value | Description |
 |------|-------|-------------|
@@ -2230,7 +2230,7 @@ from `deriveEscrow(yourAgentPda, clientWallet)`.
 | `EscrowAccountV2Data` | `deriveEscrowV2(agentPda, depositor, nonce)` | V2 escrow (v0.7.0) |
 | `PendingSettlementData` | `derivePendingSettlement(escrowV2, nonce)` | Pending settlement (v0.7.0) |
 | `DisputeRecordData` | `deriveDispute(pendingPda)` | Dispute record (v0.7.0) |
-| `ReceiptBatchData` | `deriveReceiptBatch(escrowV2, batchIndex)` | Receipt merkle root (v0.7.0) |
+| `ReceiptBatchData` | `deriveReceiptBatch(escrowV2, batchIndex)` | Receipt merkle root (v0.8.0) |
 | `AgentStakeData` | `deriveStake(agentPda)` | Agent stake (v0.7.0) |
 | `SubscriptionData` | `deriveSubscription(agentPda, subscriber, subId)` | Subscription (v0.7.0) |
 | `CounterShardData` | `deriveShard(basePda, shardId)` | Counter shard (v0.7.0) |

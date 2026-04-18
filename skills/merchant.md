@@ -1,6 +1,6 @@
 # SAP SDK — Merchant (Agent / Seller) Skill Guide
 
-> **Version:** v0.7.0
+> **Version:** v0.8.0
 > **Role:** You are a merchant (agent/seller) that registers on-chain, publishes
 > tools, inscribes schemas, receives x402 micropayments, and manages sessions.
 > **Companion:** For the client/consumer perspective see [client.md](./client.md)
@@ -79,7 +79,7 @@ synapse-sap config set rpcUrl "https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=
 10. [Network Normalization (v0.6.0)](#10-network-normalization-v060)
 11. [Settling Payments (x402)](#11-settling-payments-x402)
 11a. [EscrowV2 — Complete CRUD Lifecycle (v0.7.0)](#11a-escrowv2--complete-crud-lifecycle-v070)
-11b. [Dispute Resolution Flow (v0.7.0)](#11b-dispute-resolution-flow-v070)
+11b. [Dispute Resolution Flow (v0.8.0)](#11b-dispute-resolution-flow-v080)
 11c. [V1 → V2 Escrow Migration (v0.7.0)](#11c-v1--v2-escrow-migration-v070)
 11d. [Staking — Complete Reference (v0.7.0)](#11d-staking--complete-reference-v070)
 11e. [Subscriptions — Complete Reference (v0.7.0)](#11e-subscriptions--complete-reference-v070)
@@ -2343,15 +2343,15 @@ Fields:
 
 ---
 
-## 11b. Dispute Resolution Flow (v0.7.0)
+## 11b. Dispute Resolution Flow (v0.8.0)
 
 Disputes are only available with `DisputeWindow` settlement security.
 The flow: **settle → pending → (optional) dispute → receipt proof → auto-resolve/finalize**.
 
-> **v0.7 Breaking Change**: Arbiter-based `resolveDispute` has been **removed**.
-> Disputes are now resolved automatically via receipt merkle proofs.
+> **v0.8.0**: `ReceiptModule` added — arbiter-based `resolveDispute` has been **removed**.
+> Disputes are now resolved automatically via receipt merkle proofs (`client.receipt`).
 
-### DisputeType Enum (v0.7)
+### DisputeType Enum (v0.8.0)
 
 | Value | Name | Meaning |
 |-------|------|---------|
@@ -2371,7 +2371,7 @@ The flow: **settle → pending → (optional) dispute → receipt proof → auto
 | `4` | `PartialRefund` | Proportional: agent proved N of M calls → N/M to agent, rest refunded |
 | `5` | `Split` | Quality dispute → 50/50 split |
 
-### ResolutionLayer Enum (v0.7)
+### ResolutionLayer Enum (v0.8.0)
 
 | Value | Name | Meaning |
 |-------|------|---------|
@@ -2379,7 +2379,7 @@ The flow: **settle → pending → (optional) dispute → receipt proof → auto
 | `Auto` | Receipt-based | Resolved via merkle proofs after proof deadline |
 | `Governance` | Protocol governance | For quality disputes (future) |
 
-### Complete Dispute Flow (v0.7)
+### Complete Dispute Flow (v0.8.0)
 
 ```ts
 import { DisputeType } from "@oobe-protocol-labs/synapse-sap-sdk";
@@ -2529,7 +2529,7 @@ Fields:
   proof_deadline      — v0.7: unix timestamp by which agent must submit proof
 ```
 
-### ReceiptBatch On-Chain Fields (v0.7)
+### ReceiptBatch On-Chain Fields (v0.8.0)
 
 ```
 PDA seeds: ["sap_receipt", escrow_v2_pda, batch_index(u32 LE)]
@@ -3255,7 +3255,7 @@ await client.agent.update({
 > have been removed from the program. Self-reported metrics were an abuse vector.
 > Call counts are now tracked via **receipt batches** (merkle-committed on-chain).
 
-### Receipt Batches (v0.7)
+### Receipt Batches (v0.8.0)
 
 ```ts
 // Inscribe a batch of call receipts (agent commits merkle root)

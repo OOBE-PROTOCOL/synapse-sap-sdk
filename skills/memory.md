@@ -1,6 +1,6 @@
 # SAP SDK — Memory Systems Complete Reference
 
-> **Version:** v0.6.3
+> **Version:** v0.8.0
 > **Package:** `@oobe-protocol-labs/synapse-sap-sdk`
 > **Program:** `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`
 > **Companion guides:** [merchant.md](./merchant.md) · [client.md](./client.md) · [skills.md](./skills.md)

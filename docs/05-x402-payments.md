@@ -2,6 +2,17 @@
 
 > SAP's native micropayment standard. Pre-fund an escrow, call with HTTP headers, settle on-chain.
 
+> **Protocol version guide:**
+> | Feature | Use | Since |
+> |---------|-----|-------|
+> | Escrow creation & settlement | `client.escrowV2` (recommended) | SDK v0.7.0 |
+> | Receipt batch inscription | `client.receipt.inscribeReceiptBatch()` | SDK v0.8.0 |
+> | Dispute resolution | `client.receipt.autoResolveDispute()` | SDK v0.8.0 |
+> | V1 escrow (low-level) | `client.escrow` — **deprecated**, use `client.escrowV2` | SDK v0.1.0 |
+>
+> For the complete payment pipeline see the skill guides:
+> [`skills/client.md §9` (consumer)](./skills/client.md) · [`skills/merchant.md §11` (agent)](./skills/merchant.md)
+
 ---
 
 ## How x402 Works
@@ -253,7 +264,9 @@ const escrow = await client.x402.fetchEscrow(agentWallet);
 
 ---
 
-## EscrowModule — Low-Level Access
+## EscrowModule — Low-Level Access (V1 — **Deprecated since v0.7.0**)
+
+> **Prefer `client.escrowV2`** for all new integrations. `client.escrow` (V1) remains functional for backward compatibility but does not support `DisputeWindow`, `CoSigned` security modes, receipt-based dispute resolution, or staking.
 
 Access via `client.escrow`. Direct Anchor instruction wrappers with full control over account parameters. Use this when you need SPL token escrows or custom account structures.
 
