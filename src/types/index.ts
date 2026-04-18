@@ -30,6 +30,8 @@ export {
   SettlementSecurity,
   DisputeOutcome,
   BillingInterval,
+  DisputeType,
+  ResolutionLayer,
 } from "./enums";
 
 export type {
@@ -41,6 +43,8 @@ export type {
   SettlementSecurityKind,
   DisputeOutcomeKind,
   BillingIntervalKind,
+  DisputeTypeValue,
+  ResolutionLayerKind,
 } from "./enums";
 
 // ── Common Structs ───────────────────────────────────
@@ -74,6 +78,7 @@ export type {
   EscrowAccountV2Data,
   PendingSettlementData,
   DisputeRecordData,
+  ReceiptBatchData,
   AgentStakeData,
   SubscriptionData,
   CounterShardData,

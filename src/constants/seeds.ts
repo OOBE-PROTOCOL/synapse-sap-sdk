@@ -61,6 +61,8 @@ export const SEEDS = {
   SUBSCRIPTION: "sap_sub",
   SHARD: "sap_shard",
   INDEX_PAGE: "sap_idx_page",
+  /** @since v0.7.0 — Receipt batch merkle root PDA */
+  RECEIPT: "sap_receipt",
 } as const;
 
 /**

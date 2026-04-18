@@ -846,3 +846,35 @@ export const deriveIndexPage = (
     ],
     programId,
   );
+
+// ═════════════════════════════════════════════
+//  Receipt Batch (v0.7)
+// ═════════════════════════════════════════════
+
+/**
+ * Derive the **ReceiptBatch** PDA.
+ *
+ * Seeds: `["sap_receipt", escrow_v2_pda, batch_index_u32_le]`
+ *
+ * @name deriveReceiptBatch
+ * @description Computes the receipt batch PDA storing a merkle root of call receipts.
+ * @param escrowV2Pda - The parent V2 escrow PDA.
+ * @param batchIndex  - Zero-based batch index (u32).
+ * @param programId   - Override program ID.
+ * @returns {PdaResult} `[pda, bump]` tuple.
+ * @category PDA
+ * @since v0.7.0
+ */
+export const deriveReceiptBatch = (
+  escrowV2Pda: PublicKey,
+  batchIndex: number,
+  programId = SAP_PROGRAM_ID,
+): PdaResult =>
+  findPda(
+    [
+      toSeedBuf(SEEDS.RECEIPT),
+      escrowV2Pda.toBuffer(),
+      u32le(batchIndex),
+    ],
+    programId,
+  );

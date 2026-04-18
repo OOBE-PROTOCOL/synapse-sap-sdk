@@ -61,12 +61,14 @@ synapse-sap doctor run --quick
 7. [Escrow PDA Derivation — Deep Dive](#7-escrow-pda-derivation--deep-dive)
 8. [Building x402 Headers](#8-building-x402-headers)
 9. [Escrow Lifecycle Management](#9-escrow-lifecycle-management)
+9a. [EscrowV2 Disputes & Settlements (Consumer Side)](#9a-escrowv2-disputes--settlements-consumer-side)
 10. [Cost Estimation](#10-cost-estimation)
 11. [Zod Schema Validation (v0.6.0)](#11-zod-schema-validation-v060)
 12. [RPC Strategy & Dual Connection (v0.6.0)](#12-rpc-strategy--dual-connection-v060)
 13. [Error Classification (v0.6.0)](#13-error-classification-v060)
 14. [Feedback & Attestations](#14-feedback--attestations)
 15. [Ledger & Memory (Read-Only)](#15-ledger--memory-read-only)
+15a. [SessionManager — Complete Reference](#15a-sessionmanager--complete-reference)
 16. [Transaction Parsing & Events](#16-transaction-parsing--events)
 16b. [Tool Schema Discovery & Validation (v0.6.2)](#16b-tool-schema-discovery--validation-v062)
 16c. [Agent & Tool Analytics for Consumers (v0.6.2)](#16c-agent--tool-analytics-for-consumers-v062)
@@ -159,8 +161,10 @@ import {
   SettlementMode,
   ToolHttpMethod,
   ToolCategory,
-  SettlementSecurity,  // v0.7.0 — V2 escrow security mode
-  DisputeOutcome,      // v0.7.0 — dispute resolution outcome
+  SettlementSecurity,  // v0.7.0 — SelfReport (deprecated) | CoSigned | DisputeWindow
+  DisputeOutcome,      // v0.7.0 — Pending | AutoReleased | DepositorWins | AgentWins | PartialRefund | Split
+  DisputeType,         // v0.7.0 — NonDelivery=0 | PartialDelivery=1 | Overcharge=2 | Quality=3
+  ResolutionLayer,     // v0.7.0 — Pending | Auto | Governance
   BillingInterval,     // v0.7.0 — subscription billing interval
 } from "@oobe-protocol-labs/synapse-sap-sdk";
 
@@ -929,7 +933,8 @@ await client.escrowV2.create(agentWallet, {
   pricePerCall: new BN(1000),
   maxCalls: new BN(100),
   expiresAt: new BN(Math.floor(Date.now() / 1000) + 86400),
-  securityMode: SettlementSecurity.CoSigned, // or .Open, .Arbitrated
+  settlementSecurity: SettlementSecurity.CoSigned, // or .DisputeWindow
+  // NOTE: .SelfReport is deprecated in v0.7 and returns an error
 });
 
 // Deposit more funds
@@ -1017,6 +1022,131 @@ const escrow: EscrowAccountData | null = await client.x402.fetchEscrow(
   agentWallet,
   myWallet,
 );
+```
+
+---
+
+## 9a. EscrowV2 Disputes & Settlements (Consumer Side)
+
+As the **depositor** (consumer), you can file disputes on pending settlements,
+monitor dispute status, and read settlement history.
+
+> **v0.7 Breaking Change**: Arbiter-based `resolveDispute` has been **removed**.
+> Disputes are now resolved automatically via receipt merkle proofs.
+
+### Settlement Security Modes
+
+| Mode | Value | Description |
+|------|-------|-------------|
+| `SelfReport` | 0 | **DEPRECATED in v0.7** — returns error |
+| `CoSigned` | 1 | Both parties must co-sign every settlement |
+| `DisputeWindow` | 2 | Agent proposes, depositor has window to dispute |
+
+### Dispute Types (v0.7)
+
+| Type | Value | Description |
+|------|-------|-------------|
+| `NonDelivery` | 0 | Agent took payment but delivered nothing |
+| `PartialDelivery` | 1 | Agent delivered fewer calls than claimed |
+| `Overcharge` | 2 | Agent charged more than agreed price |
+| `Quality` | 3 | Agent delivered but output quality is disputed |
+
+### Dispute Outcomes
+
+| Outcome | Value | Description |
+|---------|-------|-------------|
+| `Pending` | 0 | Dispute filed, awaiting resolution |
+| `AutoReleased` | 1 | Dispute window expired — auto-released to agent |
+| `DepositorWins` | 2 | Full refund to depositor (agent proved 0 calls) |
+| `AgentWins` | 3 | Agent proved all claimed calls |
+| `PartialRefund` | 4 | Proportional: agent proved N of M calls |
+| `Split` | 5 | Quality dispute — 50/50 split |
+
+### Filing a dispute (consumer action)
+
+```ts
+import { DisputeType } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+// File dispute on a pending settlement with dispute type
+await client.escrowV2.fileDispute(
+  agentWallet,                   // agent's wallet
+  0,                             // escrow nonce
+  0,                             // settlement index
+  evidenceHash,                  // sha256 of evidence
+  DisputeType.PartialDelivery,   // dispute category
+);
+```
+
+### Monitoring pending settlements
+
+```ts
+import { derivePendingSettlement, deriveEscrowV2, deriveAgent } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const [agentPda] = deriveAgent(agentWallet);
+const [escrowPda] = deriveEscrowV2(agentPda, myWallet, 0);
+const [pendingPda] = derivePendingSettlement(escrowPda, 0);
+
+const pending = await client.escrowV2.fetchPendingSettlement(pendingPda);
+if (pending) {
+  console.log("Amount:", pending.amount.toString());
+  console.log("Calls:", pending.callsToSettle.toString());
+  console.log("Receipt root:", pending.receiptMerkleRoot); // v0.7
+  console.log("Release slot:", pending.releaseSlot.toString());
+  console.log("Disputed:", pending.isDisputed);
+}
+```
+
+### Checking dispute status
+
+```ts
+import { deriveDispute } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const [disputePda] = deriveDispute(pendingPda);
+const dispute = await client.escrowV2.fetchDisputeNullable(disputePda);
+if (dispute) {
+  console.log("Outcome:", dispute.outcome);
+  console.log("Dispute type:", dispute.disputeType);       // v0.7
+  console.log("Resolution:", dispute.resolutionLayer);      // v0.7
+  console.log("Proven calls:", dispute.provenCalls.toString()); // v0.7
+  console.log("Claimed calls:", dispute.claimedCalls.toString());
+  console.log("Proof deadline:", new Date(dispute.proofDeadline.toNumber() * 1000));
+  console.log("Resolved:", dispute.resolvedAt.toNumber() > 0);
+}
+```
+
+### Auto-resolution (permissionless crank — v0.7)
+
+```ts
+// After proof deadline passes, anyone can trigger resolution
+await client.receipt.autoResolveDispute(
+  agentWallet, depositorWallet, 0, 0,
+);
+```
+
+### Fetching V2 escrow account data
+
+```ts
+const escrow = await client.escrowV2.fetch(agentWallet);
+if (escrow) {
+  console.log("Balance:", escrow.balance.toString());
+  console.log("Security mode:", escrow.securityMode);
+  console.log("Calls settled:", escrow.callsSettled.toString());
+  console.log("Total settled:", escrow.totalSettled.toString());
+  console.log("Nonce:", escrow.nonce);
+  console.log("Expires at:", new Date(escrow.expiresAt * 1000));
+}
+```
+
+### Nullable fetch pattern (check-before-use)
+
+```ts
+const escrow = await client.escrowV2.fetchNullable(escrowPda);
+if (!escrow) {
+  console.log("No V2 escrow exists — create one first");
+}
+
+const pending = await client.escrowV2.fetchPendingSettlementNullable(pendingPda);
+const dispute = await client.escrowV2.fetchDisputeNullable(disputePda);
 ```
 
 ---
@@ -1211,7 +1341,7 @@ The SAP protocol has **two independent reputation signals**:
 | Signal | Source | Trustless? | Field |
 |--------|--------|-----------|-------|
 | **Reputation score** | On-chain feedback from real users | **Yes** — only updatable via feedback instructions | `reputationScore` (0-10000) |
-| **Self-reported metrics** | Agent owner sets them | **No** — treat as claims, not facts | `avgLatencyMs`, `uptimePercent` |
+| **Self-reported metrics** | ~~Agent owner~~ **Removed in v0.7** | **N/A** — replaced by receipt batches | `avgLatencyMs`, `uptimePercent` (legacy) |
 
 **Reputation score formula:**
 ```
@@ -1531,6 +1661,184 @@ for (const { signature } of sigs.reverse()) {
 const onChainRoot = Buffer.from(ledger.merkleRoot).toString("hex");
 const verified = Buffer.from(computedRoot).toString("hex") === onChainRoot;
 console.log("Merkle verification:", verified ? "✓ VALID" : "✗ TAMPERED");
+```
+
+---
+
+## 15a. SessionManager — Complete Reference
+
+The `SessionManager` class provides the full lifecycle for on-chain memory
+sessions: vault init, session open, ring-buffer writes, ledger sealing,
+and teardown. Available via `client.session`.
+
+### Types
+
+```ts
+interface SessionContext {
+  sessionId: string;           // Human-readable session name
+  sessionHash: string;         // SHA-256 of sessionId
+  sessionHashArray: number[];  // 32-byte array for PDA derivation
+  agentPda: PublicKey;         // Derived from wallet
+  vaultPda: PublicKey;         // Derived from agentPda
+  sessionPda: PublicKey;       // Derived from vaultPda + sessionHash
+  ledgerPda: PublicKey;        // Derived from sessionPda
+  wallet: PublicKey;           // Agent owner wallet
+}
+
+interface WriteResult {
+  txSignature: string;   // Transaction signature
+  contentHash: number[]; // SHA-256 of written data
+  dataSize: number;      // Bytes written
+}
+
+interface SealResult {
+  txSignature: string;   // Transaction signature
+  pageIndex: number;     // Zero-based sealed page index
+}
+
+interface RingBufferEntry {
+  data: Uint8Array;      // Raw bytes
+  text: string;          // UTF-8 decoded
+  size: number;          // Byte length
+}
+
+interface SessionStatus {
+  vaultExists: boolean;
+  sessionExists: boolean;
+  ledgerExists: boolean;
+  isClosed: boolean;
+  totalEntries: number;
+  totalDataSize: string;  // BN as string
+  numPages: number;
+  merkleRoot: string;     // Hex-encoded 32 bytes
+}
+```
+
+### deriveContext — Pure PDA computation (no network calls)
+
+```ts
+const ctx: SessionContext = client.session.deriveContext("my-session-id");
+// All PDAs resolved — use for read-only operations or pre-flight checks
+```
+
+### start — Idempotent session bootstrap
+
+Opens vault → session → ledger. Skips any step already done.
+
+```ts
+const ctx = await client.session.start("my-session-id");
+// ctx now has all PDAs, vault + session + ledger are initialized
+```
+
+Optional vault nonce (only used if vault doesn't exist yet):
+
+```ts
+const ctx = await client.session.start("my-session-id", customNonceArray);
+```
+
+### write — Write data to ring buffer + TX log
+
+Cost: TX fee only (~0.000005 SOL per write).
+
+```ts
+const result: WriteResult = await client.session.write(ctx, "Hello, world!");
+console.log("TX:", result.txSignature);
+console.log("Hash:", result.contentHash);
+console.log("Size:", result.dataSize, "bytes");
+
+// Also accepts Buffer or Uint8Array
+const binResult = await client.session.write(ctx, Buffer.from([0x01, 0x02]));
+```
+
+### readLatest — Read ring buffer entries (FREE)
+
+Uses `getAccountInfo()` — works on any RPC, no archival needed.
+
+```ts
+const entries: RingBufferEntry[] = await client.session.readLatest(ctx);
+entries.forEach(e => console.log(e.text)); // UTF-8 decoded
+```
+
+### seal — Archive ring buffer to permanent LedgerPage
+
+Creates a write-once, never-delete page (~0.031 SOL rent per page).
+
+```ts
+const sealResult: SealResult = await client.session.seal(ctx);
+console.log("Sealed page:", sealResult.pageIndex);
+```
+
+### readPage — Read a sealed archive page
+
+```ts
+const pageEntries: RingBufferEntry[] = await client.session.readPage(ctx, 0);
+pageEntries.forEach(e => console.log(e.text));
+```
+
+### readAll — Read ALL data chronologically (pages + ring buffer)
+
+```ts
+const allEntries: RingBufferEntry[] = await client.session.readAll(ctx);
+allEntries.forEach(e => console.log(e.text));
+```
+
+### getStatus — Full session status
+
+```ts
+const status: SessionStatus = await client.session.getStatus(ctx);
+console.log("Vault:", status.vaultExists);
+console.log("Session:", status.sessionExists);
+console.log("Ledger:", status.ledgerExists);
+console.log("Closed:", status.isClosed);
+console.log("Entries:", status.totalEntries);
+console.log("Data:", status.totalDataSize, "bytes");
+console.log("Pages:", status.numPages);
+console.log("Merkle:", status.merkleRoot);
+```
+
+### close — Full teardown (ledger + session)
+
+Reclaims all rent. Idempotent — skips steps already done.
+
+```ts
+await client.session.close(ctx); // closes ledger, then session
+```
+
+### closeLedger / closeSession — Granular teardown
+
+```ts
+await client.session.closeLedger(ctx);  // ~0.032 SOL reclaimed
+await client.session.closeSession(ctx); // closes session PDA
+```
+
+### Complete lifecycle example
+
+```ts
+import { SapClient } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+const client = new SapClient(provider, "mainnet");
+
+// 1. Start session (idempotent)
+const ctx = await client.session.start("chat-2024-06-15");
+
+// 2. Write conversation turns
+await client.session.write(ctx, JSON.stringify({ role: "user", content: "Swap 1 SOL" }));
+await client.session.write(ctx, JSON.stringify({ role: "agent", content: "Executing..." }));
+
+// 3. Check status
+const status = await client.session.getStatus(ctx);
+console.log(`${status.totalEntries} entries, ${status.totalDataSize} bytes`);
+
+// 4. Seal when ring buffer is full (or periodically)
+if (status.totalEntries >= 16) {
+  await client.session.seal(ctx);
+}
+
+// 5. Read everything back
+const all = await client.session.readAll(ctx);
+
+// 6. Teardown when done
+await client.session.close(ctx);
 ```
 
 ---
@@ -1896,8 +2204,10 @@ from `deriveEscrow(yourAgentPda, clientWallet)`.
 | `ToolHttpMethod` | `Get`, `Post`, `Put`, `Delete`, `Compound` |
 | `ToolCategory` | `Swap`, `Lend`, `Stake`, `Nft`, `Payment`, `Data`, `Governance`, `Bridge`, `Analytics`, `Custom` |
 | `SapNetwork` | `SOLANA_MAINNET`, `SOLANA_MAINNET_GENESIS`, `SOLANA_DEVNET`, `SOLANA_DEVNET_NAMED` |
-| `SettlementSecurity` | `Open`, `CoSigned`, `Arbitrated` | v0.7.0 |
-| `DisputeOutcome` | `CallerWins`, `AgentWins`, `Split` | v0.7.0 |
+| `SettlementSecurity` | `SelfReport` (deprecated), `CoSigned`, `DisputeWindow` | v0.7.0 |
+| `DisputeOutcome` | `Pending`, `AutoReleased`, `DepositorWins`, `AgentWins`, `PartialRefund`, `Split` | v0.7.0 |
+| `DisputeType` | `NonDelivery=0`, `PartialDelivery=1`, `Overcharge=2`, `Quality=3` | v0.7.0 |
+| `ResolutionLayer` | `Pending`, `Auto`, `Governance` | v0.7.0 |
 | `BillingInterval` | `Weekly`, `Monthly`, `Quarterly`, `Yearly` | v0.7.0 |
 
 ### Type-Level Unions
@@ -1920,6 +2230,7 @@ from `deriveEscrow(yourAgentPda, clientWallet)`.
 | `EscrowAccountV2Data` | `deriveEscrowV2(agentPda, depositor, nonce)` | V2 escrow (v0.7.0) |
 | `PendingSettlementData` | `derivePendingSettlement(escrowV2, nonce)` | Pending settlement (v0.7.0) |
 | `DisputeRecordData` | `deriveDispute(pendingPda)` | Dispute record (v0.7.0) |
+| `ReceiptBatchData` | `deriveReceiptBatch(escrowV2, batchIndex)` | Receipt merkle root (v0.7.0) |
 | `AgentStakeData` | `deriveStake(agentPda)` | Agent stake (v0.7.0) |
 | `SubscriptionData` | `deriveSubscription(agentPda, subscriber, subId)` | Subscription (v0.7.0) |
 | `CounterShardData` | `deriveShard(basePda, shardId)` | Counter shard (v0.7.0) |

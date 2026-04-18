@@ -62,6 +62,8 @@ export type {
   SettlementSecurityKind,
   DisputeOutcomeKind,
   BillingIntervalKind,
+  DisputeTypeValue,
+  ResolutionLayerKind,
   // Helper structs
   Capability,
   VolumeCurveBreakpoint,
@@ -90,6 +92,7 @@ export type {
   EscrowAccountV2Data,
   PendingSettlementData,
   DisputeRecordData,
+  ReceiptBatchData,
   AgentStakeData,
   SubscriptionData,
   CounterShardData,
@@ -129,6 +132,8 @@ export {
   SettlementSecurity,
   DisputeOutcome,
   BillingInterval,
+  DisputeType,
+  ResolutionLayer,
 } from "./types";
 
 // ── Constants ────────────────────────────────────────
@@ -178,6 +183,7 @@ export {
   deriveAttestation,
   deriveLedger,
   deriveLedgerPage,
+  deriveReceiptBatch,
 } from "./pda";
 
 // ── Utilities ────────────────────────────────────────
@@ -297,6 +303,7 @@ export {
   VaultModule,
   EscrowModule,
   EscrowV2Module,
+  ReceiptModule,
   StakingModule,
   SubscriptionModule,
   AttestationModule,

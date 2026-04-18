@@ -1,8 +1,8 @@
 /**
  * @module escrow-v2
  * @description V2 escrow settlement layer — supports settlement security
- * modes (SelfReport, CoSigned, DisputeWindow), dispute resolution,
- * pending settlements, and migration from V1.
+ * modes (CoSigned, DisputeWindow), receipt-based dispute resolution,
+ * pending settlements, and automatic resolution via merkle proofs.
  *
  * @category Modules
  * @since v0.7.0
@@ -20,7 +20,6 @@ import { BaseModule } from "./base";
 import {
   deriveAgent,
   deriveAgentStats,
-  deriveEscrow,
   deriveEscrowV2,
   derivePendingSettlement as derivePendingPda,
   deriveDispute as deriveDisputePda,
@@ -173,6 +172,7 @@ export class EscrowV2Module extends BaseModule {
     callsToSettle: BN | number | bigint,
     amount: BN | number | bigint,
     serviceHash: number[],
+    receiptMerkleRoot: number[] = new Array(32).fill(0),
   ): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(agentWallet);
     const [escrowPda] = this.deriveEscrow(agentPda, depositorWallet, nonce);
@@ -184,6 +184,7 @@ export class EscrowV2Module extends BaseModule {
         this.bn(callsToSettle),
         this.bn(amount),
         serviceHash,
+        receiptMerkleRoot,
       )
       .accounts({
         wallet: this.walletPubkey,
@@ -223,6 +224,7 @@ export class EscrowV2Module extends BaseModule {
     nonce: BN | number | bigint,
     settlementIndex: BN | number | bigint,
     evidenceHash: number[],
+    disputeType: number = 0,
   ): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(agentWallet);
     const [escrowPda] = this.deriveEscrow(agentPda, undefined, nonce);
@@ -230,7 +232,7 @@ export class EscrowV2Module extends BaseModule {
     const [disputePda] = this.deriveDispute(pendingPda);
 
     return this.methods
-      .fileDispute(evidenceHash)
+      .fileDispute(evidenceHash, disputeType)
       .accounts({
         depositor: this.walletPubkey,
         escrow: escrowPda,
@@ -241,31 +243,18 @@ export class EscrowV2Module extends BaseModule {
       .rpc();
   }
 
+  /**
+   * @deprecated Since v0.7.0 — Arbiter-based resolution removed.
+   * Use {@link ReceiptModule.submitReceiptProof} + {@link ReceiptModule.autoResolveDispute} instead.
+   */
   async resolveDispute(
-    depositorWallet: PublicKey,
-    agentWallet: PublicKey,
-    nonce: BN | number | bigint,
-    settlementIndex: BN | number | bigint,
-    outcome: number,
+    _depositorWallet: PublicKey,
+    _agentWallet: PublicKey,
+    _nonce: BN | number | bigint,
+    _settlementIndex: BN | number | bigint,
+    _outcome: number,
   ): Promise<TransactionSignature> {
-    const [agentPda] = deriveAgent(agentWallet);
-    const [escrowPda] = this.deriveEscrow(agentPda, depositorWallet, nonce);
-    const [pendingPda] = this.derivePendingSettlement(escrowPda, settlementIndex);
-    const [disputePda] = this.deriveDispute(pendingPda);
-    const [statsPda] = deriveAgentStats(agentPda);
-
-    return this.methods
-      .resolveDispute(outcome)
-      .accounts({
-        arbiter: this.walletPubkey,
-        depositor: depositorWallet,
-        agentWallet,
-        escrow: escrowPda,
-        pendingSettlement: pendingPda,
-        dispute: disputePda,
-        agentStats: statsPda,
-      })
-      .rpc();
+    throw new Error("resolveDispute removed in v0.7.0 — use ReceiptModule.autoResolveDispute");
   }
 
   async closeDispute(
@@ -327,23 +316,13 @@ export class EscrowV2Module extends BaseModule {
       .rpc();
   }
 
+  /**
+   * @deprecated Since v0.7.0 — Migration instruction removed from program.
+   */
   async migrateFromV1(
-    agentWallet: PublicKey,
+    _agentWallet: PublicKey,
   ): Promise<TransactionSignature> {
-    const [agentPda] = deriveAgent(agentWallet);
-    const [escrowV1Pda] = deriveEscrow(agentPda, this.walletPubkey);
-    const [escrowV2Pda] = this.deriveEscrow(agentPda, undefined, 0);
-
-    return this.methods
-      .migrateEscrowV1ToV2()
-      .accounts({
-        depositor: this.walletPubkey,
-        agent: agentPda,
-        escrowV1: escrowV1Pda,
-        escrowV2: escrowV2Pda,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc();
+    throw new Error("migrateFromV1 removed in v0.7.0 — migration instruction was deleted");
   }
 
   // ── Fetchers ─────────────────────────────────────────

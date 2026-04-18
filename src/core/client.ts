@@ -34,6 +34,7 @@ import { ToolsModule } from "../modules/tools";
 import { VaultModule } from "../modules/vault";
 import { EscrowModule } from "../modules/escrow";
 import { EscrowV2Module } from "../modules/escrow-v2";
+import { ReceiptModule } from "../modules/receipt";
 import { StakingModule } from "../modules/staking";
 import { SubscriptionModule } from "../modules/subscription";
 import { AttestationModule } from "../modules/attestation";
@@ -117,6 +118,7 @@ export class SapClient {
   #vault?: VaultModule;
   #escrow?: EscrowModule;
   #escrowV2?: EscrowV2Module;
+  #receipt?: ReceiptModule;
   #staking?: StakingModule;
   #subscription?: SubscriptionModule;
   #attestation?: AttestationModule;
@@ -301,6 +303,18 @@ export class SapClient {
    */
   get escrowV2(): EscrowV2Module {
     return (this.#escrowV2 ??= new EscrowV2Module(this.program));
+  }
+
+  /**
+   * @name receipt
+   * @description Receipt batch inscriptions and automatic dispute resolution (v0.7).
+   * @returns {ReceiptModule} The lazily-instantiated `ReceiptModule` singleton.
+   * @category Modules
+   * @since v0.7.0
+   * @see {@link ReceiptModule}
+   */
+  get receipt(): ReceiptModule {
+    return (this.#receipt ??= new ReceiptModule(this.program));
   }
 
   /**

@@ -1282,8 +1282,8 @@ import {
 The **Solana Agent Protocol (SAP)** is a full on-chain protocol for AI agents on Solana. The dedicated `@synapse-sap/sdk` package provides a TypeScript client for all protocol operations.
 
 > **Role-specific deep-dives** for production agents:
-> - **Consumer (buyer):** [skills/client.md](./skills/client.md) — discovery, escrow creation, x402 headers, settlement verification, endpoint validation, Zod schema validation, RPC strategy, network normalization
-> - **Merchant (seller):** [skills/merchant.md](./skills/merchant.md) — agent registration, tool publishing, escrow settlement, memory vault, delegate hot-wallet, attestations, reputation metrics, plugin adapter, PostgreSQL mirror
+> - **Consumer (buyer):** [skills/client.md](./skills/client.md) — discovery, escrow creation, x402 headers, settlement verification, endpoint validation, Zod schema validation, RPC strategy, network normalization, EscrowV2 disputes (§9a), SessionManager (§15a)
+> - **Merchant (seller):** [skills/merchant.md](./skills/merchant.md) — agent registration, tool publishing, escrow settlement, memory vault, delegate hot-wallet, attestations, reputation metrics, plugin adapter, PostgreSQL mirror, EscrowV2 CRUD (§11a-c), staking (§11d), subscriptions (§11e), agent lifecycle (§15a)
 > - **CLI access:** [§28](#28-sap-cli--synapse-sap) — `synapse-sap` command-line with 10 command groups and 40+ subcommands for full protocol access without writing code
 
 ### Installation
@@ -1347,6 +1347,70 @@ SapClient
 | **Tools** | On-chain tool descriptors with schema hashing, versioning | `tools` |
 | **Discovery** | Capability/protocol indexes, agent profiles, network overview | `discovery`, `indexing` |
 
+### V2.1 Imports Reference (v0.7.0)
+
+```ts
+import {
+  SapClient,
+  // V2.1 Enums
+  SettlementSecurity,   // SelfReport (deprecated) | CoSigned | DisputeWindow
+  DisputeOutcome,       // Pending | AutoReleased | DepositorWins | AgentWins | PartialRefund | Split
+  DisputeType,          // NonDelivery=0 | PartialDelivery=1 | Overcharge=2 | Quality=3
+  ResolutionLayer,      // Pending | Auto | Governance
+  BillingInterval,      // Weekly | Monthly | Quarterly | Yearly
+  // V2.1 PDA Derivers
+  deriveEscrowV2,
+  derivePendingSettlement,
+  deriveDispute,
+  deriveReceiptBatch,   // v0.7 — receipt batch PDA
+  deriveStake,
+  deriveSubscription,
+  deriveShard,
+  deriveIndexPage,
+  // V1 (⚠️ DEPRECATED)
+  deriveEscrow,         // → use deriveEscrowV2
+} from '@synapse-sap/sdk';
+
+import type {
+  // V2.1 Account Data
+  EscrowAccountV2Data,
+  PendingSettlementData,
+  DisputeRecordData,
+  AgentStakeData,
+  SubscriptionData,
+  CounterShardData,
+  IndexPageData,
+  // V2.1 Instruction Args
+  CreateEscrowV2Args,
+  CreateSubscriptionArgs,
+  // V1 (⚠️ DEPRECATED)
+  EscrowAccountData,    // → use EscrowAccountV2Data
+  CreateEscrowArgs,     // → use CreateEscrowV2Args
+} from '@synapse-sap/sdk';
+```
+
+### All PDA Derivation Functions (v0.7.0)
+
+| Function | Seeds | Description | Version |
+|----------|-------|-------------|---------|
+| `deriveAgent(wallet)` | `["agent", wallet]` | Agent account | v0.1 |
+| `deriveAgentStats(agentPda)` | `["agent_stats", agentPda]` | Performance metrics | v0.1 |
+| `deriveEscrow(agentPda, depositor)` | `["escrow", agentPda, depositor]` | **⚠️ DEPRECATED** V1 escrow | v0.1 |
+| `deriveEscrowV2(agentPda, depositor, nonce)` | `["sap_escrow_v2", agentPda, depositor, nonce]` | V2 escrow with nonce | v0.7.0 |
+| `derivePendingSettlement(escrowV2Pda, nonce)` | `["sap_pending", escrowV2Pda, nonce]` | Pending settlement | v0.7.0 |
+| `deriveDispute(pendingPda)` | `["sap_dispute", pendingPda]` | Dispute record | v0.7.0 |
+| `deriveStake(agentPda)` | `["sap_stake", agentPda]` | Agent stake | v0.7.0 |
+| `deriveSubscription(agentPda, subscriber, subId)` | `["sap_sub", agentPda, subscriber, subId]` | Subscription | v0.7.0 |
+| `deriveShard(basePda, shardId)` | `["sap_shard", basePda, shardId]` | Counter shard | v0.7.0 |
+| `deriveIndexPage(indexPda, page)` | `["sap_page", indexPda, page]` | Index page | v0.7.0 |
+| `deriveFeedback(agentPda, reviewer)` | `["feedback", agentPda, reviewer]` | Rating | v0.1 |
+| `deriveTool(agentPda, hash)` | `["tool_descriptor", agentPda, hash]` | Tool metadata | v0.1 |
+| `deriveVault(agentPda)` | `["memory_vault", agentPda]` | Encrypted memory | v0.1 |
+| `deriveAttestation(agentPda, attester)` | `["agent_attestation", agentPda, attester]` | Trust attestation | v0.1 |
+| `deriveCapabilityIndex(capHash)` | `["capability_index", hash]` | Discovery index | v0.1 |
+| `deriveProtocolIndex(protoHash)` | `["protocol_index", hash]` | Discovery index | v0.1 |
+| `deriveToolCategoryIndex(cat)` | `["tool_category_index", cat]` | Discovery index | v0.1 |
+
 ---
 
 ### Agent Lifecycle
@@ -1396,9 +1460,9 @@ await client.agent.deactivate();
 // Reactivate
 await client.agent.reactivate();
 
-// Self-report metrics
-await client.agent.reportCalls(100);               // Update call count
-await client.agent.updateReputation(150, 9950);     // latency ms, uptime bps (99.5%)
+// Self-report metrics — REMOVED in v0.7
+// await client.agent.reportCalls(100);           // ❌ Removed — use receipt batches
+// await client.agent.updateReputation(150, 9950); // ❌ Removed — abuse vector
 
 // Fetch agent data
 const data = await client.agent.fetch();
@@ -1483,7 +1547,8 @@ await client.escrowV2.create(agentWallet, {
   pricePerCall: new BN(10_000),
   maxCalls: new BN(100),
   expiresAt: new BN(Math.floor(Date.now() / 1000) + 3600),
-  securityMode: SettlementSecurity.CoSigned,
+  settlementSecurity: SettlementSecurity.DisputeWindow, // or .CoSigned
+  // NOTE: .SelfReport is deprecated in v0.7 and returns an error
 });
 
 // Deposit more funds
@@ -1534,6 +1599,10 @@ await client.subscription.close(agentWallet, 1);
 
 #### Consumer Flow (Paying for Agent Services)
 
+> **⚠️ v0.7.0:** `preparePayment()` creates a V1 escrow. For new integrations,
+> use `client.escrowV2.create()` + `client.escrowV2.deposit()` instead.
+> See V2 Escrow section above.
+
 ```ts
 // 1. Estimate cost
 const cost = await client.x402.estimateCost(agentPubkey, 10); // 10 calls
@@ -1552,7 +1621,11 @@ const headers = client.x402.buildPaymentHeaders(payment);
 
 #### Agent Flow (Settling Payments)
 
+> **⚠️ v0.7.0:** `client.escrow.settle()` and `batchSettle()` are V1 methods.
+> For new integrations, use `client.escrowV2.settleCalls()` instead.
+
 ```ts
+// ⚠️ V1 API — DEPRECATED. Use client.escrowV2.settleCalls() for V2.
 // Settle after serving N calls
 await client.escrow.settle(depositorPubkey, 5, serviceHash);
 
@@ -1562,9 +1635,15 @@ await client.escrow.batchSettle(depositorPubkey, settlements);
 
 #### Volume Curves
 
-Escrow supports pricing curves with up to 5 breakpoints for volume discounts:
+> **⚠️ V1-only feature.** Volume curves are supported only in V1 escrows
+> (`client.escrow.create()`). V2 escrows use a flat `pricePerCall` model.
+> If you need volume discounts with V2, implement tiered pricing in your
+> agent’s off-chain logic.
+
+V1 escrow supports pricing curves with up to 5 breakpoints for volume discounts:
 
 ```ts
+// ⚠️ V1 API — DEPRECATED
 await client.escrow.create({
   agent: agentPubkey,
   amount: new BN(10_000_000_000), // 10 SOL
@@ -1654,14 +1733,17 @@ await client.indexing.addToToolCategory(TOOL_CATEGORY_VALUES.Swap, toolPda);
 
 > **📚 Docs**: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/blob/main/docs/07-tools-schemas.md
 
+> **⚠ On-chain constraint: tool name max 32 chars** (NOT 64). Exceeding → `ToolNameTooLong` (6048).
+> Always use `publishByName()` (auto-hashes). Always inscribe ALL 3 schema types.
+
 Publish on-chain tool descriptors with schema hashing and version tracking:
 
 ```ts
 import { HTTP_METHOD_VALUES, TOOL_CATEGORY_VALUES } from '@synapse-sap/sdk';
 
-// Publish a tool descriptor
+// Publish a tool descriptor (toolName max 32 chars!)
 await client.tools.publishByName(
-  'jupiterSwap',                                    // toolName
+  'jupiterSwap',                                    // toolName (max 32 chars)
   'jupiter',                                        // protocolId
   'Execute a token swap via Jupiter aggregator',     // description
   JSON.stringify(inputSchema),                       // inputSchema (JSON string)
@@ -1685,7 +1767,7 @@ await client.tools.inscribeSchema('jupiterSwap', {
 await client.tools.update('jupiterSwap', { paramsCount: 5 });
 await client.tools.deactivate('jupiterSwap');
 await client.tools.reactivate('jupiterSwap');
-await client.tools.reportInvocations('jupiterSwap', 100);
+// await client.tools.reportInvocations('jupiterSwap', 100); // ❌ Removed in v0.7
 ```
 
 #### Complete Publish + Inscribe Pipeline (v0.6.2)
@@ -1742,8 +1824,8 @@ for (const [type, data] of [
 #### Tool Analytics & Invocation Tracking (v0.6.2)
 
 ```ts
-// Report invocations (call after serving each request)
-await client.tools.reportInvocations('jupiterSwap', 1);
+// ❌ report_tool_invocations removed in v0.7 — tool usage now tracked via receipt batches
+// await client.tools.reportInvocations('jupiterSwap', 1);
 
 // Fetch tool analytics
 const [agentPda] = deriveAgent(wallet);
@@ -1794,8 +1876,22 @@ for (const { signature } of sigs) {
 
 > **Full details:** [merchant.md §8b — Tool Schema Pipeline](./skills/merchant.md#8b-tool-schema-inscription--complete-pipeline-v062) |
 > [merchant.md §8c — Tool Analytics](./skills/merchant.md#8c-tool-analytics--invocation-tracking-v062) |
+> [merchant.md §8d — ToolInput Interface](./skills/merchant.md#8d-toolinput-interface-reference-builder-pattern) |
+> [merchant.md §8e — Tool Error Codes](./skills/merchant.md#8e-tool-error-codes-reference) |
+> [merchant.md §8f — Tool Events](./skills/merchant.md#8f-tool-events-reference) |
+> [merchant.md §8g — On-Chain Constraints](./skills/merchant.md#8g-on-chain-constraints--limits) |
+> [merchant.md §8h — Mandatory Schema Checklist](./skills/merchant.md#8h-mandatory-schema-registration--complete-merchant-checklist) |
 > [client.md §16b — Schema Discovery](./skills/client.md#16b-tool-schema-discovery--validation-v062) |
 > [client.md §16c — Consumer Analytics](./skills/client.md#16c-agent--tool-analytics-for-consumers-v062)
+>
+> **V2.1 Commerce details:** [merchant.md §11a — EscrowV2 CRUD](./skills/merchant.md#11a-escrowv2-complete-crud) |
+> [merchant.md §11b — Dispute Resolution](./skills/merchant.md#11b-dispute-resolution-flow) |
+> [merchant.md §11c — V1→V2 Migration](./skills/merchant.md#11c-v1v2-escrow-migration) |
+> [merchant.md §11d — Staking](./skills/merchant.md#11d-staking-complete-reference) |
+> [merchant.md §11e — Subscriptions](./skills/merchant.md#11e-subscriptions-complete-reference) |
+> [merchant.md §15a — Agent Lifecycle](./skills/merchant.md#15a-agent-lifecycle-deactivate-reactivate-close) |
+> [client.md §9a — EscrowV2 Disputes (Consumer)](./skills/client.md#9a-escrowv2-disputes--settlements-consumer-side) |
+> [client.md §15a — SessionManager](./skills/client.md#15a-sessionmanager--complete-reference)
 
 ---
 
@@ -1964,11 +2060,11 @@ reputationScore = (reputationSum × 10) / totalFeedbacks
 | Signal | Who Sets It | Trustless? | Fields |
 |--------|------------|-----------|--------|
 | **Reputation score** | Other users via `give_feedback` | **Yes** | `reputationScore`, `reputationSum`, `totalFeedbacks` |
-| **Self-reported metrics** | Agent owner via `reportCalls` / `updateReputation` | **No** | `totalCallsServed`, `avgLatencyMs`, `uptimePercent` |
+| **Self-reported metrics** | ~~Agent owner via `reportCalls`~~ **Removed in v0.7** | **N/A** | `totalCallsServed`, `avgLatencyMs`, `uptimePercent` (legacy) |
 
-> Consumers should weight these differently. A high `reputationScore` with
-> many `totalFeedbacks` is significantly more trustworthy than self-reported
-> latency/uptime claims.
+> Self-report instructions (`reportCalls`, `updateReputation`, `reportInvocations`)
+> were removed in v0.7. Call counts are now tracked via **receipt batches** —
+> cryptographically committed merkle roots inscribed on-chain by the agent.
 
 #### Give, Update, Revoke, Close Feedback
 
@@ -2241,9 +2337,1029 @@ const { client } = SapConnection.fromKeypair(
 
 **Tips:**
 - Prefer **Ledger** over Vault when you need to read data back
-- Use `client.escrow.batchSettle()` instead of individual `settle()` calls (up to 10 per TX)
+- **V2:** Use `client.escrowV2.settleCalls()` to batch-settle (replaces V1 `batchSettle()`)
+- ~~V1: Use `client.escrow.batchSettle()` instead of individual `settle()` calls~~ *(deprecated)*
 - Close unused accounts to reclaim rent
 - Use `SessionManager` (`client.session`) instead of manual vault/session/ledger orchestration
+
+### Merchant Validation (v0.6.4+)
+
+For server-side escrow validation before serving requests, see **§29 Merchant Validation**:
+
+```ts
+import { validateEscrowState, SapMerchantValidator, parseX402Headers } from '@oobe-protocol-labs/synapse-sap-sdk';
+
+// Quick one-shot validation
+const result = await validateEscrowState(connection, agentWallet, depositorWallet, fetchEscrow);
+if (!result.valid) throw new Error(result.errors.join(', '));
+
+// Middleware-style validator (Express/Hono)
+const validator = new SapMerchantValidator(connection, agentKeypair);
+app.use('/api/ai/*', validator.middleware());
+```
+
+---
+
+### Complete Module API Reference (v0.7.0)
+
+Every method below returns `Promise<TransactionSignature>` unless noted otherwise.
+All `fetch*` methods return deserialized account data. `fetchNullable` variants return `null` if the account doesn't exist.
+
+#### AgentModule — `client.agent`
+
+| Method | Params | Returns | Description |
+|--------|--------|---------|-------------|
+| `register(args)` | `RegisterAgentArgs` | `TransactionSignature` | Register new agent on-chain |
+| `update(args)` | `UpdateAgentArgs` | `TransactionSignature` | Update agent metadata (partial) |
+| `deactivate()` | — | `TransactionSignature` | Set `is_active = false` |
+| `reactivate()` | — | `TransactionSignature` | Restore to active |
+| `close()` | — | `TransactionSignature` | Close agent + stats PDAs, reclaim rent |
+| ~~`reportCalls(count)`~~ | — | — | **REMOVED in v0.7** — use receipt batches |
+| ~~`updateReputation(latencyMs, uptimePct)`~~ | — | — | **REMOVED in v0.7** |
+| `fetch(wallet?)` | `PublicKey?` | `AgentAccountData` | Fetch agent account |
+| `fetchNullable(wallet?)` | `PublicKey?` | `AgentAccountData \| null` | Fetch or null |
+| `fetchStats(agentPda)` | `PublicKey` | `AgentStatsData` | Fetch stats |
+| `fetchStatsNullable(agentPda)` | `PublicKey` | `AgentStatsData \| null` | Fetch stats or null |
+| `fetchGlobalRegistry()` | — | `GlobalRegistryData` | Protocol singleton |
+| `deriveAgent(wallet?)` | `PublicKey?` | `[PublicKey, number]` | Derive agent PDA |
+| `deriveStats(agentPda)` | `PublicKey` | `[PublicKey, number]` | Derive stats PDA |
+
+#### FeedbackModule — `client.feedback`
+
+| Method | Params | Returns | Description |
+|--------|--------|---------|-------------|
+| `give(agentWallet, args)` | `PublicKey, GiveFeedbackArgs` | `TransactionSignature` | Leave on-chain feedback |
+| `update(agentWallet, args)` | `PublicKey, UpdateFeedbackArgs` | `TransactionSignature` | Update existing feedback |
+| `revoke(agentWallet)` | `PublicKey` | `TransactionSignature` | Mark feedback as revoked |
+| `close(agentWallet)` | `PublicKey` | `TransactionSignature` | Close revoked feedback, reclaim rent |
+| `fetch(agentPda, reviewer?)` | `PublicKey, PublicKey?` | `FeedbackAccountData` | Fetch feedback |
+| `fetchNullable(agentPda, reviewer?)` | `PublicKey, PublicKey?` | `FeedbackAccountData \| null` | Fetch or null |
+
+#### ToolsModule — `client.tools`
+
+| Method | Params | Returns | Description |
+|--------|--------|---------|-------------|
+| `publish(args)` | `PublishToolArgs` | `TransactionSignature` | Publish tool with pre-hashed values |
+| `publishByName(name, proto, desc, inSchema, outSchema, method, cat, params, required, compound)` | `string, ...` | `TransactionSignature` | Publish with auto-hashing |
+| `inscribeSchema(toolName, args)` | `string, InscribeToolSchemaArgs` | `TransactionSignature` | Store full JSON schema in TX log (0 rent) |
+| `update(toolName, args)` | `string, UpdateToolArgs` | `TransactionSignature` | Update tool hashes/metadata |
+| `deactivate(toolName)` | `string` | `TransactionSignature` | Mark tool unavailable |
+| `reactivate(toolName)` | `string` | `TransactionSignature` | Restore tool |
+| `close(toolName)` | `string` | `TransactionSignature` | Close tool PDA |
+| ~~`reportInvocations(toolName, count)`~~ | — | — | **REMOVED in v0.7** — use receipt batches |
+| `createCheckpoint(toolName, args)` | `string, CreateCheckpointArgs` | `TransactionSignature` | Session checkpoint |
+| `fetch(agentPda, toolName)` | `PublicKey, string` | `ToolDescriptorData` | Fetch tool descriptor |
+| `fetchNullable(agentPda, toolName)` | `PublicKey, string` | `ToolDescriptorData \| null` | Fetch or null |
+
+#### VaultModule — `client.vault`
+
+| Method | Params | Returns | Description |
+|--------|--------|---------|-------------|
+| `initVault(nonce)` | `number[]` | `TransactionSignature` | Create encrypted memory vault |
+| `openSession(sessionHash)` | `number[]` | `TransactionSignature` | Open new session |
+| `inscribe(args)` | `InscribeMemoryArgs` | `TransactionSignature` | Write encrypted data to TX log |
+| `inscribeWithAccounts(session, epoch, vault, args)` | `PublicKey, PublicKey, PublicKey, InscribeMemoryArgs` | `TransactionSignature` | Inscribe with explicit accounts |
+| `compactInscribe(session, vault, args)` | `PublicKey, PublicKey, CompactInscribeArgs` | `TransactionSignature` | Simplified single-fragment write |
+| `closeSession(vault, session)` | `PublicKey, PublicKey` | `TransactionSignature` | Close session |
+| `closeVault()` | — | `TransactionSignature` | Close vault, reclaim rent |
+| `closeSessionPda(vault, session)` | `PublicKey, PublicKey` | `TransactionSignature` | Close session PDA |
+| `closeEpochPage(session, epochIdx)` | `PublicKey, number` | `TransactionSignature` | Close epoch page |
+| `addDelegate(delegateWallet, expiresAt)` | `PublicKey, BN \| null` | `TransactionSignature` | Add hot-wallet delegate |
+| `revokeDelegate(delegateWallet)` | `PublicKey` | `TransactionSignature` | Revoke delegate |
+| `rotateNonce(newNonce)` | `number[]` | `TransactionSignature` | Rotate encryption nonce |
+| `fetch(agentPda)` | `PublicKey` | `MemoryVaultData` | Fetch vault |
+| `fetchSession(vault, sessionHash)` | `PublicKey, Uint8Array` | `SessionLedgerData` | Fetch session |
+| `fetchEpochPage(session, epochIdx)` | `PublicKey, number` | `EpochPageData` | Fetch epoch page |
+| `fetchDelegate(agent, delegate)` | `PublicKey, PublicKey` | `VaultDelegateData` | Fetch delegate |
+
+#### LedgerModule — `client.ledger`
+
+| Method | Params | Returns | Description |
+|--------|--------|---------|-------------|
+| `init(sessionPda)` | `PublicKey` | `TransactionSignature` | Create ledger with 4KB ring buffer (~0.032 SOL) |
+| `write(sessionPda, data, contentHash)` | `PublicKey, Buffer, number[]` | `TransactionSignature` | Write data (~0.000005 SOL) |
+| `seal(sessionPda)` | `PublicKey` | `TransactionSignature` | Seal ring buffer → LedgerPage (~0.031 SOL) |
+| `close(sessionPda)` | `PublicKey` | `TransactionSignature` | Close ledger, reclaim rent |
+| `fetchLedger(sessionPda)` | `PublicKey` | `MemoryLedgerData` | Fetch ledger |
+| `fetchLedgerNullable(sessionPda)` | `PublicKey` | `MemoryLedgerData \| null` | Fetch or null |
+| `fetchPage(ledgerPda, pageIdx)` | `PublicKey, number` | `LedgerPageData` | Fetch sealed page |
+| `decodeLedgerEntries(ledger)` | `MemoryLedgerData` | `LedgerEntry[]` | Decode ring buffer entries |
+
+#### EscrowV2Module — `client.escrowV2` (v0.7.0)
+
+| Method | Params | Returns | Description |
+|--------|--------|---------|-------------|
+| `create(agentWallet, args, splAccounts?)` | `PublicKey, CreateEscrowV2Args, AccountMeta[]?` | `TransactionSignature` | Create V2 escrow |
+| `deposit(agentWallet, nonce, amount, splAccounts?)` | `PublicKey, BN, BN, AccountMeta[]?` | `TransactionSignature` | Top up escrow |
+| `settle(depositor, nonce, calls, serviceHash, splAccounts?, opts?)` | `PublicKey, BN, BN, number[], ...` | `TransactionSignature` | SelfReport settle (agent-side) |
+| `createPendingSettlement(agent, depositor, nonce, settlementIdx, calls, amount, serviceHash, receiptMerkleRoot?)` | `...PublicKey, ...BN, number[], number[]?` | `TransactionSignature` | Dispute-window settlement (v0.7: +receiptMerkleRoot) |
+| `finalizeSettlement(agent, depositor, nonce, settlementIdx)` | `...PublicKey, ...BN` | `TransactionSignature` | Finalize after dispute window |
+| `fileDispute(agentWallet, nonce, settlementIdx, evidenceHash, disputeType?)` | `PublicKey, BN, BN, number[], number?` | `TransactionSignature` | Depositor files dispute (v0.7: +disputeType) |
+| ~~`resolveDispute(...)`~~ | — | — | **REMOVED in v0.7** — use `client.receipt.autoResolveDispute` |
+| `closeDispute(pendingPda)` | `PublicKey` | `TransactionSignature` | Close resolved dispute PDA |
+| `closePendingSettlement(pendingPda)` | `PublicKey` | `TransactionSignature` | Close finalized pending PDA |
+| `withdraw(agentWallet, nonce, amount)` | `PublicKey, BN, BN` | `TransactionSignature` | Withdraw from escrow |
+| `close(agentWallet, nonce?)` | `PublicKey, BN?` | `TransactionSignature` | Close empty escrow |
+| ~~`migrateFromV1(agentWallet)`~~ | — | — | **REMOVED in v0.7** — migration instruction deleted |
+| `fetch(agentPda, depositor?, nonce?)` | `PublicKey, PublicKey?, BN?` | `EscrowAccountV2Data` | Fetch V2 escrow |
+| `fetchNullable(...)` | same as fetch | `EscrowAccountV2Data \| null` | Fetch or null |
+| `fetchPendingSettlement(pda)` | `PublicKey` | `PendingSettlementData` | Fetch pending settlement |
+| `fetchDispute(pda)` | `PublicKey` | `DisputeRecordData` | Fetch dispute record |
+
+#### ReceiptModule — `client.receipt` (v0.7.0)
+
+| Method | Params | Returns | Description |
+|--------|--------|---------|-------------|
+| `inscribeReceiptBatch(depositor, nonce, batchIdx, merkleRoot, callCount, periodStart, periodEnd)` | `PublicKey, BN, number, number[], BN, BN, BN` | `TransactionSignature` | Agent commits receipt merkle root |
+| `submitReceiptProof(depositor, nonce, settlementIdx, batchIdx, provenCount, proof, leaf)` | `PublicKey, BN, BN, number, BN, number[][], number[]` | `TransactionSignature` | Agent proves delivery via merkle inclusion |
+| `autoResolveDispute(agentWallet, depositor, nonce, settlementIdx)` | `PublicKey, PublicKey, BN, BN` | `TransactionSignature` | Permissionless crank — proportional resolution |
+| `fetchReceiptBatch(escrowV2Pda, batchIdx)` | `PublicKey, number` | `ReceiptBatchData` | Fetch receipt batch |
+| `fetchReceiptBatchNullable(escrowV2Pda, batchIdx)` | `PublicKey, number` | `ReceiptBatchData \| null` | Fetch or null |
+
+#### StakingModule — `client.staking` (v0.7.0)
+
+| Method | Params | Returns | Description |
+|--------|--------|---------|-------------|
+| `initStake(agentWallet, amount)` | `PublicKey, BN` | `TransactionSignature` | Initialize stake (collateral, not yield) |
+| `deposit(agentWallet, amount)` | `PublicKey, BN` | `TransactionSignature` | Add to existing stake |
+| `requestUnstake(agentWallet, amount)` | `PublicKey, BN` | `TransactionSignature` | Begin cooldown-gated unstake |
+| `completeUnstake(agentWallet)` | `PublicKey` | `TransactionSignature` | Withdraw after cooldown |
+| `fetch(agentPda)` | `PublicKey` | `AgentStakeData` | Fetch stake |
+| `fetchNullable(agentPda)` | `PublicKey` | `AgentStakeData \| null` | Fetch or null |
+
+#### SubscriptionModule — `client.subscription` (v0.7.0)
+
+| Method | Params | Returns | Description |
+|--------|--------|---------|-------------|
+| `create(agentWallet, args)` | `PublicKey, CreateSubscriptionArgs` | `TransactionSignature` | Create recurring subscription |
+| `fund(agentWallet, subId, amount)` | `PublicKey, BN, BN` | `TransactionSignature` | Top up subscription balance |
+| `cancel(agentWallet, subId?)` | `PublicKey, BN?` | `TransactionSignature` | Cancel subscription |
+| `close(agentWallet, subId?)` | `PublicKey, BN?` | `TransactionSignature` | Close cancelled subscription PDA |
+| `fetch(agentPda, subscriber?, subId?)` | `PublicKey, PublicKey?, BN?` | `SubscriptionData` | Fetch subscription |
+| `fetchNullable(...)` | same as fetch | `SubscriptionData \| null` | Fetch or null |
+
+#### AttestationModule — `client.attestation`
+
+| Method | Params | Returns | Description |
+|--------|--------|---------|-------------|
+| `create(agentWallet, args)` | `PublicKey, CreateAttestationArgs` | `TransactionSignature` | Vouch for an agent (web-of-trust) |
+| `revoke(agentWallet)` | `PublicKey` | `TransactionSignature` | Revoke attestation |
+| `close(agentWallet)` | `PublicKey` | `TransactionSignature` | Close revoked attestation PDA |
+| `fetch(agentPda, attester?)` | `PublicKey, PublicKey?` | `AgentAttestationData` | Fetch attestation |
+| `fetchNullable(agentPda, attester?)` | `PublicKey, PublicKey?` | `AgentAttestationData \| null` | Fetch or null |
+
+#### IndexingModule — `client.indexing`
+
+| Method | Params | Returns | Description |
+|--------|--------|---------|-------------|
+| `initCapabilityIndex(capId)` | `string` | `TransactionSignature` | Create capability index + register agent |
+| `addToCapabilityIndex(capId)` | `string` | `TransactionSignature` | Add agent to existing index |
+| `removeFromCapabilityIndex(capId)` | `string` | `TransactionSignature` | Remove agent from index |
+| `closeCapabilityIndex(capId)` | `string` | `TransactionSignature` | Close empty index |
+| `initProtocolIndex(protoId)` | `string` | `TransactionSignature` | Create protocol index |
+| `addToProtocolIndex(protoId)` | `string` | `TransactionSignature` | Add agent to protocol index |
+| `removeFromProtocolIndex(protoId)` | `string` | `TransactionSignature` | Remove from protocol index |
+| `closeProtocolIndex(protoId)` | `string` | `TransactionSignature` | Close empty protocol index |
+| `initToolCategoryIndex(cat)` | `number` | `TransactionSignature` | Create tool category index |
+| `addToToolCategoryIndex(cat, toolName)` | `number, string` | `TransactionSignature` | Register tool in category |
+| `removeFromToolCategoryIndex(cat, toolName)` | `number, string` | `TransactionSignature` | Remove tool from category |
+| `closeToolCategoryIndex(cat)` | `number` | `TransactionSignature` | Close empty category index |
+| `fetchCapabilityIndex(capId)` | `string` | `CapabilityIndexData` | Fetch capability index |
+| `fetchProtocolIndex(protoId)` | `string` | `ProtocolIndexData` | Fetch protocol index |
+| `fetchToolCategoryIndex(cat)` | `number` | `ToolCategoryIndexData` | Fetch tool category index |
+
+---
+
+### SAP Event System (v0.1.0+)
+
+The SAP program emits events on every state change. Use the `EventParser` to decode them from transaction logs.
+
+#### All SAP Events (38 total)
+
+```ts
+import { SAP_EVENT_NAMES, EventParser } from '@oobe-protocol-labs/synapse-sap-sdk';
+
+// SAP_EVENT_NAMES contains all 38 event name strings:
+const events = [
+  // ── Agent Lifecycle ──
+  'RegisteredEvent',          // Agent created
+  'UpdatedEvent',             // Agent metadata changed
+  'DeactivatedEvent',         // Agent set to inactive
+  'ReactivatedEvent',         // Agent restored to active
+  'ClosedEvent',              // Agent closed permanently
+
+  // ── Reputation ──
+  'FeedbackEvent',            // Feedback submitted
+  'FeedbackUpdatedEvent',     // Feedback revised
+  'FeedbackRevokedEvent',     // Feedback revoked
+  'ReputationUpdatedEvent',   // Latency/uptime self-report
+  'CallsReportedEvent',       // Call count updated
+
+  // ── Memory Vault ──
+  'VaultInitializedEvent',    // Vault created
+  'SessionOpenedEvent',       // Session started
+  'MemoryInscribedEvent',     // Encrypted data inscribed
+  'EpochOpenedEvent',         // New epoch page
+  'SessionClosedEvent',       // Session ended
+  'VaultClosedEvent',         // Vault closed
+  'SessionPdaClosedEvent',    // Session PDA reclaimed
+  'EpochPageClosedEvent',     // Epoch page reclaimed
+  'VaultNonceRotatedEvent',   // Encryption nonce changed
+  'DelegateAddedEvent',       // Hot-wallet delegate added
+  'DelegateRevokedEvent',     // Delegate revoked
+
+  // ── Tool Registry ──
+  'ToolPublishedEvent',       // Tool registered
+  'ToolSchemaInscribedEvent', // JSON schema → TX log
+  'ToolUpdatedEvent',         // Tool metadata changed
+  'ToolDeactivatedEvent',     // Tool marked unavailable
+  'ToolReactivatedEvent',     // Tool restored
+  'ToolClosedEvent',          // Tool PDA closed
+  'ToolInvocationReportedEvent', // Usage count updated
+  'CheckpointCreatedEvent',   // Session checkpoint
+
+  // ── Settlement ──
+  'EscrowCreatedEvent',       // Escrow initialized
+  'EscrowDepositedEvent',     // Funds deposited
+  'PaymentSettledEvent',      // Calls settled → agent paid
+  'EscrowWithdrawnEvent',     // Depositor withdrew
+  'BatchSettledEvent',        // V1 batch settlement
+
+  // ── Web of Trust ──
+  'AttestationCreatedEvent',  // Attestation voucher
+  'AttestationRevokedEvent',  // Attestation revoked
+
+  // ── Ledger ──
+  'LedgerEntryEvent',         // Ring buffer write
+  'LedgerSealedEvent',        // Ring buffer → sealed page
+] as const;
+```
+
+#### Parsing Events from Transactions
+
+```ts
+import { EventParser } from '@oobe-protocol-labs/synapse-sap-sdk';
+
+// Initialize parser with Anchor program
+const parser = new EventParser(program);
+
+// Parse all events from TX logs
+const events = parser.parseLogs(txLogs);
+
+// Filter by event name
+const settlements = parser.filterByName(events, 'PaymentSettledEvent');
+for (const { name, data } of settlements) {
+  console.log(`Settled ${data.callsSettled} calls for ${data.amount} lamports`);
+}
+```
+
+#### Key Event Data Shapes
+
+```ts
+// PaymentSettledEvent.data
+{
+  escrow: PublicKey;
+  agent: PublicKey;
+  depositor: PublicKey;
+  callsSettled: BN;
+  amount: BN;
+  serviceHash: number[];
+  totalCallsSettled: BN;
+  remainingBalance: BN;
+  timestamp: BN;
+}
+
+// RegisteredEvent.data
+{
+  agent: PublicKey;
+  wallet: PublicKey;
+  name: string;
+  capabilities: string[];
+  timestamp: BN;
+}
+
+// MemoryInscribedEvent.data
+{
+  vault: PublicKey;
+  session: PublicKey;
+  sequence: number;
+  epochIndex: number;
+  encryptedData: number[];
+  nonce: number[];
+  contentHash: number[];
+  totalFragments: number;
+  fragmentIndex: number;
+  compression: number;
+  dataLen: number;
+  nonceVersion: number;
+  timestamp: BN;
+}
+
+// LedgerEntryEvent.data
+{
+  session: PublicKey;
+  ledger: PublicKey;
+  entryIndex: number;
+  data: number[];
+  contentHash: number[];
+  dataLen: number;
+  merkleRoot: number[];
+  timestamp: BN;
+}
+```
+
+#### Real-Time Event Streaming (Geyser/Yellowstone)
+
+For real-time event streaming via Yellowstone gRPC, see **§23 gRPC / Geyser Parser**.
+
+```ts
+import { GeyserEventStream, EventParser } from '@oobe-protocol-labs/synapse-sap-sdk';
+
+const stream = new GeyserEventStream({
+  endpoint: 'https://us-1-mainnet.oobeprotocol.ai',
+  token: process.env.OOBE_API_KEY,
+});
+
+stream.on('logs', (logs, sig, slot) => {
+  const events = new EventParser(program).parseLogs(logs);
+  for (const e of events) {
+    if (e.name === 'PaymentSettledEvent') {
+      console.log(`Settlement: ${e.data.amount} lamports at slot ${slot}`);
+    }
+  }
+});
+
+await stream.connect();
+```
+
+---
+
+### SAP Error Codes Reference (v0.7.0)
+
+On-chain program errors are numeric codes starting at 6000. Use `SapRpcError.fromAnchor(err)` to extract them.
+
+#### Error Code → Message Mapping
+
+| Code | Variant | Message | Category |
+|------|---------|---------|----------|
+| 6000 | `NameTooLong` | `name>64` | Agent |
+| 6001 | `DescriptionTooLong` | `desc>256` | Agent |
+| 6002 | `UriTooLong` | `uri>256` | Agent |
+| 6003 | `TooManyCapabilities` | `caps>10` | Agent |
+| 6004 | `TooManyPricingTiers` | `tiers>5` | Agent |
+| 6005 | `TooManyProtocols` | `protos>5` | Agent |
+| 6006 | `TooManyPlugins` | `plugins>5` | Agent |
+| 6007 | `AlreadyActive` | `already active` | State |
+| 6008 | `AlreadyInactive` | `already inactive` | State |
+| 6009 | `InvalidFeedbackScore` | `score 0-1000` | Feedback |
+| 6010 | `TagTooLong` | `tag>32` | Feedback |
+| 6011 | `SelfReviewNotAllowed` | `self review` | Feedback |
+| 6012 | `FeedbackAlreadyRevoked` | `already revoked` | Feedback |
+| 6013 | `CapabilityIndexFull` | `cap idx full` | Indexing |
+| 6014 | `ProtocolIndexFull` | `proto idx full` | Indexing |
+| 6015 | `AgentNotInIndex` | `not in idx` | Indexing |
+| 6016 | `InvalidCapabilityHash` | `cap hash` | Indexing |
+| 6017 | `InvalidProtocolHash` | `proto hash` | Indexing |
+| 6018 | `InvalidPluginType` | `bad plugin type` | Plugin |
+| 6019 | `ChunkDataTooLarge` | `chunk>900` | Memory |
+| 6020 | `ContentTypeTooLong` | `ctype>max` | Memory |
+| 6021 | `IpfsCidTooLong` | `cid>max` | Memory |
+| 6022 | `EmptyName` | `empty name` | Validation |
+| 6023 | `ControlCharInName` | `ctrl char` | Validation |
+| 6024 | `EmptyDescription` | `empty desc` | Validation |
+| 6025 | `AgentIdTooLong` | `agentid>128` | Validation |
+| 6026 | `InvalidCapabilityFormat` | `cap format` | Validation |
+| 6027 | `DuplicateCapability` | `dup cap` | Validation |
+| 6028 | `EmptyTierId` | `empty tier` | Validation |
+| 6029 | `DuplicateTierId` | `dup tier` | Validation |
+| 6030 | `InvalidRateLimit` | `rate=0` | Validation |
+| 6031 | `SplRequiresTokenMint` | `spl needs mint` | SPL |
+| 6032 | `InvalidX402Endpoint` | `x402 https` | Validation |
+| 6033 | `InvalidVolumeCurve` | `curve order` | Escrow |
+| 6034 | `TooManyVolumeCurvePoints` | `curve>5` | Escrow |
+| 6035 | `MinPriceExceedsMax` | `min>max price` | Escrow |
+| 6036 | `InvalidUptimePercent` | `uptime 0-100` | Validation |
+| 6037 | `SessionClosed` | `session closed` | Vault |
+| 6038 | `InvalidSequence` | `bad seq` | Vault |
+| 6039 | `InvalidFragmentIndex` | `frag idx` | Vault |
+| 6040 | `InscriptionTooLarge` | `data>750` | Vault |
+| 6041 | `EmptyInscription` | `empty data` | Vault |
+| 6042 | `InvalidTotalFragments` | `frags<1` | Vault |
+| 6043 | `EpochMismatch` | `epoch mismatch` | Vault |
+| 6044 | `VaultNotClosed` | `vault open` | Vault |
+| 6045 | `SessionNotClosed` | `session open` | Vault |
+| 6046 | `DelegateExpired` | `delegate expired` | Delegation |
+| 6047 | `InvalidDelegate` | `bad delegate` | Delegation |
+| 6048 | `ToolNameTooLong` | `tool>32` | Tools |
+| 6049 | `EmptyToolName` | `empty tool` | Tools |
+| 6050 | `InvalidToolNameHash` | `tool hash` | Tools |
+| 6051 | `InvalidToolHttpMethod` | `bad method` | Tools |
+| 6052 | `InvalidToolCategory` | `bad category` | Tools |
+| 6053 | `ToolAlreadyInactive` | `tool inactive` | Tools |
+| 6054 | `ToolAlreadyActive` | `tool active` | Tools |
+| 6055 | `InvalidSchemaHash` | `schema hash` | Schema |
+| 6056 | `InvalidSchemaType` | `schema type` | Schema |
+| 6057 | `InvalidCheckpointIndex` | `cp index` | Checkpoint |
+| 6058 | `FeedbackNotRevoked` | `not revoked` | Guards |
+| 6059 | `IndexNotEmpty` | `idx not empty` | Guards |
+| 6060 | `SessionStillOpen` | `session open` | Guards |
+| 6061 | `NoFieldsToUpdate` | `no fields` | Guards |
+| 6062 | `InsufficientEscrowBalance` | `low balance` | Escrow |
+| 6063 | `EscrowMaxCallsExceeded` | `max calls` | Escrow |
+| 6064 | `EscrowEmpty` | `escrow empty` | Escrow |
+| 6065 | `EscrowNotEmpty` | `escrow!=0` | Escrow |
+| 6066 | `InvalidSettlementCalls` | `calls<1` | Escrow |
+| 6067 | `AttestationTypeTooLong` | `atype>32` | Attestation |
+| 6068 | `EmptyAttestationType` | `empty atype` | Attestation |
+| 6069 | `SelfAttestationNotAllowed` | `self attest` | Attestation |
+| 6070 | `AttestationAlreadyRevoked` | `already revoked` | Attestation |
+| 6071 | `AttestationNotRevoked` | `not revoked` | Attestation |
+| 6072 | `ToolCategoryIndexFull` | `cat idx full` | Indexing |
+| 6073 | `ToolNotInCategoryIndex` | `not in cat` | Indexing |
+| 6074 | `ToolCategoryMismatch` | `cat mismatch` | Indexing |
+| 6075 | `ArithmeticOverflow` | `overflow` | Safety |
+| 6076 | `EscrowExpired` | `escrow expired` | Escrow |
+| 6077 | `AgentInactive` | `agent inactive` | State |
+| 6078 | `AttestationExpired` | `attest expired` | Attestation |
+| 6079 | `BufferFull` | `buf full` | Buffer |
+| 6080 | `BufferDataTooLarge` | `buf>750` | Buffer |
+| 6081 | `Unauthorized` | `unauthorized` | Security |
+| 6082 | `InvalidSession` | `bad session` | Vault |
+| 6083 | `EmptyDigestHash` | `empty hash` | Digest |
+| 6084 | `LedgerDataTooLarge` | `ledger>750` | Ledger |
+| 6085 | `LedgerRingEmpty` | `ring empty` | Ledger |
+| 6086 | `BatchEmpty` | `batch empty` | Batch |
+| 6087 | `BatchTooLarge` | `batch>10` | Batch |
+| 6088 | `SplTokenRequired` | `spl accts` | SPL |
+| 6089 | `InvalidTokenAccount` | `bad token` | SPL |
+| 6090 | `InvalidTokenProgram` | `bad prog` | SPL |
+| 6091 | `InvalidSettlementSecurity` | `bad security` | V2.1 Escrow |
+| 6092 | `CoSignerRequired` | `cosigner` | V2.1 Escrow |
+| 6093 | `InvalidCoSigner` | `bad cosigner` | V2.1 Escrow |
+| 6094 | `InvalidArbiter` | `bad arbiter` | V2.1 Escrow |
+| 6095 | `ArbiterRequired` | `arbiter=0` | V2.1 Escrow |
+| 6096 | `EscrowNonceReused` | `nonce reused` | V2.1 Escrow |
+| 6097 | `SettlementNotPending` | `not pending` | V2.1 Dispute |
+| 6098 | `SettlementAlreadyFinalized` | `already final` | V2.1 Dispute |
+| 6099 | `DisputeWindowNotExpired` | `too early` | V2.1 Dispute |
+| 6100 | `DisputeWindowExpired` | `window closed` | V2.1 Dispute |
+| 6101 | `NotDepositor` | `not depositor` | V2.1 Dispute |
+| 6102 | `DisputeAlreadyFiled` | `dup dispute` | V2.1 Dispute |
+| 6103 | `DisputeStillOpen` | `dispute open` | V2.1 Dispute |
+| 6104 | `NotArbiter` | `not arbiter` | V2.1 Dispute |
+| 6105 | `InvalidDisputeOutcome` | `bad outcome` | V2.1 Dispute |
+| 6106 | `StakeBelowMinimum` | `stake<min` | V2.1 Staking |
+| 6107 | `NoStakeAccount` | `no stake` | V2.1 Staking |
+| 6108 | `UnstakeAlreadyPending` | `unstake pending` | V2.1 Staking |
+| 6109 | `UnstakeCooldownNotMet` | `cooldown` | V2.1 Staking |
+| 6110 | `NoUnstakePending` | `no unstake` | V2.1 Staking |
+| 6111 | `SlashExceedsStake` | `slash>stake` | V2.1 Staking |
+| 6112 | `SubscriptionAlreadyActive` | `sub active` | V2.1 Subscription |
+| 6113 | `SubscriptionCancelled` | `sub cancelled` | V2.1 Subscription |
+| 6114 | `NoIntervalDue` | `no due` | V2.1 Subscription |
+| 6115 | `SubscriptionInsufficientBalance` | `sub low bal` | V2.1 Subscription |
+| 6116 | `InvalidBillingInterval` | `bad interval` | V2.1 Subscription |
+| 6117 | `InvalidShardIndex` | `bad shard` | V2.1 Shards |
+| 6118 | `IndexPageFull` | `page full` | V2.1 Indexing |
+| 6119 | `InvalidPageIndex` | `bad page` | V2.1 Indexing |
+| 6120 | `IndexPageNotEmpty` | `page≠empty` | V2.1 Indexing |
+| 6121 | `AlreadyMigrated` | `already v2` | V2.1 Migration |
+| 6122 | `MigrationV1Only` | `v1 only` | V2.1 Migration |
+
+#### SDK Error Classes
+
+```ts
+import {
+  SapError,                 // Base class — catch-all
+  SapValidationError,       // Client-side validation (err.field)
+  SapRpcError,              // Anchor/RPC errors (err.rpcCode, err.logs)
+  SapAccountNotFoundError,  // Missing PDA (err.address, err.accountType)
+  SapTimeoutError,          // Network timeout (err.timeoutMs)
+  SapPermissionError,       // Unauthorized access
+} from '@oobe-protocol-labs/synapse-sap-sdk';
+
+// Best practice: use SapRpcError.fromAnchor() to wrap Anchor errors
+try {
+  await client.agent.register(args);
+} catch (raw) {
+  const err = SapRpcError.fromAnchor(raw);
+  console.error(`Error ${err.rpcCode}: ${err.message}`);
+  // err.rpcCode === 6000 → NameTooLong
+  // err.logs → transaction log lines for debugging
+}
+```
+
+---
+
+### Protocol Constants & Limits (v0.7.0)
+
+These constants mirror on-chain Rust constraints exactly. Use for client-side validation before sending transactions.
+
+#### LIMITS — Size Constraints
+
+```ts
+import { LIMITS } from '@oobe-protocol-labs/synapse-sap-sdk';
+```
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_NAME_LEN` | 64 | Agent name (bytes) |
+| `MAX_DESC_LEN` | 256 | Agent description (bytes) |
+| `MAX_URI_LEN` | 256 | URI fields (agent_uri, x402_endpoint) |
+| `MAX_AGENT_ID_LEN` | 128 | DID-style identifier |
+| `MAX_CAPABILITIES` | 10 | Capabilities per agent |
+| `MAX_PRICING_TIERS` | 5 | Pricing tiers per agent |
+| `MAX_PROTOCOLS` | 5 | Protocols per agent |
+| `MAX_PLUGINS` | 5 | Plugins per agent |
+| `MAX_VOLUME_CURVE_POINTS` | 5 | Volume curve breakpoints |
+| `MAX_TAG_LEN` | 32 | Feedback tag (bytes) |
+| `MAX_AGENTS_PER_INDEX` | 100 | Agents in a capability/protocol index |
+| `MAX_TOOL_NAME_LEN` | 32 | Tool name (bytes) |
+| `MAX_TOOLS_PER_CATEGORY` | 100 | Tools per category index |
+| `MAX_ATTESTATION_TYPE_LEN` | 32 | Attestation type string |
+| `MAX_INSCRIPTION_SIZE` | 750 | Encrypted data per fragment |
+| `INSCRIPTIONS_PER_EPOCH` | 1000 | Inscriptions per epoch page |
+| `RING_CAPACITY` | 4096 | Ledger ring buffer (bytes) |
+| `MAX_LEDGER_WRITE_SIZE` | 750 | Ledger write per call |
+| `MAX_BATCH_SETTLEMENTS` | 10 | Settlements per V1 batch |
+| `MAX_FEEDBACK_SCORE` | 1000 | Score range: 0–1000 |
+
+#### SEEDS — PDA Seed Prefixes
+
+```ts
+import { SEEDS } from '@oobe-protocol-labs/synapse-sap-sdk';
+```
+
+| Key | Value | Account Type |
+|-----|-------|-------------|
+| `AGENT` | `sap_agent` | AgentAccount |
+| `STATS` | `sap_stats` | AgentStats |
+| `FEEDBACK` | `sap_feedback` | FeedbackAccount |
+| `GLOBAL` | `sap_global` | GlobalRegistry |
+| `VAULT` | `sap_vault` | MemoryVault |
+| `SESSION` | `sap_session` | SessionLedger |
+| `EPOCH` | `sap_epoch` | EpochPage |
+| `DELEGATE` | `sap_delegate` | VaultDelegate |
+| `TOOL` | `sap_tool` | ToolDescriptor |
+| `CHECKPOINT` | `sap_checkpoint` | SessionCheckpoint |
+| `ESCROW` | `sap_escrow` | EscrowAccount (V1) |
+| `ESCROW_V2` | `sap_escrow_v2` | EscrowAccountV2 |
+| `PENDING` | `sap_pending` | PendingSettlement |
+| `DISPUTE` | `sap_dispute` | DisputeRecord |
+| `STAKE` | `sap_stake` | AgentStake |
+| `SUBSCRIPTION` | `sap_sub` | SubscriptionAccount |
+| `SHARD` | `sap_shard` | CounterShard |
+| `INDEX_PAGE` | `sap_idx_page` | IndexPage |
+| `LEDGER` | `sap_ledger` | MemoryLedger |
+| `LEDGER_PAGE` | `sap_page` | LedgerPage |
+| `ATTESTATION` | `sap_attest` | AgentAttestation |
+| `CAPABILITY_INDEX` | `sap_cap_idx` | CapabilityIndex |
+| `PROTOCOL_INDEX` | `sap_proto_idx` | ProtocolIndex |
+| `TOOL_CATEGORY` | `sap_tool_cat` | ToolCategoryIndex |
+
+#### Pre-computed Addresses
+
+```ts
+import {
+  SAP_PROGRAM,             // PublicKey: SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ
+  SAP_UPGRADE_AUTHORITY,   // PublicKey: GBLQznn1QMnx64zHXcDguP9yNW9ZfYCVdrY8eDovBvPk
+  GLOBAL_REGISTRY_ADDRESS, // PublicKey: 9odFrYBBZq6UQC6aGyzMPNXWJQn55kMtfigzhLg6S6L5
+  GLOBAL_REGISTRY_BUMP,    // 255
+  IDL_ACCOUNT_ADDRESS,     // PublicKey: ENs7L1NFuoP7dur8cqGGE6b98CQHfNeDZPWPSjRzhc4f
+} from '@oobe-protocol-labs/synapse-sap-sdk';
+```
+
+---
+
+### V1 → V2 Migration Guide (v0.7.0)
+
+#### Escrow: V1 → V2
+
+| Feature | V1 (`client.escrow`) | V2 (`client.escrowV2`) |
+|---------|---------------------|----------------------|
+| **PDA** | `deriveEscrow(agent, depositor)` | `deriveEscrowV2(agent, depositor, nonce)` |
+| **Multiple escrows** | 1 per agent-depositor pair | ∞ via `nonce` parameter |
+| **Settlement** | `settle()` / `batchSettle()` | `settle()` with `SettleOptions` |
+| **Security modes** | SelfReport only | `SelfReport \| CoSigned \| Arbitrated` |
+| **Disputes** | None | `fileDispute()` → `resolveDispute()` |
+| **Pending settlements** | None | `createPendingSettlement()` → `finalizeSettlement()` |
+| **Volume curves** | Built-in breakpoints | Not in V2 — use flat `pricePerCall` |
+
+**Migration (1 instruction):**
+
+```ts
+// Migrate V1 escrow → V2 (preserves balance, transfers to nonce=0 V2 escrow)
+await client.escrowV2.migrateFromV1(agentWallet);
+
+// After migration, the V1 escrow PDA is closed and funds are in V2
+const v2 = await client.escrowV2.fetch(agentPda, depositor, 0);
+```
+
+#### Settlement Security Modes (V2 only)
+
+```ts
+import { SettlementSecurity } from '@oobe-protocol-labs/synapse-sap-sdk';
+
+// 1. SelfReport (default) — agent settles immediately, no dispute
+await client.escrowV2.create(agentWallet, {
+  escrowNonce: 0,
+  pricePerCall: 1_000_000,
+  maxCalls: 100,
+  initialDeposit: 100_000_000,
+  settlementSecurity: { selfReport: {} },
+  disputeWindowSlots: 0,
+  // ...
+});
+
+// 2. CoSigned — requires co-signer approval
+await client.escrowV2.create(agentWallet, {
+  // ...
+  settlementSecurity: { coSigned: {} },
+  coSigner: coSignerPubkey,
+});
+
+// 3. Arbitrated — dispute window + arbiter
+await client.escrowV2.create(agentWallet, {
+  // ...
+  settlementSecurity: { disputeWindow: {} },
+  disputeWindowSlots: 432_000, // ~2 days
+  arbiter: arbiterPubkey,
+});
+```
+
+#### Import Changes
+
+```ts
+// ❌ V1 (deprecated)
+import { deriveEscrow, EscrowAccountData, CreateEscrowArgs } from '@synapse-sap/sdk';
+client.escrow.create(args);
+client.escrow.settle(depositor, calls, hash);
+client.escrow.batchSettle(depositor, settlements);
+client.x402.preparePayment(agentPubkey, opts);
+
+// ✅ V2 (recommended)
+import { deriveEscrowV2, EscrowAccountV2Data, CreateEscrowV2Args } from '@synapse-sap/sdk';
+client.escrowV2.create(agentWallet, args);
+client.escrowV2.settle(depositor, nonce, calls, hash);
+client.escrowV2.migrateFromV1(agentWallet);
+```
+
+---
+
+### Transaction Parser — `client.parser` (v0.5.0+)
+
+Decodes SAP instructions, inner CPIs, and events from raw transaction responses.
+
+```ts
+// Access via SapClient
+const parser = client.parser;
+
+// Full parse: instructions + inner calls + events
+const parsed = parser.parseTransaction(txResponse);
+console.log(parsed.instructions); // DecodedSapInstruction[]
+console.log(parsed.events);       // ParsedEvent[]
+console.log(parsed.innerCalls);   // InnerInstructionGroup[]
+
+// Batch parse (e.g., from getSignaturesForAddress)
+const results = parser.parseBatch(txResponses);
+
+// Extract instruction names only
+const names = parser.instructionNames(txResponse); // ['registerAgent', 'publishTool']
+
+// Check if a TX targets SAP
+const isSap = parser.isSapTransaction(instructions); // boolean
+
+// Decode from pre-built instruction list
+const decoded = parser.fromInstructions(ixList);
+
+// Decode inner (CPI) instructions
+const inner = parser.decodeInner(tx.meta.innerInstructions, txResponse);
+```
+
+#### Parsed Transaction Shape
+
+```ts
+interface ParsedSapTransaction {
+  signature: string;
+  slot: number;
+  blockTime: number | null;
+  instructions: DecodedSapInstruction[];  // Top-level SAP instructions
+  events: ParsedEvent[];                   // Decoded events from logs
+  innerCalls: InnerInstructionGroup[];     // CPI calls
+  success: boolean;                        // TX succeeded?
+  fee: number;                             // TX fee in lamports
+}
+
+interface DecodedSapInstruction {
+  name: string;                     // e.g., 'registerAgent'
+  data: Record<string, unknown>;    // Decoded args
+  accounts: PublicKey[];            // Account keys
+  programId: PublicKey;
+}
+```
+
+---
+
+### Priority Fees & Compute Budget (v0.6.2+)
+
+Critical for settlement TXs on congested networks. The SDK provides composable helpers.
+
+```ts
+import {
+  buildPriorityFeeIxs,
+  FAST_SETTLE_OPTIONS,
+  FAST_BATCH_SETTLE_OPTIONS,
+} from '@oobe-protocol-labs/synapse-sap-sdk';
+```
+
+#### Presets
+
+| Preset | Fee | CU Limit | Skip Preflight | Use Case |
+|--------|-----|----------|----------------|----------|
+| `FAST_SETTLE_OPTIONS` | 5000 µL | 100,000 | Yes | Single settlement |
+| `FAST_BATCH_SETTLE_OPTIONS` | 5000 µL | 300,000 | Yes | Batch settlement |
+
+#### Usage
+
+```ts
+// Option 1: Use preset with EscrowV2Module
+await client.escrowV2.settle(depositor, nonce, calls, hash, [], FAST_SETTLE_OPTIONS);
+
+// Option 2: Build custom priority fee instructions
+const feeIxs = buildPriorityFeeIxs({
+  priorityFeeMicroLamports: 10_000,  // higher = faster
+  computeUnits: 150_000,
+});
+
+// Prepend to any Anchor method builder
+await program.methods
+  .settleCalls(calls, hash)
+  .accounts({ ... })
+  .preInstructions(feeIxs)
+  .rpc({ skipPreflight: true });
+```
+
+#### Fee Guide
+
+| Priority | µLamports | ~Cost per TX | When to Use |
+|----------|-----------|-------------|-------------|
+| Low | 1,000 | ~0.0001 SOL | Non-urgent writes |
+| Medium | 5,000 | ~0.0005 SOL | Standard settlement |
+| High | 50,000 | ~0.005 SOL | Time-critical settlement |
+| Extreme | 500,000 | ~0.05 SOL | Congestion, MEV-protected |
+
+---
+
+### Zod Validation Schemas (v0.6.0+)
+
+Runtime validation for environment variables, agent manifests, and tool arguments. Zod is a peer dependency (tree-shaken if unused).
+
+```ts
+import {
+  createEnvSchema,
+  createAgentManifestSchema,
+  createToolManifestEntrySchema,
+  createEndpointDescriptorSchema,
+  createHealthCheckSchema,
+  createCallArgsSchema,
+  validateOrThrow,
+} from '@oobe-protocol-labs/synapse-sap-sdk';
+```
+
+#### Environment Validation
+
+```ts
+const envSchema = createEnvSchema();
+const env = envSchema.parse(process.env);
+// env.SOLANA_CLUSTER — typed as 'mainnet-beta' | 'devnet' | 'localnet'
+// env.SOLANA_RPC_URL — string | undefined
+// env.DATABASE_URL   — string | undefined
+// env.LOG_LEVEL      — 'debug' | 'info' | 'warn' | 'error'
+```
+
+#### Agent Manifest Validation
+
+```ts
+const manifestSchema = createAgentManifestSchema();
+const result = manifestSchema.safeParse(userInput);
+if (!result.success) {
+  console.error('Invalid manifest:', result.error.issues);
+}
+```
+
+#### Tool Entry Validation
+
+```ts
+const toolSchema = createToolManifestEntrySchema();
+toolSchema.parse({
+  name: 'getWeather',
+  description: 'Fetch weather for a city',
+  protocol: 'mcp-v1',
+  category: 'data-retrieval',
+  inputSchema: { type: 'object', properties: { city: { type: 'string' } } },
+  outputSchema: { type: 'object' },
+  httpMethod: 'POST',
+  paymentMode: 'x402',
+  pricePerCall: 1_000_000,
+});
+```
+
+---
+
+### Dual RPC Strategy (v0.6.0+)
+
+Solves WebSocket 400 rejections on authenticated RPCs during SPL token operations.
+
+```ts
+import {
+  createDualConnection,
+  getRpcUrl,
+  findATA,
+} from '@oobe-protocol-labs/synapse-sap-sdk';
+
+// Primary RPC = authenticated, fallback = public (for SPL ops)
+const dual = createDualConnection({
+  primaryUrl: 'https://synapse.oobeprotocol.ai',
+  fallbackUrl: 'https://api.mainnet-beta.solana.com',
+  commitment: 'confirmed',
+});
+
+// SAP program calls → dual.primary
+const agent = await client.agent.fetch();
+
+// SPL token ATA lookup → dual.fallback (avoids WS 400)
+const ata = await findATA(dual.fallback, wallet, mint);
+```
+
+---
+
+### Escrow Validation Pipeline (v0.6.4+)
+
+Pre-settlement validation for both SOL and SPL token escrows:
+
+```ts
+import {
+  validateEscrowState,
+  attachSplAccounts,
+  toAccountMetas,
+  MissingEscrowAtaError,
+} from '@oobe-protocol-labs/synapse-sap-sdk';
+
+// 1. Validate escrow state before settling
+const result = await validateEscrowState(
+  connection,
+  agentWallet,
+  depositorWallet,
+  (pda) => client.escrow.fetchNullable(pda),
+);
+
+if (!result.valid) {
+  console.error('Escrow validation failed:', result.errors);
+  return; // Don't attempt settlement
+}
+
+// 2. For SPL escrows, generate AccountMeta[] automatically
+if (result.isSplEscrow) {
+  const splAccounts = toAccountMetas(result.splAccounts);
+  await client.escrowV2.settle(depositor, nonce, calls, hash, splAccounts);
+} else {
+  await client.escrowV2.settle(depositor, nonce, calls, hash);
+}
+
+// Result shape:
+// {
+//   valid: boolean,
+//   escrow: EscrowAccountData | null,
+//   escrowPda: PublicKey,
+//   agentPda: PublicKey,
+//   isSplEscrow: boolean,
+//   splAccounts: SplAccountMeta[],
+//   errors: string[],
+// }
+```
+
+---
+
+### PostgreSQL Off-Chain Mirror (v0.1.0+)
+
+Mirror all on-chain SAP accounts to PostgreSQL for SQL queries, analytics, and REST APIs.
+
+```ts
+import { SapPostgres, SapSyncEngine } from '@oobe-protocol-labs/synapse-sap-sdk';
+import { Pool } from 'pg';
+```
+
+#### Setup
+
+```ts
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const pg = new SapPostgres(pool, sapClient);
+
+// 1. Create tables (idempotent)
+await pg.migrate();
+
+// 2. Full sync — mirrors all 22 account types
+await pg.syncAll();
+
+// 3. Query with SQL
+const { rows } = await pg.query<{ name: string; reputation_score: number }>(
+  'SELECT name, reputation_score FROM sap_agents WHERE is_active = true ORDER BY reputation_score DESC',
+);
+```
+
+#### Sync Methods
+
+| Method | Description |
+|--------|-------------|
+| `migrate()` | Create/update all SAP tables (idempotent) |
+| `syncAll(opts?)` | Sync all 22 account types |
+| `syncAgents()` | Sync AgentAccount + AgentStats |
+| `syncFeedback()` | Sync FeedbackAccount |
+| `syncEscrows()` | Sync EscrowAccount |
+| `syncVaults()` | Sync MemoryVault + Sessions |
+| `syncTools()` | Sync ToolDescriptor |
+| `syncIndexes()` | Sync Capability/Protocol/Category indexes |
+| `syncLedgers()` | Sync MemoryLedger + LedgerPage |
+| `syncAttestations()` | Sync AgentAttestation |
+| `upsert(table, row)` | Insert or update single row |
+| `query(sql, params)` | Raw SQL query |
+
+#### Real-Time Sync Engine
+
+```ts
+const sync = new SapSyncEngine(pg, sapClient);
+
+// One-shot full sync
+await sync.run();
+
+// Periodic sync (every 60 seconds)
+sync.start(60_000);
+
+// Live event streaming via Yellowstone gRPC
+await sync.startEventStream({
+  endpoint: 'https://us-1-mainnet.oobeprotocol.ai',
+  token: process.env.OOBE_API_KEY,
+});
+
+// Graceful shutdown
+await sync.stop();
+```
+
+#### Database Tables Created
+
+| Table | Source Account | Key Columns |
+|-------|---------------|-------------|
+| `sap_agents` | AgentAccount | pda, wallet, name, description, is_active, capabilities |
+| `sap_agent_stats` | AgentStats | pda, total_calls, avg_latency, uptime |
+| `sap_feedback` | FeedbackAccount | pda, agent_pda, reviewer, score, tag |
+| `sap_escrows` | EscrowAccount | pda, agent_pda, depositor, balance, settled_calls |
+| `sap_vaults` | MemoryVault | pda, agent_pda, session_count, nonce_version |
+| `sap_sessions` | SessionLedger | pda, vault_pda, is_closed, entries_count |
+| `sap_tools` | ToolDescriptor | pda, agent_pda, tool_name, category, is_active |
+| `sap_attestations` | AgentAttestation | pda, agent_pda, attester, type, is_revoked |
+| `sap_ledgers` | MemoryLedger | pda, session_pda, num_pages, ring_head |
+| `sap_capability_indexes` | CapabilityIndex | pda, capability_hash, agent_count |
+| `sap_protocol_indexes` | ProtocolIndex | pda, protocol_hash, agent_count |
+| `sap_tool_categories` | ToolCategoryIndex | pda, category, tool_count |
+
+---
+
+### Hash Utilities
+
+```ts
+import { sha256, hashToArray } from '@oobe-protocol-labs/synapse-sap-sdk';
+
+// SHA-256 hash (for PDA seeds and schema IDs)
+const hash = sha256('jupiter:swap');       // Uint8Array (32 bytes)
+
+// Convert to number[] for Anchor instruction args
+const arr = hashToArray(hash);             // number[] (32 elements)
+
+// Common usage: tool name hashing
+const toolHash = hashToArray(sha256('getWeather'));
+await client.tools.publish({ toolNameHash: toolHash, ... });
+
+// Tip: Use publishByName() to auto-hash strings
+await client.tools.publishByName('getWeather', ...);  // handles hashing internally
+```
+
+---
+
+### Common Gotchas & Troubleshooting
+
+| Problem | Cause | Fix |
+|---------|-------|-----|
+| `6000 NameTooLong` | Agent name > 64 bytes | Shorten name, check UTF-8 byte length |
+| `6003 TooManyCapabilities` | > 10 capabilities | Remove less critical capabilities |
+| `6062 InsufficientEscrowBalance` | Settling more calls than funded | Check `escrow.balance` before settling |
+| `6076 EscrowExpired` | Escrow `expires_at` passed | Create new escrow with later expiry |
+| `6081 Unauthorized` | Wrong signer for instruction | Verify wallet matches expected authority |
+| `6096 EscrowNonceReused` | Same nonce for agent-depositor pair | Increment nonce for new escrows |
+| `6109 UnstakeCooldownNotMet` | Called `completeUnstake` too early | Wait for cooldown period to pass |
+| `AccountNotFound` | PDA doesn't exist on-chain | Check derivation params, ensure account was created |
+| `WS 400 on SPL ops` | Authenticated RPC rejects WS for tokens | Use `createDualConnection()` with public fallback |
+| `Transaction too large` | Too many accounts / data | Split into multiple TXs, use lookup tables |
+| `Blockhash expired` | TX took too long to land | Use priority fees, retry with fresh blockhash |
 
 ---
 
