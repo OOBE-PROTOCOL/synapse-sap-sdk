@@ -1326,6 +1326,7 @@ SapClient
 ├── .vault          → VaultModule          (init, sessions, inscribe, delegate, encrypt)
 ├── .escrow         → EscrowModule         (⚠️ DEPRECATED — use escrowV2)
 ├── .escrowV2       → EscrowV2Module       (create, deposit, settle, withdraw, close, disputes) [v0.7.0]
+├── .receipt        → ReceiptModule        (inscribeReceiptBatch, submitReceiptProof, autoResolveDispute) [v0.8.0]
 ├── .staking        → StakingModule        (initStake, deposit, requestUnstake, completeUnstake) [v0.7.0]
 ├── .subscription   → SubscriptionModule   (create, fund, cancel, close) [v0.7.0]
 ├── .attestation    → AttestationModule    (create, revoke)
@@ -1343,7 +1344,7 @@ SapClient
 | **Identity** | Agent registration, lifecycle, reputation metrics | `agent`, `feedback`, `attestation` |
 | **Memory** | Conversation storage — ring buffer (Ledger) or encrypted (Vault) | `ledger`, `vault`, `session` |
 | **Reputation** | On-chain feedback (0–1000 score → 0–10000 aggregate), attestations, trust signals | `feedback`, `attestation` |
-| **Commerce** | x402 micropayment escrow — SOL & SPL token, volume curves, V2 settlement security, disputes, staking, subscriptions | `escrow` (⚠️), `escrowV2`, `staking`, `subscription`, `x402` |
+| **Commerce** | x402 micropayment escrow — SOL & SPL token, volume curves, V2 settlement security, receipt-based disputes, staking, subscriptions | `escrow` (⚠️), `escrowV2`, `receipt`, `staking`, `subscription`, `x402` |
 | **Tools** | On-chain tool descriptors with schema hashing, versioning | `tools` |
 | **Discovery** | Capability/protocol indexes, agent profiles, network overview | `discovery`, `indexing` |
 
@@ -1362,7 +1363,7 @@ import {
   deriveEscrowV2,
   derivePendingSettlement,
   deriveDispute,
-  deriveReceiptBatch,   // v0.7 — receipt batch PDA
+  deriveReceiptBatch,   // v0.8.0 — receipt batch PDA
   deriveStake,
   deriveSubscription,
   deriveShard,
@@ -1885,7 +1886,7 @@ for (const { signature } of sigs) {
 > [client.md §16c — Consumer Analytics](./skills/client.md#16c-agent--tool-analytics-for-consumers-v062)
 >
 > **V2.1 Commerce details:** [merchant.md §11a — EscrowV2 CRUD](./skills/merchant.md#11a-escrowv2-complete-crud) |
-> [merchant.md §11b — Dispute Resolution](./skills/merchant.md#11b-dispute-resolution-flow) |
+> [merchant.md §11b — Dispute Resolution + Receipt Layer (v0.8.0)](./skills/merchant.md#11b-dispute-resolution-flow-v080) |
 > [merchant.md §11c — V1→V2 Migration](./skills/merchant.md#11c-v1v2-escrow-migration) |
 > [merchant.md §11d — Staking](./skills/merchant.md#11d-staking-complete-reference) |
 > [merchant.md §11e — Subscriptions](./skills/merchant.md#11e-subscriptions-complete-reference) |
@@ -2464,9 +2465,11 @@ All `fetch*` methods return deserialized account data. `fetchNullable` variants 
 | `fetch(agentPda, depositor?, nonce?)` | `PublicKey, PublicKey?, BN?` | `EscrowAccountV2Data` | Fetch V2 escrow |
 | `fetchNullable(...)` | same as fetch | `EscrowAccountV2Data \| null` | Fetch or null |
 | `fetchPendingSettlement(pda)` | `PublicKey` | `PendingSettlementData` | Fetch pending settlement |
+| `fetchPendingSettlementNullable(pda)` | `PublicKey` | `PendingSettlementData \| null` | Fetch or null |
 | `fetchDispute(pda)` | `PublicKey` | `DisputeRecordData` | Fetch dispute record |
+| `fetchDisputeNullable(pda)` | `PublicKey` | `DisputeRecordData \| null` | Fetch or null |
 
-#### ReceiptModule — `client.receipt` (v0.7.0)
+#### ReceiptModule — `client.receipt` (v0.8.0)
 
 | Method | Params | Returns | Description |
 |--------|--------|---------|-------------|
