@@ -19,6 +19,7 @@ export { ToolsModule } from "./tools";
 export { VaultModule } from "./vault";
 export { EscrowModule } from "./escrow";
 export { EscrowV2Module } from "./escrow-v2";
+export { ReceiptModule } from "./receipt";
 export { StakingModule } from "./staking";
 export { SubscriptionModule } from "./subscription";
 export { AttestationModule } from "./attestation";

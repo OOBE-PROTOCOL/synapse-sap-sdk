@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-04-18
+
+### Added — Trustless Receipt-Based Dispute Resolution
+
+Receipt layer for cryptographic dispute resolution: agents inscribe merkle roots
+of call receipt batches on-chain; during disputes, merkle proofs automatically
+determine proportional payouts — no arbiter needed.
+
+- **`ReceiptModule`** (`client.receipt`) — receipt batch inscriptions, merkle proof submissions, and automatic dispute resolution
+- **`deriveReceiptBatch()`** PDA deriver — seeds: `["sap_receipt", escrow_v2_pda, batch_index_u32_le]`
+- **`ReceiptBatchData`** account type — `merkleRoot`, `callCount`, `periodStart`, `periodEnd`, `inscribedAt`
+- **`DisputeType`** enum — `NonDelivery`, `PartialDelivery`, `Overcharge`, `Quality`
+- **`ResolutionLayer`** enum — `Pending`, `Auto`, `Governance`
+- **`DisputeOutcome.PartialRefund`** — proportional refund based on proven vs claimed calls
+- **`DisputeOutcome.Split`** — 50/50 split for irresolvable quality disputes
+- **`DisputeRecordData`** extended fields: `disputeType`, `resolutionLayer`, `disputeBond`, `provenCalls`, `claimedCalls`, `proofDeadline`
+- **`EscrowAccountV2Data.receiptBatchCount`** — tracks inscribed receipt batches per escrow
+- **`PendingSettlementData.receiptMerkleRoot`** — merkle root backing each settlement
+- **`EscrowV2Module.settleCalls()`** — new `receiptMerkleRoot` parameter (defaults to zero)
+- **`EscrowV2Module.openDispute()`** — new `disputeType` parameter
+- `SEEDS.RECEIPT` constant (`"sap_receipt"`)
+- IDL synced to latest on-chain program
+- Updated skills documentation (client, merchant, skills)
+
+### Deprecated
+
+- **`SettlementSecurity.SelfReport`** — returns `SelfReportDeprecated` error on-chain (abuse vector removed)
+- **`EscrowV2Module.resolveDispute()`** — throws; use `ReceiptModule.submitReceiptProof()` + `ReceiptModule.autoResolveDispute()` instead
+- **`DisputeRecordData.arbiter`** — arbiter role replaced by automatic receipt verification
+
 ## [0.7.0] - 2025-07-17
 
 ### Added — V2.1 Protocol: Escrow V2, Staking, Subscriptions

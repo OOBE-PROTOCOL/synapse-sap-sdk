@@ -221,7 +221,7 @@ export type ToolCategoryKind =
  * @name SettlementSecurity
  * @description Anchor-compatible enum variants for V2 escrow settlement security levels.
  *
- * - `SelfReport` — Agent settles unilaterally (v1 compatible).
+ * - `SelfReport` — **DEPRECATED in v0.7** — Agent settles unilaterally (abuse vector).
  * - `CoSigned` — Agent + client must co-sign every settlement.
  * - `DisputeWindow` — Settlement enters pending state, depositor can dispute.
  *
@@ -229,6 +229,7 @@ export type ToolCategoryKind =
  * @since v0.5.0
  */
 export const SettlementSecurity = {
+  /** @deprecated Removed in v0.7 — returns SelfReportDeprecated error */
   SelfReport: { selfReport: {} },
   CoSigned: { coSigned: {} },
   DisputeWindow: { disputeWindow: {} },
@@ -253,10 +254,63 @@ export const DisputeOutcome = {
   AutoReleased: { autoReleased: {} },
   DepositorWins: { depositorWins: {} },
   AgentWins: { agentWins: {} },
+  /** @since v0.7.0 — Proportional refund based on proven vs claimed calls */
+  PartialRefund: { partialRefund: {} },
+  /** @since v0.7.0 — 50/50 split for irresolvable quality disputes */
+  Split: { split: {} },
 } as const;
 
 export type DisputeOutcomeKind =
   (typeof DisputeOutcome)[keyof typeof DisputeOutcome];
+
+// ═══════════════════════════════════════════════════════════════════
+//  Dispute Type (v0.7)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @name DisputeType
+ * @description Categories of disputes that can be filed against a pending settlement.
+ *
+ * - `NonDelivery` — Agent took payment but delivered nothing.
+ * - `PartialDelivery` — Agent delivered fewer calls than claimed.
+ * - `Overcharge` — Agent charged more than the agreed price.
+ * - `Quality` — Agent delivered but output quality is disputed.
+ *
+ * @category Types
+ * @since v0.7.0
+ */
+export const DisputeType = {
+  NonDelivery: 0,
+  PartialDelivery: 1,
+  Overcharge: 2,
+  Quality: 3,
+} as const;
+
+export type DisputeTypeValue = (typeof DisputeType)[keyof typeof DisputeType];
+
+// ═══════════════════════════════════════════════════════════════════
+//  Resolution Layer (v0.7)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @name ResolutionLayer
+ * @description How a dispute was resolved.
+ *
+ * - `Pending` — Not yet resolved.
+ * - `Auto` — Resolved automatically via receipt merkle proofs.
+ * - `Governance` — Resolved via protocol governance (quality disputes).
+ *
+ * @category Types
+ * @since v0.7.0
+ */
+export const ResolutionLayer = {
+  Pending: { pending: {} },
+  Auto: { auto: {} },
+  Governance: { governance: {} },
+} as const;
+
+export type ResolutionLayerKind =
+  (typeof ResolutionLayer)[keyof typeof ResolutionLayer];
 
 // ═══════════════════════════════════════════════════════════════════
 //  Billing Interval (V2.1)

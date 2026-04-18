@@ -11,7 +11,7 @@
 
 import type { PublicKey } from "@solana/web3.js";
 import type BN from "bn.js";
-import type { ToolHttpMethodKind, ToolCategoryKind, SettlementSecurityKind, DisputeOutcomeKind, BillingIntervalKind } from "./enums";
+import type { ToolHttpMethodKind, ToolCategoryKind, SettlementSecurityKind, DisputeOutcomeKind, BillingIntervalKind, ResolutionLayerKind } from "./enums";
 import type { Capability, PricingTier, PluginRef, VolumeCurveBreakpoint } from "./common";
 
 // ═══════════════════════════════════════════════════════════════════
@@ -652,9 +652,12 @@ export interface EscrowAccountV2Data {
   readonly disputeWindowSlots: BN;
   readonly settlementIndex: BN;
   readonly coSigner: PublicKey | null;
+  /** @deprecated Since v0.7.0 — arbiter role replaced by automatic receipt verification */
   readonly arbiter: PublicKey | null;
   readonly pendingAmount: BN;
   readonly pendingCalls: BN;
+  /** @since v0.7.0 — Number of receipt batches inscribed against this escrow */
+  readonly receiptBatchCount: number;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -682,6 +685,8 @@ export interface PendingSettlementData {
   readonly isFinalized: boolean;
   readonly isDisputed: boolean;
   readonly outcome: DisputeOutcomeKind;
+  /** @since v0.7.0 — Merkle root of receipts backing this settlement */
+  readonly receiptMerkleRoot: number[]; // [u8; 32]
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -690,7 +695,7 @@ export interface PendingSettlementData {
 
 /**
  * @interface DisputeRecordData
- * @description On-chain dispute with arbiter resolution.
+ * @description On-chain dispute with automatic receipt-based resolution (v0.7).
  * @category Types
  * @since v0.5.0
  */
@@ -702,12 +707,56 @@ export interface DisputeRecordData {
   readonly agent: PublicKey;
   readonly evidenceHash: number[]; // [u8; 32]
   readonly agentEvidenceHash: number[]; // [u8; 32]
+  /** @deprecated Since v0.7.0 — arbiter role replaced by automatic resolution */
   readonly arbiter: PublicKey;
   readonly outcome: DisputeOutcomeKind;
   readonly createdAt: BN;
   readonly resolvedAt: BN;
   readonly resolutionHash: number[]; // [u8; 32]
   readonly slashAmount: BN;
+  /** @since v0.7.0 — Category of dispute (NonDelivery=0, PartialDelivery=1, Overcharge=2, Quality=3) */
+  readonly disputeType: number;
+  /** @since v0.7.0 — How the dispute was resolved (Pending/Auto/Governance) */
+  readonly resolutionLayer: ResolutionLayerKind;
+  /** @since v0.7.0 — Bond deposited by the disputer (lamports) */
+  readonly disputeBond: BN;
+  /** @since v0.7.0 — Number of calls the agent proved via merkle proofs */
+  readonly provenCalls: BN;
+  /** @since v0.7.0 — Number of calls the agent originally claimed */
+  readonly claimedCalls: BN;
+  /** @since v0.7.0 — Unix timestamp by which agent must submit proof */
+  readonly proofDeadline: BN;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Receipt Batch (v0.7)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @interface ReceiptBatchData
+ * @description Merkle root of a batch of call receipts inscribed by an agent.
+ *
+ * Seeds: `["sap_receipt", escrow_v2_pda, batch_index_u32_le]`
+ *
+ * @category Types
+ * @since v0.7.0
+ */
+export interface ReceiptBatchData {
+  readonly bump: number;
+  /** Parent escrow V2 PDA */
+  readonly escrow: PublicKey;
+  /** Zero-based batch index */
+  readonly batchIndex: number;
+  /** Merkle root of the receipt batch */
+  readonly merkleRoot: number[]; // [u8; 32]
+  /** Number of calls in the batch */
+  readonly callCount: BN;
+  /** Unix timestamp for the start of the period covered */
+  readonly periodStart: BN;
+  /** Unix timestamp for the end of the period covered */
+  readonly periodEnd: BN;
+  /** Unix timestamp when the batch was inscribed */
+  readonly inscribedAt: BN;
 }
 
 // ═══════════════════════════════════════════════════════════════════
