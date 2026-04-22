@@ -373,6 +373,7 @@ export {
   X402Registry,
   SessionManager,
   AgentBuilder,
+  MetaplexBridge,
 } from "./registries/index";
 export type {
   DiscoveredAgent,
@@ -398,4 +399,10 @@ export type {
   ToolInput,
   RegisterResult,
   RegisterWithToolsResult,
+  UnifiedProfile,
+  MplAgentSnapshot,
+  Eip8004Registration,
+  Eip8004Service,
+  AttachAgentIdentityOpts,
+  UpdateAgentIdentityUriOpts,
 } from "./registries/index";

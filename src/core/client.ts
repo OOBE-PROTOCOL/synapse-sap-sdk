@@ -45,6 +45,7 @@ import { DiscoveryRegistry } from "../registries/discovery";
 import { X402Registry } from "../registries/x402";
 import { SessionManager } from "../registries/session";
 import { AgentBuilder } from "../registries/builder";
+import { MetaplexBridge } from "../registries/metaplex-bridge";
 
 // IDL is embedded inside the SDK — no external workspace dependency
 import idl from "../idl/synapse_agent_sap.json";
@@ -132,6 +133,7 @@ export class SapClient {
   #discovery?: DiscoveryRegistry;
   #x402?: X402Registry;
   #session?: SessionManager;
+  #metaplex?: MetaplexBridge;
 
   private constructor(program: SapProgram) {
     this.program = program;
@@ -496,5 +498,35 @@ export class SapClient {
    */
   get builder(): AgentBuilder {
     return new AgentBuilder(this.program);
+  }
+
+  /**
+   * @name metaplex
+   * @description Bridge between SAP and the Metaplex Agent Kit
+   * (MPL Core Asset + AgentIdentity plugin). Read-side merges SAP
+   * `AgentAccount` with MPL Core asset metadata; write-side composes
+   * atomic dual-protocol delegation instructions.
+   *
+   * Requires the optional peer dependencies
+   * `@metaplex-foundation/mpl-core` and
+   * `@metaplex-foundation/umi-bundle-defaults`. They are imported lazily
+   * the first time a method that needs them is called, so consumers that
+   * do not use the bridge incur zero overhead.
+   *
+   * @returns {MetaplexBridge} The lazily-instantiated `MetaplexBridge` singleton.
+   * @category Registries
+   * @since v0.9.0
+   * @see {@link MetaplexBridge}
+   *
+   * @example
+   * ```ts
+   * const profile = await client.metaplex.getUnifiedProfile({
+   *   wallet: agentWallet,
+   *   rpcUrl: "https://api.mainnet-beta.solana.com",
+   * });
+   * ```
+   */
+  get metaplex(): MetaplexBridge {
+    return (this.#metaplex ??= new MetaplexBridge(this.program));
   }
 }

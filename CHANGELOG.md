@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-04-22
+
+### Added — Metaplex Core Bridge (`AgentIdentity` + EIP-8004)
+
+Single-transaction bridge between SAP agents and Metaplex Core assets.
+Built on the **real** `mpl-core` 1.9.0 surface ([PR #258](https://github.com/metaplex-foundation/mpl-core/pull/258)) — the
+`AgentIdentity` external plugin adapter (one URI field) plus an EIP-8004
+agent-registration JSON served live by the SAP indexer. After the initial
+attach, every SAP write propagates to MPL consumers without a second
+transaction.
+
+- **`MetaplexBridge`** (`client.metaplex`) — new lazy registry singleton
+- **`buildAttachAgentIdentityIx(opts)`** — single MPL ix wrapping `addExternalPluginAdapterV1` with `AgentIdentity` + `[Execute, CanApprove]` lifecycle check
+- **`buildUpdateAgentIdentityUriIx(opts)`** — wraps `updateExternalPluginAdapterV1` for registry-host migration
+- **`buildEip8004Registration({ sapAgentOwner, services?, extra? })`** — server-side EIP-8004 JSON builder rendered from on-chain SAP state
+- **`deriveRegistrationUrl(sapAgentPda, baseUrl)`** — pure helper for the canonical `<base>/agents/<pda>/eip-8004.json` URL
+- **`getUnifiedProfile({ wallet?, asset?, rpcUrl })`** — merged read (SAP `AgentAccount` + MPL Core asset + EIP-8004 JSON)
+- **`verifyLink({ asset, sapAgentPda, rpcUrl })`** — bidirectional cryptographic link check
+- New types: `Eip8004Registration`, `Eip8004Service`, `AttachAgentIdentityOpts`, `UpdateAgentIdentityUriOpts`, `MplAgentSnapshot`, `UnifiedProfile`
+- Optional peer deps: `@metaplex-foundation/mpl-core` `>=1.9.0`, `@metaplex-foundation/umi-bundle-defaults` `>=0.9.0` (lazy-loaded; consumers that don't use the bridge incur zero overhead)
+- New skill guide: `skills/metaplex-bridge.md`
+- New doc: `docs/11-metaplex-bridge.md`
+- Updated `skills/skills.md` and `skills/merchant.md` to reference the bridge
+
+### Notes
+
+- **Zero on-chain SAP changes.** The 8 mainnet agents continue to work
+  unmodified; linking is expressed entirely via the MPL plugin URI plus the
+  host-served JSON.
+- **Efficiency:** every recurring operation drops from 2 tx (naive
+  dual-on-chain design) to 1 tx.
+
 ## [0.8.0] - 2026-04-18
 
 ### Added — Trustless Receipt-Based Dispute Resolution

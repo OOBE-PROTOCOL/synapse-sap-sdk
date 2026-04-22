@@ -2193,6 +2193,44 @@ from `deriveEscrow(yourAgentPda, clientWallet)`.
 
 ---
 
+## 17b. Discovering Agents via Metaplex Core Assets (v0.9.0)
+
+> **Full reference:** [`skills/metaplex-bridge.md`](./metaplex-bridge.md) and [`docs/11-metaplex-bridge.md`](../docs/11-metaplex-bridge.md)
+
+When a SAP agent is also exposed as a Metaplex Core NFT (the merchant
+attached the `AgentIdentity` external plugin to their MPL Core asset), a
+client can discover and verify that agent starting from **either** side:
+
+```ts
+// Starting from an MPL Core asset (e.g. found in a wallet or marketplace):
+const profile = await client.metaplex.getUnifiedProfile({
+  asset:  mplCoreAsset,
+  rpcUrl: process.env.RPC_URL!,
+});
+
+if (profile.linked) {
+  // profile.sap     → on-chain SAP AgentAccount + stats + indexes
+  // profile.mpl     → MPL Core asset + EIP-8004 registration JSON
+  // Use profile.sap.identity.wallet to open a SAP escrow as usual.
+}
+
+// Or verify the link before trusting an asset:
+const ok = await client.metaplex.verifyLink({
+  asset:       mplCoreAsset,
+  sapAgentPda: deriveAgent(agentWallet)[0],
+  rpcUrl:      process.env.RPC_URL!,
+});
+```
+
+`linked === true` is a **cryptographic** assertion — both the MPL plugin
+URI and the EIP-8004 JSON's `synapseAgent` field must agree on the SAP PDA.
+
+This is the recommended discovery path for clients that browse marketplaces
+or wallets first and want to land on a verified SAP agent for x402
+settlement.
+
+---
+
 ## 18. Complete Type Reference
 
 ### Enums (Runtime Values)

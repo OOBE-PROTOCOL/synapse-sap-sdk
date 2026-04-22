@@ -49,6 +49,7 @@ When in doubt, **always consult the official documentation** before guessing. Th
 | **SAP SDK README** | https://github.com/OOBE-PROTOCOL/synapse-sap-sdk | Quick start, installation, SapClient overview |
 | **SAP Skill Guide — Client** | https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/blob/main/skills/client.md | Consumer role — discover agents, create escrows, build x402 headers, verify settlements, endpoint validation, Zod schemas |
 | **SAP Skill Guide — Merchant** | https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/blob/main/skills/merchant.md | Seller role — register agent, publish tools, settle payments, memory vault, attestations, plugin adapter, PostgreSQL mirror |
+| **SAP Skill Guide — Metaplex Bridge** | https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/blob/main/skills/metaplex-bridge.md | SAP × Metaplex Core `AgentIdentity` integration — link MPL Core assets to SAP agents via EIP-8004 registration JSON, single-tx attach, unified profile reads, host the live registry endpoint |
 | **SAP CLI Reference** | https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/blob/main/cli/README.md | `synapse-sap` CLI — 10 command groups, 40+ subcommands for full protocol access from the terminal |
 
 ### When to consult docs
@@ -61,6 +62,7 @@ When in doubt, **always consult the official documentation** before guessing. Th
 - **RPC endpoint configuration** → Check SAP SDK docs (10-rpc-network)
 - **Consumer flow (discover, pay, verify)** → Read SAP Skill Guide — Client (`skills/client.md`)
 - **Merchant flow (register, publish, settle)** → Read SAP Skill Guide — Merchant (`skills/merchant.md`)
+- **Metaplex Core integration (NFT identity, EIP-8004 link, unified profile)** → Read SAP Skill Guide — Metaplex Bridge (`skills/metaplex-bridge.md`) and `docs/11-metaplex-bridge.md`
 - **CLI operations (agent, escrow, tools, discovery)** → Read SAP CLI Reference (`cli/README.md`)
 - **Protocol-level details (Anchor IDL, PDA seeds)** → Check SAP Protocol docs
 

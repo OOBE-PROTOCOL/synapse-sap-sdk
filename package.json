@@ -1,6 +1,6 @@
 {
   "name": "@oobe-protocol-labs/synapse-sap-sdk",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "TypeScript SDK for the Synapse Agent Protocol (SAP v2) on Solana Mainnet/Devnet",
   "license": "MIT",
   "main": "dist/cjs/index.js",
@@ -97,6 +97,11 @@
       "require": "./dist/cjs/registries/builder.js",
       "types": "./dist/types/registries/builder.d.ts"
     },
+    "./registries/metaplex-bridge": {
+      "import": "./dist/esm/registries/metaplex-bridge.js",
+      "require": "./dist/cjs/registries/metaplex-bridge.js",
+      "types": "./dist/types/registries/metaplex-bridge.d.ts"
+    },
     "./idl": {
       "import": "./dist/esm/idl/index.js",
       "require": "./dist/cjs/idl/index.js",
@@ -168,7 +173,9 @@
     "@solana/web3.js": ">=1.90.0",
     "@triton-one/yellowstone-grpc": ">=1.0.0",
     "zod": ">=3.20.0",
-    "pg": ">=8.0.0"
+    "pg": ">=8.0.0",
+    "@metaplex-foundation/mpl-core": ">=1.9.0",
+    "@metaplex-foundation/umi-bundle-defaults": ">=0.9.0"
   },
   "peerDependenciesMeta": {
     "zod": {
@@ -178,6 +185,12 @@
       "optional": true
     },
     "@triton-one/yellowstone-grpc": {
+      "optional": true
+    },
+    "@metaplex-foundation/mpl-core": {
+      "optional": true
+    },
+    "@metaplex-foundation/umi-bundle-defaults": {
       "optional": true
     }
   },
