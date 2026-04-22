@@ -52,7 +52,7 @@ const ix = await client.metaplex.buildAttachAgentIdentityIx({
   asset:               mplCoreAsset,
   authority:           wallet.publicKey,
   sapAgentOwner:       wallet.publicKey,
-  registrationBaseUrl: "https://api.synapse.xyz",
+  registrationBaseUrl: "https://explorer.oobeprotocol.ai",
   rpcUrl:              process.env.RPC_URL!,
 });
 
