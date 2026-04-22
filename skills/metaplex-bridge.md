@@ -212,7 +212,7 @@ This means the URI's authority can approve `Execute` operations on the asset —
 
 ---
 
-## 11. Future on-chain link (Phase 3, optional)
+## 11. Future on-chain link (#0001 - MPL- PROPOSAL) 
 
 If we later add an on-chain `mpl_asset: Pubkey` field to `AgentAccount` for cryptographic dual-link:
 
