@@ -16,7 +16,7 @@ MPL Core's `AgentIdentity` is an **asset-only external plugin adapter** with **o
 Therefore the most efficient SAP × MPL bridge is:
 
 ```
-SAP indexer  ──serves──▶  https://api.synapse.xyz/agents/<sapAgentPda>/eip-8004.json
+SAP indexer  ──serves──▶  https://explorer.oobeprotocol.ai/agents/<sapAgentPda>/eip-8004.json
                                      ▲
                                      │ AgentIdentity.uri
                                      │
@@ -60,7 +60,7 @@ await provider.sendAndConfirm(new Transaction().add(ix));
 ```
 
 What happens on chain:
-1. `mpl_core` adds an `AgentIdentity` adapter to the asset with `uri = https://api.synapse.xyz/agents/<sapAgentPda>/eip-8004.json` and lifecycle check `[Execute, CanApprove]`.
+1. `mpl_core` adds an `AgentIdentity` adapter to the asset with `uri = https://explorer.oobeprotocol.ai/agents/<sapAgentPda>/eip-8004.json` and lifecycle check `[Execute, CanApprove]`.
 2. SAP state is **untouched** — no SAP transaction, no SAP fee.
 
 What happens off chain afterwards:
@@ -119,7 +119,7 @@ export async function GET(
       {
         id:    "x402-default",
         type:  "x402-endpoint",
-        url:   `https://api.synapse.xyz/agents/${params.wallet}/x402`,
+        url:   `https://explorer.oobeprotocol.ai/agents/${params.wallet}/x402`,
       },
     ],
   });
