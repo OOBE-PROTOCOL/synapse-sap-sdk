@@ -76,3 +76,13 @@ export type {
   RegisterResult,
   RegisterWithToolsResult,
 } from "./builder";
+
+export { MetaplexBridge } from "./metaplex-bridge";
+export type {
+  UnifiedProfile,
+  MplAgentSnapshot,
+  Eip8004Registration,
+  Eip8004Service,
+  AttachAgentIdentityOpts,
+  UpdateAgentIdentityUriOpts,
+} from "./metaplex-bridge";

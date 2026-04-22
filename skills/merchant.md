@@ -95,6 +95,7 @@ synapse-sap config set rpcUrl "https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=
 20. [Plugin Adapter (52 Tools)](#20-plugin-adapter-52-tools)
 21. [PostgreSQL Mirror](#21-postgresql-mirror)
 22. [Dual-Role: Merchant + Client](#22-dual-role-merchant--client)
+22b. [Metaplex Core Bridge — NFT Identity for SAP Agents (v0.9.0)](#22b-metaplex-core-bridge--nft-identity-for-sap-agents-v090)
 23. [Complete Type Reference](#23-complete-type-reference)
 24. [Lifecycle Checklist](#24-lifecycle-checklist)
 
@@ -3918,6 +3919,80 @@ const headers = client.x402.buildPaymentHeaders(ctx);
 The PDA system ensures no collision: your EscrowAccount as a depositor
 (`deriveEscrow(otherAgent, yourWallet)`) is separate from escrows where
 you are the agent (`deriveEscrow(yourAgent, clientWallet)`).
+
+---
+
+## 22b. Metaplex Core Bridge — NFT Identity for SAP Agents (v0.9.0)
+
+> **Full reference:** [`skills/metaplex-bridge.md`](./metaplex-bridge.md) and [`docs/11-metaplex-bridge.md`](../docs/11-metaplex-bridge.md)
+
+A merchant who already owns an MPL Core Asset (any Metaplex Core NFT) can
+**link it to their SAP agent in a single transaction** so that the asset
+becomes a transferable, marketplace-tradeable identity for the on-chain
+agent. The bridge uses Metaplex's `AgentIdentity` external plugin (mpl-core
+≥ 1.9.0, [PR #258](https://github.com/metaplex-foundation/mpl-core/pull/258))
+which stores a single `uri` pointing to an EIP-8004 registration JSON.
+
+### How it works
+
+```
+MPL Core Asset.AgentIdentity.uri  ──▶  https://api.synapse.xyz/agents/<sapAgentPda>/eip-8004.json
+                                                      │
+                                                      ▼
+                                       Live JSON rendered from on-chain SAP state
+```
+
+- **One MPL transaction** attaches the plugin. SAP state is unchanged.
+- After that, **every SAP write** (`addCapability`, `addDelegate`, x402
+  tier change, etc.) propagates automatically — no second transaction.
+- Reads merge SAP `AgentAccount` + MPL Core asset + EIP-8004 JSON in one
+  call.
+
+### Merchant flow
+
+```ts
+// 1. (Once) Link the asset to your SAP agent
+const ix = await client.metaplex.buildAttachAgentIdentityIx({
+  asset:               myMplCoreAsset,
+  authority:           wallet.publicKey,
+  sapAgentOwner:       wallet.publicKey,
+  registrationBaseUrl: "https://api.synapse.xyz",
+  rpcUrl:              process.env.RPC_URL!,
+});
+await provider.sendAndConfirm(new Transaction().add(ix));
+
+// 2. (Forever after) Just keep using SAP normally:
+await client.vault.addDelegate(hotWallet, 0b111, expiresAt);
+//    ↑ this single SAP tx is also reflected in the EIP-8004 JSON
+//      that the MPL asset's AgentIdentity.uri points at.
+
+// 3. Confirm the link is healthy
+const ok = await client.metaplex.verifyLink({
+  asset:       myMplCoreAsset,
+  sapAgentPda: deriveAgent(wallet.publicKey)[0],
+  rpcUrl:      process.env.RPC_URL!,
+});
+```
+
+### Why merchants care
+
+- Sell the entire agent (reputation + memory keys + revenue stream) by
+  selling the NFT.
+- Existing wallets / marketplaces already render the MPL Core asset.
+- No re-registration on the buyer's side — just transfer the NFT and
+  optionally call `buildUpdateAgentIdentityUriIx` if migrating registry
+  hosts.
+- Zero on-chain changes to the SAP program required (the 8 mainnet agents
+  keep working).
+
+### Required peer deps (optional)
+
+```bash
+npm i @metaplex-foundation/mpl-core @metaplex-foundation/umi-bundle-defaults
+```
+
+These are **optional** peer dependencies — only consumers that actually
+call `client.metaplex.*` need them.
 
 ---
 
