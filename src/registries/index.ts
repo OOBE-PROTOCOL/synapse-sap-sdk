@@ -80,6 +80,7 @@ export type {
 export { MetaplexBridge } from "./metaplex-bridge";
 export type {
   UnifiedProfile,
+  AgentIdentifierResolution,
   MplAgentSnapshot,
   Eip8004Registration,
   Eip8004Service,
