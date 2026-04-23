@@ -41,12 +41,39 @@ import {
   PublicKey,
   type TransactionInstruction,
 } from "@solana/web3.js";
-import type { Program } from "@coral-xyz/anchor";
-import { deriveAgent, deriveAgentStats } from "../pda";
-import type { AgentAccountData, AgentStatsData } from "../types";
+import type {
+  AssetV1,
+  HookableLifecycleEvent as HookableLifecycleEventEnum,
+} from "@metaplex-foundation/mpl-core";
+import type {
+  Instruction as UmiInstruction,
+  PublicKey as UmiPublicKey,
+  Signer as UmiSigner,
+  TransactionBuilder,
+  Umi,
+} from "@metaplex-foundation/umi";
+import type { SapProgram } from "../modules/base";
+import { deriveAgent, deriveAgentStats, deriveVault } from "../pda";
+import type {
+  AgentAccountData,
+  AgentStatsData,
+  Capability,
+  VaultDelegateData,
+} from "../types";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type SapProgram = Program<any>;
+// ═══════════════════════════════════════════════════════════════════
+//  Typed peer-dep handles (lazy-loaded)
+// ═══════════════════════════════════════════════════════════════════
+
+type MplCoreModule = typeof import("@metaplex-foundation/mpl-core");
+type UmiBundleModule = typeof import("@metaplex-foundation/umi-bundle-defaults");
+type UmiModule = typeof import("@metaplex-foundation/umi");
+
+interface MplCoreRuntime {
+  readonly mplCore: MplCoreModule;
+  readonly umiBundle: UmiBundleModule;
+  readonly umiCore: UmiModule;
+}
 
 // ═══════════════════════════════════════════════════════════════════
 //  Public Types
@@ -157,37 +184,44 @@ const PEER_DEP_INSTALL_HINT =
   "@metaplex-foundation/umi-bundle-defaults. " +
   "Install: npm i @metaplex-foundation/mpl-core @metaplex-foundation/umi-bundle-defaults";
 
-interface MplCoreRuntime {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly mplCore: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly umi: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly publicKey: (s: string) => any;
-}
-
 let cachedRuntime: MplCoreRuntime | null = null;
 
 async function loadMplCore(): Promise<MplCoreRuntime> {
   if (cachedRuntime) return cachedRuntime;
   try {
     const [mplCore, umiBundle, umiCore] = await Promise.all([
-      import("@metaplex-foundation/mpl-core" as string),
-      import("@metaplex-foundation/umi-bundle-defaults" as string),
-      import("@metaplex-foundation/umi" as string),
+      import("@metaplex-foundation/mpl-core"),
+      import("@metaplex-foundation/umi-bundle-defaults"),
+      import("@metaplex-foundation/umi"),
     ]);
-    cachedRuntime = {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      mplCore: mplCore as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      umi: umiBundle as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      publicKey: (umiCore as any).publicKey,
-    };
+    cachedRuntime = { mplCore, umiBundle, umiCore };
     return cachedRuntime;
   } catch (cause) {
     throw new Error(PEER_DEP_INSTALL_HINT, { cause: cause as Error });
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Typed SAP account namespace (Anchor IDL is generic; this struct
+//  pins the only three accessors this module needs.)
+// ═══════════════════════════════════════════════════════════════════
+
+interface AnchorAccountFetcher<T> {
+  fetch(address: PublicKey): Promise<T>;
+}
+
+interface AnchorAccountList<T> {
+  all(
+    filters?: ReadonlyArray<{
+      memcmp: { offset: number; bytes: string };
+    }>,
+  ): Promise<{ publicKey: PublicKey; account: T }[]>;
+}
+
+interface SapAccountNamespace {
+  agentAccount: AnchorAccountFetcher<AgentAccountData>;
+  agentStats: AnchorAccountFetcher<AgentStatsData>;
+  vaultDelegate: AnchorAccountList<VaultDelegateData>;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -297,17 +331,32 @@ export class MetaplexBridge {
   async buildUpdateAgentIdentityUriIx(
     opts: UpdateAgentIdentityUriOpts,
   ): Promise<TransactionInstruction> {
-    const { mplCore, umi: umiBundle, publicKey: pk } = await loadMplCore();
-    const umi = umiBundle.createUmi(opts.rpcUrl).use(mplCore.mplCore());
-    const builder = mplCore.updateExternalPluginAdapterV1(umi, {
-      asset: pk(opts.asset.toBase58()),
-      authority: this.umiSigner(pk(opts.authority.toBase58())),
-      payer: this.umiSigner(
-        pk((opts.payer ?? opts.authority).toBase58()),
-      ),
-      key: { __kind: "AgentIdentity" },
-      updateInfo: { __kind: "AgentIdentity", uri: opts.newUri },
-    });
+    const { mplCore, umiBundle, umiCore } = await loadMplCore();
+    const umi: Umi = umiBundle.createUmi(opts.rpcUrl).use(mplCore.mplCore());
+    const authority: UmiSigner = umiCore.createNoopSigner(
+      umiCore.publicKey(opts.authority.toBase58()),
+    );
+    const payer: UmiSigner = umiCore.createNoopSigner(
+      umiCore.publicKey((opts.payer ?? opts.authority).toBase58()),
+    );
+    const builder: TransactionBuilder = mplCore.updateExternalPluginAdapterV1(
+      umi,
+      {
+        asset: umiCore.publicKey(opts.asset.toBase58()),
+        authority,
+        payer,
+        key: { __kind: "AgentIdentity" },
+        updateInfo: {
+          __kind: "AgentIdentity",
+          fields: [
+            {
+              uri: opts.newUri,
+              lifecycleChecks: null,
+            },
+          ],
+        },
+      },
+    );
     return this.firstWeb3Ix(builder, "updateExternalPluginAdapterV1");
   }
 
@@ -390,14 +439,15 @@ export class MetaplexBridge {
   //  Private — SAP fetching
   // ═════════════════════════════════════════════════════
 
+  private get accounts(): SapAccountNamespace {
+    return this.program.account as unknown as SapAccountNamespace;
+  }
+
   private async fetchAgentNullable(
     pda: PublicKey,
   ): Promise<AgentAccountData | null> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (await (this.program.account as any).agentAccount.fetch(
-        pda,
-      )) as AgentAccountData;
+      return await this.accounts.agentAccount.fetch(pda);
     } catch {
       return null;
     }
@@ -408,10 +458,7 @@ export class MetaplexBridge {
   ): Promise<AgentStatsData | null> {
     try {
       const [statsPda] = deriveAgentStats(agentPda);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (await (this.program.account as any).agentStats.fetch(
-        statsPda,
-      )) as AgentStatsData;
+      return await this.accounts.agentStats.fetch(statsPda);
     } catch {
       return null;
     }
@@ -421,29 +468,20 @@ export class MetaplexBridge {
     agentPda: PublicKey,
   ): Promise<{ wallet: string; expiresAt: string | null }[]> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const all = await (this.program.account as any).vaultDelegate.all([
-        { memcmp: { offset: 8, bytes: agentPda.toBase58() } },
+      const [vaultPda] = deriveVault(agentPda);
+      // VaultDelegate layout: [discriminator(8) | bump(1) | vault(32) | ...]
+      const all = await this.accounts.vaultDelegate.all([
+        { memcmp: { offset: 8 + 1, bytes: vaultPda.toBase58() } },
       ]);
       const now = Math.floor(Date.now() / 1000);
       return all
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((entry: any) => {
-          const account = entry.account ?? entry;
-          const expires = account.expiresAt?.toString?.() ?? null;
-          const wallet =
-            account.delegateWallet?.toBase58?.() ??
-            account.wallet?.toBase58?.() ??
-            null;
-          return { wallet, expiresAt: expires };
+        .map(({ account }) => {
+          const expiresRaw = account.expiresAt.toString();
+          const expiresAt: string | null =
+            expiresRaw === "0" ? null : expiresRaw;
+          return { wallet: account.delegate.toBase58(), expiresAt };
         })
-        .filter(
-          (d: { wallet: string | null; expiresAt: string | null }) =>
-            d.wallet !== null &&
-            (d.expiresAt === null ||
-              d.expiresAt === "0" ||
-              Number(d.expiresAt) > now),
-        ) as { wallet: string; expiresAt: string | null }[];
+        .filter((d) => d.expiresAt === null || Number(d.expiresAt) > now);
     } catch {
       return [];
     }
@@ -457,12 +495,14 @@ export class MetaplexBridge {
     asset: PublicKey,
     rpcUrl: string,
   ): Promise<MplAgentSnapshot | null> {
-    const { mplCore, umi: umiBundle, publicKey: pk } = await loadMplCore();
-    const umi = umiBundle.createUmi(rpcUrl).use(mplCore.mplCore());
+    const { mplCore, umiBundle, umiCore } = await loadMplCore();
+    const umi: Umi = umiBundle.createUmi(rpcUrl).use(mplCore.mplCore());
     try {
-      const fetched = await mplCore.fetchAsset(umi, pk(asset.toBase58()));
-      const ownerStr: string = fetched.owner?.toString?.() ?? "";
-      const owner = ownerStr ? new PublicKey(ownerStr) : asset;
+      const fetched: AssetV1 = await mplCore.fetchAsset(
+        umi,
+        umiCore.publicKey(asset.toBase58()),
+      );
+      const owner = new PublicKey(fetched.owner.toString());
       const uri = this.extractAgentIdentityUri(fetched);
       const registration = uri ? await this.fetchEip8004Safe(uri) : null;
       return {
@@ -477,24 +517,12 @@ export class MetaplexBridge {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private extractAgentIdentityUri(asset: any): string | null {
-    const direct = asset?.agentIdentity?.uri;
-    if (typeof direct === "string") return direct;
-    const adapters: unknown =
-      asset?.externalPluginAdapters ?? asset?.externalPlugins;
-    if (Array.isArray(adapters)) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const found = (adapters as any[]).find(
-        (a) =>
-          a?.type === "AgentIdentity" ||
-          a?.__kind === "AgentIdentity" ||
-          a?.key?.__kind === "AgentIdentity",
-      );
-      const uri = found?.uri ?? found?.data?.uri;
-      if (typeof uri === "string") return uri;
-    }
-    return null;
+  private extractAgentIdentityUri(asset: AssetV1): string | null {
+    const adapters = asset.agentIdentities;
+    if (!adapters || adapters.length === 0) return null;
+    const first = adapters[0];
+    if (!first) return null;
+    return typeof first.uri === "string" ? first.uri : null;
   }
 
   private async fetchEip8004Safe(
@@ -538,65 +566,53 @@ export class MetaplexBridge {
     uri: string;
     rpcUrl: string;
   }): Promise<TransactionInstruction> {
-    const { mplCore, umi: umiBundle, publicKey: pk } = await loadMplCore();
-    const umi = umiBundle.createUmi(args.rpcUrl).use(mplCore.mplCore());
-    const HookableLifecycleEvent =
-      mplCore.HookableLifecycleEvent ?? { Execute: 5 };
-    const ExternalCheckResult =
-      mplCore.ExternalCheckResult ?? { CanApprove: 1 };
-    const builder = mplCore.addExternalPluginAdapterV1(umi, {
-      asset: pk(args.asset.toBase58()),
-      authority: this.umiSigner(pk(args.authority.toBase58())),
-      payer: this.umiSigner(pk(args.payer.toBase58())),
+    const { mplCore, umiBundle, umiCore } = await loadMplCore();
+    const umi: Umi = umiBundle.createUmi(args.rpcUrl).use(mplCore.mplCore());
+    const authority: UmiSigner = umiCore.createNoopSigner(
+      umiCore.publicKey(args.authority.toBase58()),
+    );
+    const payer: UmiSigner = umiCore.createNoopSigner(
+      umiCore.publicKey(args.payer.toBase58()),
+    );
+    // HookableLifecycleEvent.Execute = 4; ExternalCheckResult { flags: 1 } = CanApprove
+    const ExecuteEvent = mplCore.HookableLifecycleEvent.Execute as HookableLifecycleEventEnum;
+    const builder: TransactionBuilder = mplCore.addExternalPluginAdapterV1(umi, {
+      asset: umiCore.publicKey(args.asset.toBase58()),
+      authority,
+      payer,
       initInfo: {
         __kind: "AgentIdentity",
-        uri: args.uri,
-        initPluginAuthority: { __kind: "UpdateAuthority" },
-        lifecycleChecks: [
-          [HookableLifecycleEvent.Execute, ExternalCheckResult.CanApprove],
+        fields: [
+          {
+            uri: args.uri,
+            initPluginAuthority: { __kind: "UpdateAuthority" },
+            lifecycleChecks: [[ExecuteEvent, { flags: 1 }]],
+          },
         ],
       },
     });
     return this.firstWeb3Ix(builder, "addExternalPluginAdapterV1");
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private umiSigner(publicKey: any): any {
-    return {
-      publicKey,
-      signMessage: () => Promise.resolve(new Uint8Array()),
-      signTransaction: <T,>(tx: T) => Promise.resolve(tx),
-      signAllTransactions: <T,>(txs: T[]) => Promise.resolve(txs),
-    };
-  }
-
   private async firstWeb3Ix(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    builder: any,
+    builder: TransactionBuilder,
     name: string,
   ): Promise<TransactionInstruction> {
-    if (!builder?.getInstructions) {
-      throw new Error(
-        `MetaplexBridge: ${name} did not return a TransactionBuilder. ` +
-          `Upgrade @metaplex-foundation/mpl-core to >=1.9.0.`,
-      );
-    }
-    const ixs = await builder.getInstructions();
-    if (!Array.isArray(ixs) || ixs.length === 0) {
+    const items = builder.getInstructions();
+    const first = items[0];
+    if (!first) {
       throw new Error(`MetaplexBridge: ${name} produced no instructions`);
     }
-    return this.umiIxToWeb3(ixs[0]);
+    return this.umiIxToWeb3(first);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private umiIxToWeb3(ix: any): TransactionInstruction {
+  private umiIxToWeb3(ix: UmiInstruction): TransactionInstruction {
     return {
       programId: new PublicKey(ix.programId.toString()),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      keys: ix.keys.map((k: any) => ({
-        pubkey: new PublicKey(k.pubkey.toString()),
-        isSigner: !!k.isSigner,
-        isWritable: !!k.isWritable,
+      keys: ix.keys.map((k) => ({
+        pubkey: new PublicKey((k.pubkey as UmiPublicKey).toString()),
+        isSigner: k.isSigner,
+        isWritable: k.isWritable,
       })),
       data: Buffer.from(ix.data),
     };
@@ -606,6 +622,7 @@ export class MetaplexBridge {
   //  Private — link detection + duck-typed readers
   // ═════════════════════════════════════════════════════
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private detectLink(
     sapPda: PublicKey,
     mpl: MplAgentSnapshot | null,
@@ -616,19 +633,13 @@ export class MetaplexBridge {
     return mpl.registration.synapseAgent === sapPda.toBase58();
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private readString(identity: any, key: string): string | null {
-    const value = identity?.[key];
+  private readString(identity: AgentAccountData, key: keyof AgentAccountData): string | null {
+    const value = identity[key];
     return typeof value === "string" ? value : null;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private readCapabilities(identity: any): string[] {
-    const caps = identity?.capabilities;
-    if (!Array.isArray(caps)) return [];
-    return caps
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((c: any) => (typeof c === "string" ? c : c?.id ?? c?.name))
-      .filter((c: unknown): c is string => typeof c === "string");
+  private readCapabilities(identity: AgentAccountData): string[] {
+    const caps: ReadonlyArray<Capability> = identity.capabilities ?? [];
+    return caps.map((c) => c.id).filter((s): s is string => typeof s === "string");
   }
 }
