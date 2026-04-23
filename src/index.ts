@@ -400,6 +400,7 @@ export type {
   RegisterResult,
   RegisterWithToolsResult,
   UnifiedProfile,
+  AgentIdentifierResolution,
   MplAgentSnapshot,
   Eip8004Registration,
   Eip8004Service,

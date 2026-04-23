@@ -175,6 +175,28 @@ export interface UnifiedProfile {
   readonly linked: boolean;
 }
 
+/**
+ * @interface AgentIdentifierResolution
+ * @description Resolution result for an agent identifier that may be either
+ * an SAP owner wallet or an MPL Core asset address.
+ *
+ * - `kind = "wallet"`: input is treated as owner wallet.
+ * - `kind = "core-asset"`: input is an MPL Core asset; `wallet` is asset owner.
+ * - `kind = "unknown"`: input is invalid or cannot be resolved.
+ *
+ * @category Registries
+ * @since v0.9.2
+ */
+export interface AgentIdentifierResolution {
+  readonly input: string;
+  readonly kind: "wallet" | "core-asset" | "unknown";
+  readonly wallet: PublicKey | null;
+  readonly sapAgentPda: PublicKey | null;
+  readonly asset: PublicKey | null;
+  readonly hasSapAgent: boolean;
+  readonly error: string | null;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  Lazy peer-dep loader
 // ═══════════════════════════════════════════════════════════════════
@@ -412,6 +434,79 @@ export class MetaplexBridge {
       sap: { pda: sapPda, identity, stats },
       mpl,
       linked: this.detectLink(sapPda, mpl),
+    };
+  }
+
+  /**
+   * @name resolveAgentIdentifier
+   * @description Resolve a generic agent identifier to canonical SAP routing
+   * keys. Useful when callers may receive either owner wallets or Metaplex
+   * Core asset IDs (e.g. metaplex.com/agents/<core-asset-id>). 
+   *
+   * Resolution order:
+   *   1) Treat input as wallet and check if a SAP agent exists.
+   *   2) If not found, treat input as MPL Core asset and resolve owner wallet.
+   *
+   * @since v0.9.2
+   */
+  async resolveAgentIdentifier(input: {
+    identifier: string;
+    rpcUrl: string;
+  }): Promise<AgentIdentifierResolution> {
+    let asPubkey: PublicKey;
+    try {
+      asPubkey = new PublicKey(input.identifier);
+    } catch {
+      return {
+        input: input.identifier,
+        kind: "unknown",
+        wallet: null,
+        sapAgentPda: null,
+        asset: null,
+        hasSapAgent: false,
+        error: "Invalid public key",
+      };
+    }
+
+    // 1) Wallet-first resolution (SAP-native)
+    const [walletSapPda] = deriveAgent(asPubkey);
+    const walletIdentity = await this.fetchAgentNullable(walletSapPda);
+    if (walletIdentity) {
+      return {
+        input: input.identifier,
+        kind: "wallet",
+        wallet: asPubkey,
+        sapAgentPda: walletSapPda,
+        asset: null,
+        hasSapAgent: true,
+        error: null,
+      };
+    }
+
+    // 2) MPL Core asset resolution
+    const mpl = await this.fetchMplSnapshot(asPubkey, input.rpcUrl);
+    if (!mpl) {
+      return {
+        input: input.identifier,
+        kind: "unknown",
+        wallet: null,
+        sapAgentPda: null,
+        asset: null,
+        hasSapAgent: false,
+        error: "Not a SAP wallet and not a readable MPL Core asset",
+      };
+    }
+
+    const [sapPdaFromOwner] = deriveAgent(mpl.owner);
+    const ownerIdentity = await this.fetchAgentNullable(sapPdaFromOwner);
+    return {
+      input: input.identifier,
+      kind: "core-asset",
+      wallet: mpl.owner,
+      sapAgentPda: sapPdaFromOwner,
+      asset: asPubkey,
+      hasSapAgent: !!ownerIdentity,
+      error: ownerIdentity ? null : "Core asset owner has no SAP agent profile",
     };
   }
 
