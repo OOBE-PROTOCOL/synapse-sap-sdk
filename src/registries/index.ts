@@ -86,4 +86,12 @@ export type {
   Eip8004Service,
   AttachAgentIdentityOpts,
   UpdateAgentIdentityUriOpts,
+  RegisterAgentInput,
+  MintAttachOpts,
+  MintAttachResult,
+  SapForMplOpts,
+  SapForMplResult,
+  RegisterBothOpts,
+  RegisterBothResult,
+  TripleCheckResult,
 } from "./metaplex-bridge";

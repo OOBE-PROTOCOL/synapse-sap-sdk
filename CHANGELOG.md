@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-04-24
+
+### Added — Metaplex Bridge: triple-check + atomic register flows
+
+Production hardening of the v0.9.0 bridge after a live verification pass on mainnet (XONA agent, 2026-04-23) revealed (1) a silent `401` on gated RPCs because umi was created without `httpHeaders` and (2) the need for atomic compose flows when callers don't already have one side of the link.
+
+- **`tripleCheckLink({ asset, expectedOwner?, rpcUrl, rpcHeaders? })`** — three-layer link audit returning `{ mplOnChain, eip8004Json, sapOnChain, linked, ... }`. UIs can drive next-step actions from partial-pass states.
+- **`buildMintAndAttachIxs(opts)`** — mint a fresh MPL Core asset and attach `AgentIdentity` in a single transaction (2 ixs). Returns `assetSecretKey: Uint8Array` for server-side partial-signing.
+- **`buildRegisterSapForMplOwnerIx(opts)`** — idempotent SAP `registerAgent` for the owner of an existing MPL Core asset. Returns `{ instruction: null, alreadyRegistered: true }` when the SAP agent already exists.
+- **`buildRegisterBothIxs(opts)`** — atomic 3-ix bundle (`SAP registerAgent` + `MPL create` + `AgentIdentity attach`) for callers who have neither side.
+- **`rpcHeaders?: Record<string, string>`** — new optional parameter on every read method (`getUnifiedProfile`, `resolveAgentIdentifier`, `verifyLink`, `tripleCheckLink`). Internal `buildUmi(rpcUrl, rpcHeaders)` injects headers into umi's HTTP client. Required on Synapse RPC and any RPC that gates `getAsset`.
+- New types: `RegisterAgentInput`, `MintAttachOpts`, `MintAttachResult`, `SapForMplOpts`, `SapForMplResult`, `RegisterBothOpts`, `RegisterBothResult`, `TripleCheckResult`.
+- Updated skill guide `skills/metaplex-bridge.md` with section 13 covering all of the above plus the verified-live pitfall table.
+
+### Fixed
+
+- `MetaplexBridge.fetchMplSnapshot` no longer creates a header-less umi instance — gated RPCs (Synapse `x-api-key`) now read assets correctly.
+- `getUnifiedProfile` propagates `rpcHeaders` through every internal fetch.
+
+### Notes
+
+- **Backward-compatible.** All new parameters are optional; existing v0.9.0/v0.9.1/v0.9.2 callers continue to work unchanged.
+- **No on-chain SAP changes.** The mainnet program is untouched.
+- **0.9.3 ≡ republished 0.9.0.** Versions `0.9.1` and `0.9.2` were intermediate iterations and remain on npm for history; `0.9.0` (republished) and `0.9.3` ship the same code.
+
+## [0.9.2] - 2026-04-23 [intermediate]
+## [0.9.1] - 2026-04-22 [intermediate]
+
 ## [0.9.0] - 2026-04-22
 
 ### Added — Metaplex Core Bridge (`AgentIdentity` + EIP-8004)
