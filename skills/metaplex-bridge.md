@@ -33,8 +33,12 @@ SAP indexer  ──serves──▶  https://explorer.oobeprotocol.ai/agents/<sap
 |---|---|
 | Mint a tradeable NFT identity for an existing SAP agent | `buildAttachAgentIdentityIx(...)` |
 | Migrate an asset to a new registry host | `buildUpdateAgentIdentityUriIx(...)` |
-| Render an explorer page for one agent (NFT image + on-chain stats) | `getUnifiedProfile({ asset, rpcUrl })` |
-| Confirm an asset cryptographically links to a SAP PDA | `verifyLink({ asset, sapAgentPda, rpcUrl })` |
+| Render an explorer page for one agent (NFT image + on-chain stats) | `getUnifiedProfile({ asset, rpcUrl, rpcHeaders? })` |
+| Confirm an asset cryptographically links to a SAP PDA | `verifyLink({ asset, sapAgentPda, rpcUrl, rpcHeaders? })` |
+| **Three-layer link audit** (mpl-core + EIP-8004 JSON + SAP PDA) | `tripleCheckLink({ asset, expectedOwner?, rpcUrl, rpcHeaders? })` |
+| **Mint MPL Core asset + attach AgentIdentity** in one shot (SAP already exists) | `buildMintAndAttachIxs(opts)` |
+| **Register SAP agent for an existing MPL Core asset's owner** (idempotent) | `buildRegisterSapForMplOwnerIx(opts)` |
+| **Atomic both-sided register** (no SAP, no MPL — start fresh) | `buildRegisterBothIxs(opts)` |
 | Serve the EIP-8004 JSON from your own host | `buildEip8004Registration({ sapAgentOwner, services })` |
 | Compute the canonical URL without fetching | `deriveRegistrationUrl(sapAgentPda, baseUrl)` |
 
@@ -227,10 +231,147 @@ The SDK API is **forward-compatible**.
 ## 12. Quick reference
 
 ```ts
-client.metaplex.deriveRegistrationUrl(sapPda, baseUrl);                 // pure
-client.metaplex.buildEip8004Registration({ sapAgentOwner, services });  // server-side JSON
-client.metaplex.buildAttachAgentIdentityIx(opts);                       // 1 MPL ix
-client.metaplex.buildUpdateAgentIdentityUriIx(opts);                    // 1 MPL ix (host migration)
-client.metaplex.getUnifiedProfile({ asset|wallet, rpcUrl });            // merged read
-client.metaplex.verifyLink({ asset, sapAgentPda, rpcUrl });             // boolean
+client.metaplex.deriveRegistrationUrl(sapPda, baseUrl);                       // pure
+client.metaplex.buildEip8004Registration({ sapAgentOwner, services });        // server-side JSON
+client.metaplex.buildAttachAgentIdentityIx(opts);                             // 1 MPL ix
+client.metaplex.buildUpdateAgentIdentityUriIx(opts);                          // 1 MPL ix (host migration)
+client.metaplex.getUnifiedProfile({ asset|wallet, rpcUrl, rpcHeaders? });     // merged read
+client.metaplex.verifyLink({ asset, sapAgentPda, rpcUrl, rpcHeaders? });      // boolean
+client.metaplex.tripleCheckLink({ asset, expectedOwner?, rpcUrl, rpcHeaders? }); // 3-layer audit
+client.metaplex.buildMintAndAttachIxs(opts);                                  // mint MPL + attach (SAP exists)
+client.metaplex.buildRegisterSapForMplOwnerIx(opts);                          // SAP register for asset owner
+client.metaplex.buildRegisterBothIxs(opts);                                   // atomic SAP + MPL + attach
 ```
+
+---
+
+## 13. v0.9.3 — Triple-check & atomic register flows
+
+### 13.1 Authenticated RPC headers
+
+Every read method now accepts an optional `rpcHeaders?: Record<string, string>` parameter that the bridge injects into umi's HTTP client. Required when your RPC enforces auth (e.g. Synapse RPC `x-api-key`); without it `fetchAsset` silently returns 401 and the read layers report `false`.
+
+```ts
+const { url, headers } = getRpcConfig();           // { url, headers: { 'x-api-key': '...' } }
+await client.metaplex.tripleCheckLink({
+  asset:        new PublicKey(assetId),
+  expectedOwner: new PublicKey(walletId),         // optional consistency check
+  rpcUrl:       url,
+  rpcHeaders:   headers,                          // ← critical on gated RPCs
+});
+```
+
+### 13.2 `tripleCheckLink` — three independent layers
+
+```ts
+const result: TripleCheckResult = await client.metaplex.tripleCheckLink({
+  asset:        assetPk,
+  expectedOwner: walletPk,
+  rpcUrl,
+  rpcHeaders,
+});
+
+result.layers; // { mplOnChain: boolean, eip8004Json: boolean, sapOnChain: boolean }
+result.linked; // true ⇔ all three layers pass
+```
+
+| Layer | Passes when | Common cause of failure |
+|---|---|---|
+| `mplOnChain`  | Asset readable + `AgentIdentity` plugin present | RPC blocks `fetchAsset` (401), asset doesn't exist, no plugin attached |
+| `eip8004Json` | `agentIdentityUri` resolves AND JSON `synapseAgent === sapPda` | URI points to a foreign registry (e.g. `api.metaplex.com/v1/agents/...`) |
+| `sapOnChain`  | `AgentAccount` PDA exists for the asset's owner | Wallet never registered a SAP agent |
+
+Use partial-pass states in your UI to drive next-step actions:
+- `mpl + sap, ¬eip` → "Update plugin URI to point to SAP host" → `buildUpdateAgentIdentityUriIx`
+- `sap, ¬mpl` → "Mint identity NFT" → `buildMintAndAttachIxs`
+- `mpl, ¬sap` → "Register asset owner on SAP" → `buildRegisterSapForMplOwnerIx`
+- `none` → "Atomic both" → `buildRegisterBothIxs`
+
+### 13.3 Three register flows — choose the right one
+
+```ts
+// Flow A — SAP exists, mint MPL + attach (2 ixs in 1 tx)
+const a = await client.metaplex.buildMintAndAttachIxs({
+  sapAgentOwner: wallet,
+  authority:     wallet,
+  payer:         wallet,
+  owner:         wallet,
+  name:          "My Agent",
+  metadataUri:   "https://...metadata.json",
+  registrationBaseUrl: "https://explorer.oobeprotocol.ai",
+  rpcUrl,
+});
+// a.assetSecretKey is a fresh Uint8Array — partial-sign server-side, NEVER ship to client.
+const tx = new Transaction().add(...a.instructions);
+tx.partialSign(Keypair.fromSecretKey(a.assetSecretKey));
+
+// Flow B — MPL exists, register SAP for asset owner (idempotent)
+const b = await client.metaplex.buildRegisterSapForMplOwnerIx({
+  asset:         assetPk,
+  registerArgs:  { name, capabilities, metadataUri },
+  rpcUrl,
+});
+if (b.alreadyRegistered) { /* nothing to do */ }
+else { await sendTx([b.instruction!], b.assetOwner); }
+
+// Flow C — neither side exists, atomic 3-ix bundle
+const c = await client.metaplex.buildRegisterBothIxs({
+  wallet,
+  payer: wallet,
+  registerArgs:  { name, capabilities, metadataUri },
+  mintName:      "My Agent",
+  mintMetadataUri: "https://...metadata.json",
+  registrationBaseUrl: "https://explorer.oobeprotocol.ai",
+  rpcUrl,
+});
+const tx = new Transaction().add(...c.instructions);
+tx.partialSign(Keypair.fromSecretKey(c.assetSecretKey));
+```
+
+### 13.4 Result shapes
+
+```ts
+type MintAttachResult = {
+  instructions:      web3.TransactionInstruction[];   // [mpl-create, agent-attach]
+  assetAddress:      PublicKey;                       // new MPL Core asset
+  assetSecretKey:    Uint8Array;                      // partial-signer (server-only!)
+  sapAgentPda:       PublicKey;
+  registrationUrl:   string;                          // baked into AgentIdentity.uri
+};
+
+type SapForMplResult = {
+  instruction:       web3.TransactionInstruction | null;  // null when alreadyRegistered
+  alreadyRegistered: boolean;
+  sapAgentPda:       PublicKey;
+  assetOwner:        PublicKey;
+};
+
+type RegisterBothResult = MintAttachResult & {
+  // includes an extra leading SAP `registerAgent` ix
+  // instructions: [sap-register, mpl-create, agent-attach]
+};
+```
+
+### 13.5 Server-side flow pattern (Solana Pay tx-as-API)
+
+```ts
+async function buildLinkBothFlow(req): Promise<{ base64Tx: string }> {
+  const result = await client.metaplex.buildRegisterBothIxs({...});
+  const assetKp = Keypair.fromSecretKey(result.assetSecretKey);   // ✋ server-only
+  const tx = new Transaction({ feePayer: wallet, recentBlockhash });
+  tx.add(...result.instructions);
+  tx.partialSign(assetKp);                                        // signs MPL `create`
+  return { base64Tx: tx.serialize({ requireAllSignatures: false }).toString('base64') };
+}
+```
+
+The client wallet adapter co-signs (fee-payer + asset owner) and submits — the fresh asset Keypair never leaves the server.
+
+### 13.6 Pitfalls — verified live (XONA 2026-04-23)
+
+| Symptom | Root cause | Fix |
+|---|---|---|
+| `mplOnChain: false` despite asset existing | umi created without `httpHeaders` → 401 from gated RPC | Pass `rpcHeaders` to every read method |
+| `getProgramAccounts` returns 502 on Synapse RPC | Heavy method blocked upstream | Use DAS `getAssetsByOwner` first, fall back to on-chain only as Tier 2 |
+| `eip8004Json: false` on a real Metaplex agent | URI points to `api.metaplex.com/v1/agents/...` (foreign directory) | Migrate plugin URI to your SAP host with `buildUpdateAgentIdentityUriIx` |
+| `linked: false` after a fresh attach | Caller forgot `rpcHeaders` on the verification call | Both write *and* verify must use the same authenticated RPC config |

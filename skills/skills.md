@@ -49,7 +49,7 @@ When in doubt, **always consult the official documentation** before guessing. Th
 | **SAP SDK README** | https://github.com/OOBE-PROTOCOL/synapse-sap-sdk | Quick start, installation, SapClient overview |
 | **SAP Skill Guide — Client** | https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/blob/main/skills/client.md | Consumer role — discover agents, create escrows, build x402 headers, verify settlements, endpoint validation, Zod schemas |
 | **SAP Skill Guide — Merchant** | https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/blob/main/skills/merchant.md | Seller role — register agent, publish tools, settle payments, memory vault, attestations, plugin adapter, PostgreSQL mirror |
-| **SAP Skill Guide — Metaplex Bridge** | https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/blob/main/skills/metaplex-bridge.md | SAP × Metaplex Core `AgentIdentity` integration — link MPL Core assets to SAP agents via EIP-8004 registration JSON, single-tx attach, unified profile reads, host the live registry endpoint |
+| **SAP Skill Guide — Metaplex Bridge** | https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/blob/main/skills/metaplex-bridge.md | SAP × Metaplex Core `AgentIdentity` integration — link MPL Core assets to SAP agents via EIP-8004 registration JSON. v0.9.3 adds **`tripleCheckLink`** (3-layer audit), **`buildMintAndAttachIxs`** / **`buildRegisterSapForMplOwnerIx`** / **`buildRegisterBothIxs`** (atomic register flows), and `rpcHeaders` injection for gated RPCs. |
 | **SAP CLI Reference** | https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/blob/main/cli/README.md | `synapse-sap` CLI — 10 command groups, 40+ subcommands for full protocol access from the terminal |
 
 ### When to consult docs

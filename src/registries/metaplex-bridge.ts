@@ -197,6 +197,168 @@ export interface AgentIdentifierResolution {
   readonly error: string | null;
 }
 
+/**
+ * @interface RegisterAgentInput
+ * @description Minimal input set the bridge needs to construct a SAP
+ * `registerAgent` instruction. Exposed independently so the bridge does not
+ * import `RegisterAgentArgs` from another module (keeping the public surface flat).
+ *
+ * @category Registries
+ * @since v0.9.3
+ */
+export interface RegisterAgentInput {
+  readonly name: string;
+  readonly description: string;
+  readonly capabilities: readonly Capability[];
+  readonly pricing: unknown;
+  readonly protocols: readonly number[];
+  readonly agentId?: string | null;
+  readonly agentUri?: string | null;
+  readonly x402Endpoint?: string | null;
+}
+
+/**
+ * @interface MintAttachOpts
+ * @description Inputs for {@link MetaplexBridge.buildMintAndAttachIxs}.
+ * Builds: MPL Core `create` (mint a fresh asset) + `addExternalPluginAdapterV1`
+ * (attach AgentIdentity → SAP EIP-8004 URL) — produced as two web3.js
+ * instructions in deterministic order.
+ *
+ * The caller MUST sign with the returned `assetSigner` in addition to the
+ * wallet authority, since Core mint requires the asset keypair as a signer.
+ *
+ * @category Registries
+ * @since v0.9.3
+ */
+export interface MintAttachOpts {
+  readonly sapAgentOwner: PublicKey;
+  readonly authority: PublicKey;
+  readonly payer?: PublicKey;
+  readonly owner?: PublicKey;
+  readonly name: string;
+  readonly metadataUri: string;
+  readonly registrationBaseUrl: string;
+  readonly rpcUrl: string;
+  readonly collection?: PublicKey;
+}
+
+/**
+ * @interface MintAttachResult
+ * @description Return shape of {@link MetaplexBridge.buildMintAndAttachIxs}
+ * and the mint half of {@link MetaplexBridge.buildRegisterBothIxs}.
+ *
+ * `assetSecretKey` is the freshly generated asset keypair's secret. The
+ * caller is responsible for safe handling: server-side flows should
+ * partial-sign the assembled transaction with it and then discard.
+ *
+ * @category Registries
+ * @since v0.9.3
+ */
+export interface MintAttachResult {
+  readonly assetAddress: PublicKey;
+  readonly assetSecretKey: Uint8Array;
+  readonly registrationUrl: string;
+  readonly instructions: readonly TransactionInstruction[];
+}
+
+/**
+ * @interface SapForMplOpts
+ * @description Inputs for {@link MetaplexBridge.buildRegisterSapForMplOwnerIx}.
+ * Resolves the owner of `asset`, derives that owner's SAP PDA, and (if no
+ * agent exists yet) returns the `registerAgent` instruction the owner must sign.
+ *
+ * @category Registries
+ * @since v0.9.3
+ */
+export interface SapForMplOpts {
+  readonly asset: PublicKey;
+  readonly registerArgs: RegisterAgentInput;
+  readonly rpcUrl: string;
+}
+
+/**
+ * @interface SapForMplResult
+ * @description Result of {@link MetaplexBridge.buildRegisterSapForMplOwnerIx}.
+ * `instruction` is `null` when the asset owner already has a SAP agent
+ * (idempotent: nothing to do).
+ *
+ * @category Registries
+ * @since v0.9.3
+ */
+export interface SapForMplResult {
+  readonly assetOwner: PublicKey;
+  readonly sapAgentPda: PublicKey;
+  readonly alreadyRegistered: boolean;
+  readonly currentAgentIdentityUri: string | null;
+  readonly instruction: TransactionInstruction | null;
+}
+
+/**
+ * @interface RegisterBothOpts
+ * @description Inputs for {@link MetaplexBridge.buildRegisterBothIxs}.
+ * Builds the atomic SAP `registerAgent` + MPL Core `create` + `AgentIdentity`
+ * attach sequence for a wallet that owns neither side yet.
+ *
+ * @category Registries
+ * @since v0.9.3
+ */
+export interface RegisterBothOpts {
+  readonly wallet: PublicKey;
+  readonly payer?: PublicKey;
+  readonly registerArgs: RegisterAgentInput;
+  readonly mintName: string;
+  readonly mintMetadataUri: string;
+  readonly registrationBaseUrl: string;
+  readonly rpcUrl: string;
+  readonly collection?: PublicKey;
+}
+
+/**
+ * @interface RegisterBothResult
+ * @description Result of {@link MetaplexBridge.buildRegisterBothIxs}.
+ * Instructions are ordered: `[0]` SAP `registerAgent`, `[1]` MPL Core mint,
+ * `[2]` MPL `AgentIdentity` attach. All three execute atomically inside one
+ * transaction signed by the wallet + `assetSecretKey`.
+ *
+ * @category Registries
+ * @since v0.9.3
+ */
+export interface RegisterBothResult {
+  readonly sapAgentPda: PublicKey;
+  readonly assetAddress: PublicKey;
+  readonly assetSecretKey: Uint8Array;
+  readonly registrationUrl: string;
+  readonly instructions: readonly TransactionInstruction[];
+}
+
+/**
+ * @interface TripleCheckResult
+ * @description Result of {@link MetaplexBridge.tripleCheckLink} — the explicit
+ * 3-layer verification used by explorer/host badges.
+ *
+ *  - `mplOnChain`: MPL Core asset fetched on-chain via mpl-core (gRPC/RPC).
+ *  - `eip8004Json`: registration JSON fetched from `agentIdentityUri` and
+ *    its `synapseAgent` matches the SAP PDA.
+ *  - `sapOnChain`: a SAP `AgentAccount` exists on-chain at that PDA.
+ *
+ * `linked = true` only when **all three** layers pass.
+ *
+ * @category Registries
+ * @since v0.9.3
+ */
+export interface TripleCheckResult {
+  readonly asset: PublicKey;
+  readonly sapAgentPda: PublicKey;
+  readonly mplOnChain: boolean;
+  readonly eip8004Json: boolean;
+  readonly sapOnChain: boolean;
+  readonly linked: boolean;
+  readonly agentIdentityUri: string | null;
+  readonly registration: Eip8004Registration | null;
+  readonly identity: AgentAccountData | null;
+  readonly error: string | null;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  Lazy peer-dep loader
 // ═══════════════════════════════════════════════════════════════════
@@ -383,6 +545,177 @@ export class MetaplexBridge {
   }
 
   // ─────────────────────────────────────────────────────
+  //  Write side — combined SAP × MPL register flows (v0.9.3)
+  // ─────────────────────────────────────────────────────
+
+  /**
+   * @name buildMintAndAttachIxs
+   * @description Build the two MPL Core instructions needed to mint a new
+   * asset for an existing SAP agent and immediately bind it via the
+   * `AgentIdentity` plugin (URI = canonical EIP-8004 URL).
+   *
+   * Flow:
+   *   1. Generate a fresh asset keypair (returned as `assetSecretKey`).
+   *   2. Build `mpl_core::create` with the new asset as signer.
+   *   3. Build `addExternalPluginAdapterV1` for the AgentIdentity URI.
+   *
+   * The returned `instructions` are deterministic order. The caller
+   * partial-signs the assembled transaction with `assetSecretKey` and the
+   * authority/payer wallet.
+   *
+   * @since v0.9.3
+   */
+  async buildMintAndAttachIxs(opts: MintAttachOpts): Promise<MintAttachResult> {
+    const { mplCore, umiBundle, umiCore } = await loadMplCore();
+    const umi: Umi = umiBundle.createUmi(opts.rpcUrl).use(mplCore.mplCore());
+
+    const [sapPda] = deriveAgent(opts.sapAgentOwner);
+    const registrationUrl = this.deriveRegistrationUrl(
+      sapPda,
+      opts.registrationBaseUrl,
+    );
+
+    const assetUmiSigner = umiCore.generateSigner(umi);
+    const assetAddress = new PublicKey(assetUmiSigner.publicKey.toString());
+    const assetSecretKey = assetUmiSigner.secretKey;
+
+    const authority: UmiSigner = umiCore.createNoopSigner(
+      umiCore.publicKey(opts.authority.toBase58()),
+    );
+    const payer: UmiSigner = umiCore.createNoopSigner(
+      umiCore.publicKey((opts.payer ?? opts.authority).toBase58()),
+    );
+    const ownerUmi = opts.owner
+      ? umiCore.publicKey(opts.owner.toBase58())
+      : umiCore.publicKey(opts.authority.toBase58());
+
+    const createBuilder: TransactionBuilder = mplCore.create(umi, {
+      asset: assetUmiSigner,
+      collection: opts.collection
+        ? ({ publicKey: umiCore.publicKey(opts.collection.toBase58()) } as never)
+        : undefined,
+      authority,
+      payer,
+      owner: ownerUmi,
+      name: opts.name,
+      uri: opts.metadataUri,
+    });
+    const mintIx = await this.firstWeb3Ix(createBuilder, "mpl_core::create");
+
+    const attachIx = await this.buildAddExternalPluginIx({
+      asset: assetAddress,
+      authority: opts.authority,
+      payer: opts.payer ?? opts.authority,
+      uri: registrationUrl,
+      rpcUrl: opts.rpcUrl,
+    });
+
+    return {
+      assetAddress,
+      assetSecretKey,
+      registrationUrl,
+      instructions: [mintIx, attachIx],
+    };
+  }
+
+  /**
+   * @name buildRegisterSapForMplOwnerIx
+   * @description Given an existing MPL Core asset, resolve its on-chain
+   * owner and build the SAP `registerAgent` instruction the owner must
+   * sign. Idempotent: if a SAP agent already exists for that owner the
+   * method returns `instruction: null` with `alreadyRegistered: true`.
+   *
+   * Use after a wallet has minted (or holds) an MPL Core agent NFT and
+   * wants to back-fill a SAP identity at the canonical PDA so the bridge's
+   * EIP-8004 URL becomes resolvable.
+   *
+   * @since v0.9.3
+   */
+  async buildRegisterSapForMplOwnerIx(
+    opts: SapForMplOpts,
+  ): Promise<SapForMplResult> {
+    const snap = await this.fetchMplSnapshot(opts.asset, opts.rpcUrl);
+    if (!snap) {
+      throw new Error(
+        `buildRegisterSapForMplOwnerIx: MPL Core asset ${opts.asset.toBase58()} not readable`,
+      );
+    }
+    const [sapPda] = deriveAgent(snap.owner);
+    const existing = await this.fetchAgentNullable(sapPda);
+    if (existing) {
+      return {
+        assetOwner: snap.owner,
+        sapAgentPda: sapPda,
+        alreadyRegistered: true,
+        currentAgentIdentityUri: snap.agentIdentityUri,
+        instruction: null,
+      };
+    }
+
+    const ix = await this.buildRegisterAgentIx({
+      wallet: snap.owner,
+      args: opts.registerArgs,
+    });
+    return {
+      assetOwner: snap.owner,
+      sapAgentPda: sapPda,
+      alreadyRegistered: false,
+      currentAgentIdentityUri: snap.agentIdentityUri,
+      instruction: ix,
+    };
+  }
+
+  /**
+   * @name buildRegisterBothIxs
+   * @description Atomic 3-instruction bundle for a wallet that owns
+   * neither side: `[SAP registerAgent, MPL Core create, MPL AgentIdentity attach]`.
+   * Single transaction, single user signature (plus the ephemeral asset
+   * keypair returned in `assetSecretKey`).
+   *
+   * Throws if a SAP agent already exists for `wallet` — callers should
+   * fall through to {@link MetaplexBridge.buildMintAndAttachIxs} instead.
+   *
+   * @since v0.9.3
+   */
+  async buildRegisterBothIxs(
+    opts: RegisterBothOpts,
+  ): Promise<RegisterBothResult> {
+    const [sapPda] = deriveAgent(opts.wallet);
+    const existing = await this.fetchAgentNullable(sapPda);
+    if (existing) {
+      throw new Error(
+        `buildRegisterBothIxs: SAP agent already exists at ${sapPda.toBase58()}; ` +
+          `use buildMintAndAttachIxs instead`,
+      );
+    }
+
+    const sapIx = await this.buildRegisterAgentIx({
+      wallet: opts.wallet,
+      args: opts.registerArgs,
+    });
+
+    const mint = await this.buildMintAndAttachIxs({
+      sapAgentOwner: opts.wallet,
+      authority: opts.wallet,
+      payer: opts.payer ?? opts.wallet,
+      owner: opts.wallet,
+      name: opts.mintName,
+      metadataUri: opts.mintMetadataUri,
+      registrationBaseUrl: opts.registrationBaseUrl,
+      rpcUrl: opts.rpcUrl,
+      collection: opts.collection,
+    });
+
+    return {
+      sapAgentPda: sapPda,
+      assetAddress: mint.assetAddress,
+      assetSecretKey: mint.assetSecretKey,
+      registrationUrl: mint.registrationUrl,
+      instructions: [sapIx, ...mint.instructions],
+    };
+  }
+
+  // ─────────────────────────────────────────────────────
   //  Read side
   // ─────────────────────────────────────────────────────
 
@@ -397,6 +730,7 @@ export class MetaplexBridge {
     wallet?: PublicKey;
     asset?: PublicKey;
     rpcUrl: string;
+    rpcHeaders?: Record<string, string>;
   }): Promise<UnifiedProfile> {
     if (!input.wallet && !input.asset) {
       throw new Error("getUnifiedProfile: provide `wallet` or `asset`");
@@ -414,7 +748,7 @@ export class MetaplexBridge {
 
     let mpl: MplAgentSnapshot | null = null;
     if (input.asset) {
-      mpl = await this.fetchMplSnapshot(input.asset, input.rpcUrl);
+      mpl = await this.fetchMplSnapshot(input.asset, input.rpcUrl, input.rpcHeaders);
       if (!sapPda && mpl?.registration?.synapseAgent) {
         try {
           sapPda = new PublicKey(mpl.registration.synapseAgent);
@@ -452,6 +786,7 @@ export class MetaplexBridge {
   async resolveAgentIdentifier(input: {
     identifier: string;
     rpcUrl: string;
+    rpcHeaders?: Record<string, string>;
   }): Promise<AgentIdentifierResolution> {
     let asPubkey: PublicKey;
     try {
@@ -484,7 +819,7 @@ export class MetaplexBridge {
     }
 
     // 2) MPL Core asset resolution
-    const mpl = await this.fetchMplSnapshot(asPubkey, input.rpcUrl);
+    const mpl = await this.fetchMplSnapshot(asPubkey, input.rpcUrl, input.rpcHeaders);
     if (!mpl) {
       return {
         input: input.identifier,
@@ -522,12 +857,79 @@ export class MetaplexBridge {
     asset: PublicKey;
     sapAgentPda: PublicKey;
     rpcUrl: string;
+    rpcHeaders?: Record<string, string>;
   }): Promise<boolean> {
-    const snap = await this.fetchMplSnapshot(args.asset, args.rpcUrl);
+    const snap = await this.fetchMplSnapshot(args.asset, args.rpcUrl, args.rpcHeaders);
     if (!snap?.agentIdentityUri || !snap.registration) return false;
     const expectedSuffix = `/agents/${args.sapAgentPda.toBase58()}/eip-8004.json`;
     if (!snap.agentIdentityUri.endsWith(expectedSuffix)) return false;
     return snap.registration.synapseAgent === args.sapAgentPda.toBase58();
+  }
+
+  /**
+   * @name tripleCheckLink
+   * @description Explicit 3-layer verification for explorer/host badges.
+   * Returns one struct enumerating each check independently so UIs can
+   * present partial trust states (e.g. "MPL plugin present, JSON pending").
+   *
+   * Layers:
+   *   1. **mplOnChain** — Asset + AgentIdentity URI fetched on-chain.
+   *   2. **eip8004Json** — JSON fetched and `synapseAgent` matches PDA.
+   *   3. **sapOnChain** — `AgentAccount` PDA exists on the SAP program.
+   *
+   * @since v0.9.3
+   */
+  async tripleCheckLink(args: {
+    asset: PublicKey;
+    expectedOwner?: PublicKey;
+    rpcUrl: string;
+    rpcHeaders?: Record<string, string>;
+  }): Promise<TripleCheckResult> {
+    const snap = await this.fetchMplSnapshot(args.asset, args.rpcUrl, args.rpcHeaders);
+    if (!snap) {
+      const fallbackPda = args.expectedOwner
+        ? deriveAgent(args.expectedOwner)[0]
+        : args.asset;
+      return {
+        asset: args.asset,
+        sapAgentPda: fallbackPda,
+        mplOnChain: false,
+        eip8004Json: false,
+        sapOnChain: false,
+        linked: false,
+        agentIdentityUri: null,
+        registration: null,
+        identity: null,
+        error: "MPL Core asset not readable on-chain",
+      };
+    }
+
+    const owner = args.expectedOwner ?? snap.owner;
+    const [sapPda] = deriveAgent(owner);
+    const expectedSuffix = `/agents/${sapPda.toBase58()}/eip-8004.json`;
+
+    const mplOnChain = !!snap.agentIdentityUri;
+    const eip8004Json =
+      !!snap.registration &&
+      !!snap.agentIdentityUri &&
+      snap.agentIdentityUri.endsWith(expectedSuffix) &&
+      snap.registration.synapseAgent === sapPda.toBase58();
+
+    const identity = await this.fetchAgentNullable(sapPda);
+    const sapOnChain = !!identity;
+
+    return {
+      asset: args.asset,
+      sapAgentPda: sapPda,
+      mplOnChain,
+      eip8004Json,
+      sapOnChain,
+      linked: mplOnChain && eip8004Json && sapOnChain,
+      agentIdentityUri: snap.agentIdentityUri,
+      registration: snap.registration,
+      identity,
+      error: null,
+    };
   }
 
   // ═════════════════════════════════════════════════════
@@ -586,12 +988,30 @@ export class MetaplexBridge {
   //  Private — MPL fetching
   // ═════════════════════════════════════════════════════
 
+  private async buildUmi(
+    rpcUrl: string,
+    rpcHeaders?: Record<string, string>,
+  ): Promise<Umi> {
+    const { mplCore, umiBundle } = await loadMplCore();
+    // umi-bundle-defaults.createUmi accepts an options object with httpHeaders
+    // since umi 1.x — required for gated providers like Synapse RPC that
+    // enforce `x-api-key`. Without it `getAccountInfo` returns 401 silently.
+    const umi: Umi = (umiBundle.createUmi as unknown as (
+      endpoint: string,
+      opts?: { httpHeaders?: Record<string, string> },
+    ) => Umi)(rpcUrl, rpcHeaders ? { httpHeaders: rpcHeaders } : undefined).use(
+      mplCore.mplCore(),
+    );
+    return umi;
+  }
+
   private async fetchMplSnapshot(
     asset: PublicKey,
     rpcUrl: string,
+    rpcHeaders?: Record<string, string>,
   ): Promise<MplAgentSnapshot | null> {
-    const { mplCore, umiBundle, umiCore } = await loadMplCore();
-    const umi: Umi = umiBundle.createUmi(rpcUrl).use(mplCore.mplCore());
+    const { mplCore, umiCore } = await loadMplCore();
+    const umi: Umi = await this.buildUmi(rpcUrl, rpcHeaders);
     try {
       const fetched: AssetV1 = await mplCore.fetchAsset(
         umi,
@@ -687,6 +1107,45 @@ export class MetaplexBridge {
       },
     });
     return this.firstWeb3Ix(builder, "addExternalPluginAdapterV1");
+  }
+
+  // ═════════════════════════════════════════════════════
+  //  Private — SAP instruction building (v0.9.3)
+  // ═════════════════════════════════════════════════════
+
+  private async buildRegisterAgentIx(args: {
+    wallet: PublicKey;
+    args: RegisterAgentInput;
+  }): Promise<TransactionInstruction> {
+    // Lazy import to avoid a hard cycle with `pda/index.ts`.
+    const { deriveGlobalRegistry } = await import("../pda");
+    const { SystemProgram } = await import("@solana/web3.js");
+    const [agentPda] = deriveAgent(args.wallet);
+    const [statsPda] = deriveAgentStats(agentPda);
+    const [globalPda] = deriveGlobalRegistry();
+    const a = args.args;
+    // Cast to `any` to sidestep Anchor's deep generic IDL inference, which
+    // otherwise blows TS recursion budget here. Same pattern as BaseModule.
+    const methods = (this.program as { methods: any }).methods;
+    return await methods
+      .registerAgent(
+        a.name,
+        a.description,
+        a.capabilities,
+        a.pricing,
+        a.protocols,
+        a.agentId ?? null,
+        a.agentUri ?? null,
+        a.x402Endpoint ?? null,
+      )
+      .accounts({
+        wallet: args.wallet,
+        agent: agentPda,
+        agentStats: statsPda,
+        globalRegistry: globalPda,
+        systemProgram: SystemProgram.programId,
+      })
+      .instruction();
   }
 
   private async firstWeb3Ix(
