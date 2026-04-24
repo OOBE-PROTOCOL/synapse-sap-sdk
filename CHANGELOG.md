@@ -9,33 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.3] - 2026-04-24
 
-### Added — Metaplex Bridge: triple-check + atomic register flows
-
-Production hardening of the v0.9.0 bridge after a live verification pass on mainnet (XONA agent, 2026-04-23) revealed (1) a silent `401` on gated RPCs because umi was created without `httpHeaders` and (2) the need for atomic compose flows when callers don't already have one side of the link.
-
-- **`tripleCheckLink({ asset, expectedOwner?, rpcUrl, rpcHeaders? })`** — three-layer link audit returning `{ mplOnChain, eip8004Json, sapOnChain, linked, ... }`. UIs can drive next-step actions from partial-pass states.
-- **`buildMintAndAttachIxs(opts)`** — mint a fresh MPL Core asset and attach `AgentIdentity` in a single transaction (2 ixs). Returns `assetSecretKey: Uint8Array` for server-side partial-signing.
-- **`buildRegisterSapForMplOwnerIx(opts)`** — idempotent SAP `registerAgent` for the owner of an existing MPL Core asset. Returns `{ instruction: null, alreadyRegistered: true }` when the SAP agent already exists.
-- **`buildRegisterBothIxs(opts)`** — atomic 3-ix bundle (`SAP registerAgent` + `MPL create` + `AgentIdentity attach`) for callers who have neither side.
-- **`rpcHeaders?: Record<string, string>`** — new optional parameter on every read method (`getUnifiedProfile`, `resolveAgentIdentifier`, `verifyLink`, `tripleCheckLink`). Internal `buildUmi(rpcUrl, rpcHeaders)` injects headers into umi's HTTP client. Required on Synapse RPC and any RPC that gates `getAsset`.
-- New types: `RegisterAgentInput`, `MintAttachOpts`, `MintAttachResult`, `SapForMplOpts`, `SapForMplResult`, `RegisterBothOpts`, `RegisterBothResult`, `TripleCheckResult`.
-- Updated skill guide `skills/metaplex-bridge.md` with section 13 covering all of the above plus the verified-live pitfall table.
-
-### Fixed
-
-- `MetaplexBridge.fetchMplSnapshot` no longer creates a header-less umi instance — gated RPCs (Synapse `x-api-key`) now read assets correctly.
-- `getUnifiedProfile` propagates `rpcHeaders` through every internal fetch.
-
-### Notes
-
-- **Backward-compatible.** All new parameters are optional; existing v0.9.0/v0.9.1/v0.9.2 callers continue to work unchanged.
-- **No on-chain SAP changes.** The mainnet program is untouched.
-- **0.9.3 ≡ republished 0.9.0.** Versions `0.9.1` and `0.9.2` were intermediate iterations and remain on npm for history; `0.9.0` (republished) and `0.9.3` ship the same code.
-
-## [0.9.2] - 2026-04-23 [intermediate]
-## [0.9.1] - 2026-04-22 [intermediate]
-
-## [0.9.0] - 2026-04-22
+> **Canonical Metaplex Core Bridge release.**
+> `0.9.3` supersedes and replaces `0.9.0` — same intent, complete and production-hardened.
+> Versions `0.9.1` and `0.9.2` were intermediate iterations and remain on npm for history only; do not depend on them. The original `0.9.0` was unpublished and could not be re-uploaded under the same number due to npm's permanent name@version block, so the canonical release ships under `0.9.3`.
 
 ### Added — Metaplex Core Bridge (`AgentIdentity` + EIP-8004)
 
@@ -51,21 +27,41 @@ transaction.
 - **`buildUpdateAgentIdentityUriIx(opts)`** — wraps `updateExternalPluginAdapterV1` for registry-host migration
 - **`buildEip8004Registration({ sapAgentOwner, services?, extra? })`** — server-side EIP-8004 JSON builder rendered from on-chain SAP state
 - **`deriveRegistrationUrl(sapAgentPda, baseUrl)`** — pure helper for the canonical `<base>/agents/<pda>/eip-8004.json` URL
-- **`getUnifiedProfile({ wallet?, asset?, rpcUrl })`** — merged read (SAP `AgentAccount` + MPL Core asset + EIP-8004 JSON)
-- **`verifyLink({ asset, sapAgentPda, rpcUrl })`** — bidirectional cryptographic link check
-- New types: `Eip8004Registration`, `Eip8004Service`, `AttachAgentIdentityOpts`, `UpdateAgentIdentityUriOpts`, `MplAgentSnapshot`, `UnifiedProfile`
+- **`getUnifiedProfile({ wallet?, asset?, rpcUrl, rpcHeaders? })`** — merged read (SAP `AgentAccount` + MPL Core asset + EIP-8004 JSON)
+- **`verifyLink({ asset, sapAgentPda, rpcUrl, rpcHeaders? })`** — bidirectional cryptographic link check
+- **`resolveAgentIdentifier({ identifier, rpcUrl, rpcHeaders? })`** — accepts SAP PDA, MPL Core asset address, or owner wallet and returns the canonical resolution
+- New types: `Eip8004Registration`, `Eip8004Service`, `AttachAgentIdentityOpts`, `UpdateAgentIdentityUriOpts`, `MplAgentSnapshot`, `UnifiedProfile`, `AgentIdentifierResolution`
 - Optional peer deps: `@metaplex-foundation/mpl-core` `>=1.9.0`, `@metaplex-foundation/umi-bundle-defaults` `>=0.9.0` (lazy-loaded; consumers that don't use the bridge incur zero overhead)
-- New skill guide: `skills/metaplex-bridge.md`
-- New doc: `docs/11-metaplex-bridge.md`
-- Updated `skills/skills.md` and `skills/merchant.md` to reference the bridge
+- Skill guide: `skills/metaplex-bridge.md`
+- Doc: `docs/11-metaplex-bridge.md`
+- `skills/skills.md` and `skills/merchant.md` reference the bridge
+
+### Added — Triple-check audit & atomic register flows (post-mainnet hardening)
+
+Production hardening after a live verification pass on mainnet (XONA agent, 2026-04-23) that revealed (1) a silent `401` on gated RPCs because umi was created without `httpHeaders` and (2) the need for atomic compose flows when callers don't already have one side of the link.
+
+- **`tripleCheckLink({ asset, expectedOwner?, rpcUrl, rpcHeaders? })`** — three-layer link audit returning `{ mplOnChain, eip8004Json, sapOnChain, linked, ... }`. UIs can drive next-step actions from partial-pass states.
+- **`buildMintAndAttachIxs(opts)`** — mint a fresh MPL Core asset and attach `AgentIdentity` in a single transaction (2 ixs). Returns `assetSecretKey: Uint8Array` for server-side partial-signing.
+- **`buildRegisterSapForMplOwnerIx(opts)`** — idempotent SAP `registerAgent` for the owner of an existing MPL Core asset. Returns `{ instruction: null, alreadyRegistered: true }` when the SAP agent already exists.
+- **`buildRegisterBothIxs(opts)`** — atomic 3-ix bundle (`SAP registerAgent` + `MPL create` + `AgentIdentity attach`) for callers who have neither side.
+- **`rpcHeaders?: Record<string, string>`** — new optional parameter on every read method (`getUnifiedProfile`, `resolveAgentIdentifier`, `verifyLink`, `tripleCheckLink`). Internal `buildUmi(rpcUrl, rpcHeaders)` injects headers into umi's HTTP client. Required on Synapse RPC and any RPC that gates `getAsset`.
+- New types: `RegisterAgentInput`, `MintAttachOpts`, `MintAttachResult`, `SapForMplOpts`, `SapForMplResult`, `RegisterBothOpts`, `RegisterBothResult`, `TripleCheckResult`.
+- `skills/metaplex-bridge.md` extended with section 13 (triple-check + atomic flows + verified-live pitfall table).
+
+### Fixed
+
+- `MetaplexBridge.fetchMplSnapshot` no longer creates a header-less umi instance — gated RPCs (Synapse `x-api-key`) now read assets correctly. Previously, `tripleCheckLink.layers.mplOnChain` would falsely report `false` for valid assets behind authenticated RPCs.
+- `getUnifiedProfile` and `resolveAgentIdentifier` propagate `rpcHeaders` through every internal fetch.
 
 ### Notes
 
-- **Zero on-chain SAP changes.** The 8 mainnet agents continue to work
-  unmodified; linking is expressed entirely via the MPL plugin URI plus the
-  host-served JSON.
-- **Efficiency:** every recurring operation drops from 2 tx (naive
-  dual-on-chain design) to 1 tx.
+- **Zero on-chain SAP changes.** The 8 mainnet agents continue to work unmodified; linking is expressed entirely via the MPL plugin URI plus the host-served JSON.
+- **Efficiency:** every recurring operation drops from 2 tx (naive dual-on-chain design) to 1 tx.
+- **Backward-compatible.** All new parameters are optional; existing callers continue to work unchanged.
+
+## [0.9.2] - 2026-04-23 [SUPERSEDED — use 0.9.3]
+## [0.9.1] - 2026-04-22 [SUPERSEDED — use 0.9.3]
+## [0.9.0] - 2026-04-22 [UNPUBLISHED — replaced by 0.9.3]
 
 ## [0.8.0] - 2026-04-18
 
