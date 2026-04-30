@@ -1,3 +1,8 @@
+---
+name: sap-overview
+description: 'Master reference for the Synapse Client SDK + Synapse Agent Protocol (SAP) SDK ecosystem on Solana. Use when needing the complete API surface (RPC 53 methods, DAS 11 methods, 139 LangChain tools, 110 SynapseAgentKit plugins, MCP server/client, x402 payments, intents, Solana Actions, Next.js patterns). Pair with sap-merchant or sap-client for role-specific guides.'
+---
+
 # Synapse Client SDK — Agent Skills Reference
 
 > **Package**: `@oobe-protocol-labs/synapse-client-sdk`  
