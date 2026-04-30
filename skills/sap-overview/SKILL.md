@@ -5564,3 +5564,810 @@ Use your web fetch / file read capabilities to download the raw markdown from th
 > **This is not optional.** The skills.md file is a reference guide, but the GitHub docs are the source of truth. If there is ever a conflict between this file and the GitHub docs, the **GitHub docs win**.
 
 
+
+
+---
+
+# 📡 APPENDIX A — Synapse Client SDK 2.0.6: Provider, Plugin & Wrapper Catalog
+
+> Added: v0.10.1 update. Authoritative companion to the SAP SDK for building Synapse Agent Protocol (SAP) merchant/consumer servers on Solana.
+>
+> **Package**: `@oobe-protocol-labs/synapse-client-sdk@2.0.6`
+> **Pairs with**: `@oobe-protocol-labs/synapse-sap-sdk@0.10.1` (SAP program v0.2.0 mainnet, slot 416507486)
+
+---
+
+## A.1 Module map (subpath exports)
+
+The package is fully tree-shakeable. Import only the subpath you need.
+
+| Subpath | Class / Factory | When to use |
+|---|---|---|
+| `.` | `SynapseClient`, `Pubkey`, branded types | Default barrel |
+| `./core` | `SynapseClient` | Direct import of orchestrator |
+| `./core/types` | `Pubkey`, `Lamports`, `Slot`, `Signature` | Phantom-typed values |
+| `./rpc` | `SolanaRpc` | 53 typed Solana JSON-RPC methods |
+| `./das` | `DasClient` | NFT / cNFT / fungible (Metaplex Read API) |
+| `./websocket` | `WsClient` | PubSub subscriptions (browser+node) |
+| `./grpc` | `GrpcTransport` | Yellowstone/Geyser streaming (node only) |
+| `./accounts` | `AccountsClient` | Decoded fetchers (Token, Mint, Stake, Nonce, LUT) |
+| `./kit` | bridge fns | `@solana/kit` interop, signers |
+| `./programs` | program-id constants | System, SPL Token, ATA, Memo… |
+| `./decoders` | zero-dep decoders | Token-2022, Stake, Nonce, Multisig, LUT |
+| `./utils` | `SynapseNetwork`, `SynapseRegion`, `autoSelectRegion` | Endpoint resolution |
+| `./ai` | barrel | All AI integrations |
+| `./ai/tools` | `createExecutableSolanaTools` | 53 RPC LangChain tools |
+| `./ai/tools/protocols` | `createJupiterTools`, `createRaydiumTools`, `createMetaplexTools` | Per-protocol tool factories |
+| `./ai/plugins` | `SynapseAgentKit`, plugin objects | Chainable kit (110+ tools) |
+| `./ai/plugins/{token,nft,defi,misc,blinks}` | plugin objects | Single-domain plugins |
+| `./ai/mcp` | `SynapseMcpServer`, `McpClientBridge` | MCP server + client |
+| `./ai/sap` | `SynapseAnchorSap` | SAP bridge (Anchor provider) |
+| `./ai/gateway` | `AgentGateway` | Pricing, sessions, attestation |
+| `./ai/gateway/x402` | `X402Paywall`, `X402Client`, `FacilitatorClient` | x402 payment protocol v1+v2 |
+| `./ai/gateway/monetize` | helpers | Pricing helpers |
+| `./ai/actions` | Solana Actions / Blinks | URL generation |
+| `./ai/intents` | intent parser/planner/executor | Cross-protocol DAG planner |
+| `./ai/persistence` | session persistence | Conversation state |
+| `./next` | `synapseResponse`, `withSynapseError`, `createSynapseProvider` | Next.js helpers |
+| `./context` | context mgmt | Multi-step flows |
+
+---
+
+## A.2 Provider catalog (every wrapper class)
+
+### `SynapseClient` — main orchestrator
+
+```ts
+import { SynapseClient, Pubkey } from '@oobe-protocol-labs/synapse-client-sdk';
+import { SynapseNetwork, SynapseRegion } from '@oobe-protocol-labs/synapse-client-sdk/utils';
+
+// Direct endpoint
+const client = new SynapseClient({
+  endpoint: process.env.SYNAPSE_RPC!,
+  apiKey: process.env.SYNAPSE_API_KEY,
+  timeout: 30_000,
+  maxRetries: 3,
+  debug: false,
+});
+
+// Network + region (auto-resolve)
+const client2 = SynapseClient.fromEndpoint({
+  network: SynapseNetwork.Mainnet,
+  region: SynapseRegion.US,
+  apiKey: process.env.SYNAPSE_API_KEY,
+});
+```
+
+Lazy sub-clients (zero cost if unused): `client.rpc`, `client.das`, `client.ws`, `client.grpc`, `client.accounts`, `client.kitRpc`, `client.kitSubscriptions`.
+
+### `HttpTransport`
+- Auto retry on `-32601` (method-not-allowed)
+- Per-call timeout override
+- BigInt-safe JSON serialization
+
+### `SolanaRpc` — 53 typed methods
+Account: `getBalance`, `getAccount`, `getMultipleAccounts`, `getProgramAccounts`, `getAccountInfo` ・ Tx: `sendTransaction`, `getTransaction`, `getTransactionCount` ・ Slot/epoch: `getSlot`, `getEpochInfo` ・ Rent: `getMinimumBalanceForRentExemption` ・ Token: `getTokenAccountsByOwner`, `getTokenAccountsByDelegate`, `getTokenSupply`, `getTokenLargestAccounts` ・ +38 altri.
+
+### `DasClient` — Metaplex Read API
+`getAsset`, `getAssetProof`, `getAssetBatch`, `getAssetsByOwner|Group|Creator|Authority`, `searchAssets`, `getTokenAccounts`.
+
+### `WsClient` — PubSub
+Auto-reconnect + backoff + ping/pong. Methods: `onAccountChange`, `onProgramAccountChange`, `onLogs`, `onSignature`, `onSlotChange`, `onRootChange`, `unsubscribe(localId)`, `close`.
+
+### `GrpcTransport` — Yellowstone/Geyser (Node only)
+`loadProto(path, package)`, `getService<T>(name)`, `unary<TReq,TRes>(service, method, req, opts)`, `close()`.
+
+### `AccountsClient`
+`fetchTokenAccount`, `fetchMint`, `fetchTokenAccountsByOwner(owner, mint?)`, `fetchStakeAccount`, `fetchNonceAccount`, `fetchLookupTable`, `fetchDecoded<T>(pubkey, decoder)`, `fetchDecodedMultiple<T>(pubkeys, decoder)`.
+
+---
+
+## A.3 Plugin / Wrapper system (`SynapseAgentKit`)
+
+### Registry
+
+```ts
+import { SynapseAgentKit, TokenPlugin, NFTPlugin, DeFiPlugin, MiscPlugin, BlinksPlugin } from '@oobe-protocol-labs/synapse-client-sdk/ai/plugins';
+
+const kit = new SynapseAgentKit({
+  rpcUrl: process.env.SYNAPSE_RPC!,
+  apiKey: process.env.SYNAPSE_API_KEY,
+  walletPubkey: process.env.WALLET_PUBKEY,
+  protocolConfig: {
+    jupiter: { apiKey: process.env.JUPITER_API_KEY },
+    raydium: { apiKey: process.env.RAYDIUM_API_KEY },
+  },
+  toolOpts: { prefix: 'solana_', prettyJson: true },
+  mcpEnabled: false,
+});
+
+kit.use(TokenPlugin)
+   .use(DeFiPlugin)
+   .use(NFTPlugin)
+   .use(MiscPlugin)
+   .use(BlinksPlugin);
+
+const tools         = kit.getTools();             // ProtocolTool[]
+const map           = kit.getToolMap();           // by name
+const tokenTools    = kit.getPluginTools('token');
+const raydiumKit    = kit.getProtocolToolkit('defi', 'raydium-pools');
+const mcpDescriptors= kit.getMcpToolDescriptors();
+const vercelTools   = kit.getVercelAITools();
+const summary       = kit.summary();
+```
+
+### Plugin shape
+
+```ts
+interface SynapsePlugin {
+  meta: { id: string; name: string; description: string; version: string };
+  protocols: readonly PluginProtocol[];
+  install(ctx: PluginContext): {
+    executor: (m: ProtocolMethod, input: any, ctx: PluginContext) => Promise<unknown>;
+    teardown?: () => Promise<void>;
+    httpClients?: Record<string, { baseUrl: string; getHeaders: () => Record<string,string> }>;
+  };
+}
+```
+
+### Built-in plugins (110+ tools)
+
+| Plugin | Protocols | Tools |
+|---|---|---|
+| `TokenPlugin` | spl-token (11), staking (7), bridging (4) | **22** |
+| `NFTPlugin` | metaplex-nft (9), 3land (5), das (5) | **19** |
+| `DeFiPlugin` | pump (2), raydium-pools (5), orca (5), manifest (4), meteora (5), openbook (3), drift (7), adrena (5), lulo (4), jito (3) | **43** |
+| `MiscPlugin` | sns (3), alldomains (3), pyth (3), coingecko (6), gibwork (3), send-arcade (2) | **20** |
+| `BlinksPlugin` | blinks (6) | **6** |
+
+### Tool execution sample
+
+```ts
+// Transfer USDC via TokenPlugin
+const transfer = kit.getToolMap()['spl_token_transfer'];
+const result = await transfer.invoke({
+  mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+  to: 'D7r…xYZ',
+  amount: '1000000', // 1 USDC
+  owner: '<signer>',
+});
+```
+
+### Custom plugin (build your own)
+
+```ts
+import type { SynapsePlugin, PluginContext } from '@oobe-protocol-labs/synapse-client-sdk/ai/plugins';
+import { z } from 'zod';
+
+const MyPlugin: SynapsePlugin = {
+  meta: { id: 'myco', name: 'MyCo', description: 'In-house tools', version: '1.0.0' },
+  protocols: [{
+    id: 'analytics',
+    name: 'MyCo Analytics',
+    methods: [{
+      name: 'reportRevenue',
+      protocol: 'analytics',
+      input: z.object({ period: z.enum(['day','week','month']) }),
+      output: z.object({ totalUsdc: z.string() }),
+    }],
+  }],
+  install(ctx) {
+    return {
+      executor: async (method, input) => {
+        if (method.name === 'reportRevenue') return { totalUsdc: '12345.67' };
+        throw new Error('unknown method');
+      },
+    };
+  },
+};
+
+kit.use(MyPlugin);
+```
+
+---
+
+## A.4 LangChain tools (139+)
+
+### Solana RPC tools (53)
+
+```ts
+import { createExecutableSolanaTools } from '@oobe-protocol-labs/synapse-client-sdk/ai/tools';
+
+const { tools, toolMap } = createExecutableSolanaTools(client, {
+  prefix: 'solana_',
+  include: ['getBalance','getSlot','getTransaction'],
+  prettyJson: true,
+});
+```
+
+### Protocol tools
+
+```ts
+import { createJupiterTools, createRaydiumTools, createMetaplexTools }
+  from '@oobe-protocol-labs/synapse-client-sdk/ai/tools';
+
+const jupiter  = createJupiterTools({ apiUrl: 'https://api.jup.ag', apiKey: process.env.JUPITER_API_KEY });
+const raydium  = createRaydiumTools({ apiUrl: 'https://api.raydium.io', apiKey: process.env.RAYDIUM_API_KEY });
+const metaplex = createMetaplexTools(client);
+```
+
+### Custom protocol toolkit
+
+```ts
+import { buildProtocolTools, type ProtocolMethod } from '@oobe-protocol-labs/synapse-client-sdk/ai/tools';
+import { z } from 'zod';
+
+const methods: ProtocolMethod[] = [{
+  name: 'getQuote',
+  protocol: 'myco',
+  httpMethod: 'GET',
+  path: '/quote',
+  input: z.object({ from: z.string(), to: z.string(), amount: z.string() }),
+  output: z.object({ price: z.string() }),
+}];
+
+const toolkit = buildProtocolTools(methods, async (method, input) => {
+  return fetch(`https://api.myco.io${method.path}?${new URLSearchParams(input as any)}`).then(r => r.json());
+});
+```
+
+---
+
+## A.5 MCP — Model Context Protocol
+
+### Server (expose your kit as an MCP server)
+
+```ts
+import { SynapseMcpServer } from '@oobe-protocol-labs/synapse-client-sdk/ai/mcp';
+
+// stdio (for Claude Desktop / Cursor)
+const server = new SynapseMcpServer(kit, {
+  name: 'synapse-merchant',
+  version: '1.0.0',
+  instructions: 'On-chain merchant tools for SAP agents',
+  transport: 'stdio',
+});
+await server.start();
+
+// SSE (web clients)
+const sse = new SynapseMcpServer(kit, { transport: 'sse', ssePort: 3001, ssePath: '/mcp' });
+await sse.start();
+```
+
+`claude_desktop_config.json`:
+```json
+{ "mcpServers": { "synapse-merchant": {
+  "command": "node", "args": ["./dist/mcp-server.js"],
+  "env": { "SYNAPSE_RPC": "...", "SYNAPSE_API_KEY": "sk-...", "MERCHANT_KEYPAIR": "[1,2,...]" }
+}}}
+```
+
+### Client (consume external MCP servers)
+
+```ts
+import { McpClientBridge } from '@oobe-protocol-labs/synapse-client-sdk/ai/mcp';
+
+const bridge = new McpClientBridge();
+await bridge.connect({
+  id: 'github', name: 'GitHub',
+  transport: 'stdio',
+  command: 'npx', args: ['@modelcontextprotocol/server-github'],
+  env: { GITHUB_TOKEN: process.env.GITHUB_TOKEN! },
+});
+
+const tools  = bridge.getTools();
+const result = await bridge.callTool('github', 'search_repositories', { query: 'solana' });
+
+// Convert MCP server into a SynapseAgentKit plugin
+const plugin = bridge.toPlugin();
+kit.use(plugin);
+```
+
+---
+
+## A.6 x402 payment protocol (paywall + client + facilitator)
+
+### Architecture
+- **Client (buyer)** — gets `402 Payment Required`, signs payload, retries with `PAYMENT-SIGNATURE` header
+- **Resource server (seller)** — `X402Paywall`: returns 402 if no payment, verifies + executes + settles
+- **Facilitator** — verifies signatures + submits on-chain settlement (`/verify`, `/settle`, `/supported`)
+
+### Known facilitators
+
+```ts
+import { createFacilitator, KnownFacilitator, FacilitatorDiscovery, SOLANA_MAINNET }
+  from '@oobe-protocol-labs/synapse-client-sdk';
+
+createFacilitator();                                 // default: PayAI
+createFacilitator(KnownFacilitator.Dexter);
+createFacilitator(KnownFacilitator.RelAI);           // gas-sponsored
+
+const best = await new FacilitatorDiscovery().findBest({
+  network: SOLANA_MAINNET, preferGasSponsored: true, healthCheck: true,
+});
+```
+
+Enum: `PayAI | Dexter | RelAI | CDP | AutoIncentive | SolPay | CoinbaseDefault`.
+
+### Paywall (seller)
+
+```ts
+import { X402Paywall, SOLANA_MAINNET, USDC_SOLANA_MAINNET } from '@oobe-protocol-labs/synapse-client-sdk';
+
+const paywall = new X402Paywall({
+  enabled: true,
+  payTo: process.env.MERCHANT_PUBKEY!,
+  facilitator: { url: 'https://facilitator.payai.network' },
+  defaultNetwork: SOLANA_MAINNET,
+  defaultAsset:   USDC_SOLANA_MAINNET,        // SAP v0.2.0 allowlist: SOL or USDC
+  defaultPrice:   '1000',                      // 0.001 USDC per call
+});
+
+const result = await paywall.processRequest('runTool', headers);
+if (result.type === 'payment-required') return Response.json(result.body, { status: 402, headers: result.headers });
+if (result.type === 'payment-valid') {
+  const data = await runUserCode();
+  const settle = await paywall.settleAfterResponse(result.paymentPayload, result.requirements);
+  return Response.json(data, { headers: settle.responseHeader ? { 'PAYMENT-RESPONSE': settle.responseHeader } : {} });
+}
+```
+
+### Client (buyer)
+
+```ts
+import { X402Client, SOLANA_MAINNET, USDC_SOLANA_MAINNET } from '@oobe-protocol-labs/synapse-client-sdk';
+
+const x402 = new X402Client({
+  enabled: true,
+  signer: async (req, res) => {
+    // Build & sign Solana TransferChecked tx → return base64
+    const tx = await buildPaymentTx(req, res);
+    return { x402Version: 2, accepted: req, resource: res, payload: { transaction: tx.toBase64() } };
+  },
+  preferredNetwork: SOLANA_MAINNET,
+  preferredAsset: USDC_SOLANA_MAINNET,
+  maxAmountPerCall: '10000',          // 0.01 USDC max per call
+  maxRetries: 1,
+  autoDetect: true,
+  budgetCheck: async (amount) => (await getBudget()) >= BigInt(amount),
+});
+
+const r = await x402.fetch(MERCHANT_URL, { method: 'POST', body: JSON.stringify({…}) });
+```
+
+### Network / asset constants
+- `SOLANA_MAINNET` = `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp`
+- `SOLANA_DEVNET` = `solana:EtWTRABZaYq6iMfeYKA7Kmt9SnEYrFCMWmcrVHnvxF94`
+- `USDC_SOLANA_MAINNET` = `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`
+- `USDC_SOLANA_DEVNET` = `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`
+- helpers: `isSvmNetwork(n)`, `isEvmNetwork(n)`
+
+> **SAP integration tip** — Set `payTo` to the agent's `vault` PDA so the x402 settlement deposits funds directly into the SAP escrow / vault, then call `settleEscrow(...)` server-side once the resource has been delivered.
+
+---
+
+## A.7 SAP bridge (`SynapseAnchorSap`)
+
+```ts
+import { SynapseAnchorSap } from '@oobe-protocol-labs/synapse-client-sdk/ai/sap';
+import { SynapseNetwork } from '@oobe-protocol-labs/synapse-client-sdk/utils';
+
+// From an existing SynapseClient
+const sap = SynapseAnchorSap.fromSynapseClient(client, wallet);
+
+// Direct
+const sap2 = SynapseAnchorSap.create({
+  wallet, network: SynapseNetwork.Mainnet, apiKey: process.env.SYNAPSE_API_KEY,
+});
+
+const agents = await sap.agent.discover();
+const tools  = await sap.tool.listForAgent(agentPubkey);
+const builder= sap.builder;     // low-level tx builder
+```
+
+---
+
+## A.8 Next.js helpers
+
+```ts
+// app/api/agents/route.ts
+import { synapseResponse, withSynapseError, createSynapseProvider }
+  from '@oobe-protocol-labs/synapse-client-sdk/next';
+
+const getClient = createSynapseProvider({
+  endpoint: process.env.SYNAPSE_RPC!,
+  apiKey:   process.env.SYNAPSE_API_KEY,
+});
+
+export const GET = withSynapseError(async (req) => {
+  const sap = SynapseAnchorSap.fromSynapseClient(getClient(), serverWallet);
+  const agents = await sap.agent.discover();
+  return synapseResponse({ agents });   // BigInt-safe
+});
+```
+
+Benefits: BigInt → string serialization, error envelope, HMR-safe singleton.
+
+---
+
+## A.9 Env vars contract
+
+```bash
+# Synapse Client SDK
+SYNAPSE_RPC=https://rpc.synapse.com         # or use SynapseClient.fromEndpoint
+SYNAPSE_API_KEY=sk-…
+SYNAPSE_NETWORK=mainnet                      # mainnet | devnet | testnet
+SYNAPSE_REGION=US                            # US | EU
+SYNAPSE_RPC_TIMEOUT=30000
+SYNAPSE_WS_ENDPOINT=                         # auto-derived if absent
+SYNAPSE_GRPC_ENDPOINT=
+
+# SAP merchant
+MERCHANT_KEYPAIR=[…]                         # JSON array
+MERCHANT_PUBKEY=…
+SAP_PROGRAM_ID=SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ
+
+# x402
+X402_FACILITATOR_URL=https://facilitator.payai.network
+X402_DEFAULT_PRICE=1000                      # micro-USDC
+
+# Optional protocol API keys
+JUPITER_API_KEY=
+RAYDIUM_API_KEY=
+```
+
+---
+
+# 🛠 APPENDIX B — Build a SAP Merchant Server end-to-end (on-chain)
+
+> Goal: a TypeScript server that (a) registers an on-chain agent, (b) publishes a JSON-Schema'd tool, (c) stakes 0.1 SOL minimum, (d) accepts x402 micropayments, (e) serves the tool, (f) settles escrows on-chain via `settleEscrow` + `deriveSettlementReceipt`.
+>
+> Stack: `@oobe-protocol-labs/synapse-sap-sdk@0.10.1` + `@oobe-protocol-labs/synapse-client-sdk@2.0.6` + Next.js 14 (App Router) or any Node HTTP server.
+
+## B.1 Project layout
+
+```
+my-merchant/
+├─ src/
+│  ├─ sap/
+│  │  ├─ wallet.ts         # signer
+│  │  ├─ client.ts         # SapClient + SynapseClient singletons
+│  │  ├─ register.ts       # one-shot bootstrap script
+│  │  └─ settle.ts         # settlement workers
+│  ├─ tools/
+│  │  ├─ schema.json       # JSON-Schema input/output
+│  │  ├─ handler.ts        # business logic
+│  │  └─ index.ts          # tool registry
+│  ├─ x402/
+│  │  └─ paywall.ts        # X402Paywall instance
+│  ├─ mcp/
+│  │  └─ server.ts         # MCP exposure (optional)
+│  └─ http/
+│     └─ server.ts         # Express / Next route
+├─ scripts/
+│  └─ bootstrap.ts         # registerAgent → publishTool → stake
+├─ .env
+└─ package.json
+```
+
+## B.2 Singletons (server-only)
+
+```ts
+// src/sap/client.ts
+import 'server-only';
+import { SynapseClient } from '@oobe-protocol-labs/synapse-client-sdk';
+import { SynapseAnchorSap } from '@oobe-protocol-labs/synapse-client-sdk/ai/sap';
+import { Keypair } from '@solana/web3.js';
+
+const wallet = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(process.env.MERCHANT_KEYPAIR!)));
+
+export const synapse = new SynapseClient({
+  endpoint: process.env.SYNAPSE_RPC!,
+  apiKey:   process.env.SYNAPSE_API_KEY,
+});
+
+export const sap = SynapseAnchorSap.fromSynapseClient(synapse, wallet);
+export const merchantKeypair = wallet;
+```
+
+## B.3 Bootstrap script — register → publish → stake
+
+```ts
+// scripts/bootstrap.ts
+import { sap, merchantKeypair } from '../src/sap/client';
+import {
+  MIN_AGENT_STAKE_LAMPORTS,        // 100_000_000n (0.1 SOL)
+  USDC_MINT_MAINNET,
+  isAcceptedPaymentToken,
+  computeBatchRoot,
+  deriveSettlementReceipt,
+} from '@oobe-protocol-labs/synapse-sap-sdk';
+import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
+import { sha256 } from '@noble/hashes/sha256';
+import { readFileSync } from 'node:fs';
+
+async function main() {
+  // 1. Register agent
+  const agentPda = await sap.agent.register({
+    name: 'my-merchant',
+    description: 'On-chain weather oracle agent',
+    metadataUri: 'https://my-merchant.com/agent.json',
+    capabilities: ['weather.lookup'],
+  });
+  console.log('agent:', agentPda.toBase58());
+
+  // 2. Stake the MIN floor (0.1 SOL) — required for escrow acceptance
+  await sap.stake.deposit({ agent: agentPda, lamports: MIN_AGENT_STAKE_LAMPORTS });
+
+  // 3. Publish a tool with JSON-Schema (REQUIRED in v0.2.0)
+  const schema     = readFileSync('src/tools/schema.json');
+  const schemaHash = sha256(schema);                       // 32 bytes
+  const schemaUri  = 'https://my-merchant.com/schemas/weather.json';
+
+  await sap.tool.publish({
+    agent: agentPda,
+    toolId: 'weather-lookup',
+    name: 'Weather Lookup',
+    description: 'Returns hourly forecast',
+    schemaUri,
+    schemaHash,
+    inputHash:  sha256(Buffer.from('input-schema')),       // for hardening
+    outputHash: sha256(Buffer.from('output-schema')),
+    pricing: { tokenMint: USDC_MINT_MAINNET, amount: 1_000n },  // 0.001 USDC
+  });
+
+  // 4. Validate payment token (assert)
+  if (!isAcceptedPaymentToken(USDC_MINT_MAINNET)) throw new Error('token not allowed');
+
+  console.log('merchant ready ✅');
+}
+main().catch(e => { console.error(e); process.exit(1); });
+```
+
+## B.4 x402 paywall middleware
+
+```ts
+// src/x402/paywall.ts
+import { X402Paywall, SOLANA_MAINNET, USDC_SOLANA_MAINNET } from '@oobe-protocol-labs/synapse-client-sdk';
+
+export const paywall = new X402Paywall({
+  enabled: true,
+  payTo: process.env.MERCHANT_PUBKEY!,           // = agent vault PDA recommended
+  facilitator: { url: process.env.X402_FACILITATOR_URL! },
+  defaultNetwork: SOLANA_MAINNET,
+  defaultAsset:   USDC_SOLANA_MAINNET,
+  defaultPrice:   process.env.X402_DEFAULT_PRICE ?? '1000',
+});
+```
+
+## B.5 HTTP handler (Next.js App Router)
+
+```ts
+// app/api/tools/weather/route.ts
+import { paywall } from '@/x402/paywall';
+import { runWeather } from '@/tools/handler';
+import { sap, merchantKeypair } from '@/sap/client';
+import { deriveSettlementReceipt } from '@oobe-protocol-labs/synapse-sap-sdk';
+import { synapseResponse, withSynapseError } from '@oobe-protocol-labs/synapse-client-sdk/next';
+
+export const POST = withSynapseError(async (req) => {
+  const body    = await req.json();
+  const headers = Object.fromEntries(req.headers);
+
+  // 1. Paywall gate
+  const gate = await paywall.processRequest('weather.lookup', headers);
+  if (gate.type === 'payment-required') {
+    return new Response(JSON.stringify(gate.body), { status: 402, headers: gate.headers });
+  }
+
+  // 2. Run the tool
+  const result = await runWeather(body);
+
+  // 3. Settle x402 (off-chain rails)
+  let settlementHeader: Record<string,string> = {};
+  if (gate.type === 'payment-valid') {
+    const settle = await paywall.settleAfterResponse(gate.paymentPayload, gate.requirements);
+    if (settle.responseHeader) settlementHeader = { 'PAYMENT-RESPONSE': settle.responseHeader };
+  }
+
+  // 4. (Optional) Settle on-chain SAP escrow + emit settlement receipt PDA
+  if (body.escrowPda) {
+    const escrow = new PublicKey(body.escrowPda);
+    const serviceHash = await hashServiceCall(body, result);          // your scheme
+    const [receiptPda] = deriveSettlementReceipt(escrow, serviceHash);
+    await sap.escrow.settle({
+      escrow,
+      payer: merchantKeypair.publicKey,
+      receipt: receiptPda,
+      serviceHash,
+    });
+    settlementHeader['SAP-RECEIPT'] = receiptPda.toBase58();
+  }
+
+  return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json', ...settlementHeader }});
+});
+```
+
+## B.6 Batch settlement worker (high-throughput merchants)
+
+```ts
+// src/sap/settle.ts — process N escrows in one batch
+import { computeBatchRoot, deriveSettlementReceipt } from '@oobe-protocol-labs/synapse-sap-sdk';
+
+export async function batchSettle(escrows: { escrow: PublicKey; serviceHash: Uint8Array }[]) {
+  const root = computeBatchRoot(escrows.map(e => e.serviceHash));      // 32-byte merkle root
+  const [batchReceipt] = deriveSettlementReceipt(escrows[0].escrow, root);
+
+  for (const e of escrows) {
+    const [r] = deriveSettlementReceipt(e.escrow, e.serviceHash);
+    // emit per-receipt or include in single batch ix depending on program version
+  }
+
+  await sap.escrow.settleBatch({ escrows, batchRoot: root, batchReceipt });
+}
+```
+
+## B.7 MCP exposure (optional)
+
+```ts
+// src/mcp/server.ts
+import { SynapseAgentKit, TokenPlugin } from '@oobe-protocol-labs/synapse-client-sdk/ai/plugins';
+import { SynapseMcpServer } from '@oobe-protocol-labs/synapse-client-sdk/ai/mcp';
+import { merchantPlugin } from './plugin';
+
+const kit = new SynapseAgentKit({ rpcUrl: process.env.SYNAPSE_RPC! })
+  .use(TokenPlugin)
+  .use(merchantPlugin);                              // your custom plugin from A.3
+
+await new SynapseMcpServer(kit, { transport: 'stdio', name: 'my-merchant' }).start();
+```
+
+---
+
+# 🔁 APPENDIX C — Extending an existing merchant server
+
+## C.1 Add a new tool (zero-downtime)
+
+```ts
+// 1. Publish on-chain (additive, no migration needed)
+await sap.tool.publish({ agent: agentPda, toolId: 'weather-radar', schemaUri, schemaHash, ... });
+
+// 2. Register handler
+toolRegistry.set('weather-radar', radarHandler);
+
+// 3. Hot-route in HTTP
+app.post('/api/tools/:id', async (req, res) => {
+  const handler = toolRegistry.get(req.params.id);
+  if (!handler) return res.status(404).json({ error: 'unknown tool' });
+  // ...paywall + handler + settle
+});
+```
+
+## C.2 Rotate pricing
+
+```ts
+await sap.tool.updatePricing({ agent: agentPda, toolId: 'weather-lookup', amount: 2_000n });
+// x402 paywall reads `defaultPrice` per request — push new price via env or DB
+```
+
+## C.3 Re-stake / top-up
+
+```ts
+import { MIN_AGENT_STAKE_LAMPORTS } from '@oobe-protocol-labs/synapse-sap-sdk';
+
+const current = await sap.stake.get(agentPda);
+if (current.staked < MIN_AGENT_STAKE_LAMPORTS) {
+  await sap.stake.deposit({ agent: agentPda, lamports: MIN_AGENT_STAKE_LAMPORTS - current.staked });
+}
+```
+
+`request_unstake` will refuse to drop below `MIN_STAKE`.
+
+## C.4 Migrate from non-hardened (pre-v0.2.0)
+
+1. **Verify schema** — if a published tool has `schema_uri == ""`, re-publish with valid schema. SDK 0.10.1+ refuses `publishTool` without schema.
+2. **Verify token allowlist** — call `isAcceptedPaymentToken(mint)` before any pricing update.
+3. **Rotate delegate** — `MAX_DELEGATE_DURATION_SECS` = 365 days. Old delegates beyond this are still honored on-chain but new grants are clamped.
+
+## C.5 Indexer + monitoring
+
+```ts
+client.ws.onLogs({ mentions: [SAP_PROGRAM_ID] }, (n) => {
+  // Stream EscrowSettled, ToolPublished, StakeDeposited events
+  parseEvent(n.value.logs).forEach(processEvent);
+});
+
+// or via Geyser
+const grpc = client.grpc;
+grpc.loadProto('./proto/geyser.proto', 'geyser');
+const svc = grpc.getService('Geyser');
+const stream = svc.subscribe({ accounts: { sap: { owner: [SAP_PROGRAM_ID] } } });
+```
+
+---
+
+# 🛡 APPENDIX D — Best practices
+
+## D.1 Signer management
+- **Never** hold the merchant keypair in a long-lived process if avoidable. Use:
+  - **`@solana/kit` signer abstraction** for HW / KMS integration
+  - **Squads multisig** for high-value vaults (treasury > 10 SOL)
+  - **Ephemeral session signers** for x402 settlement — derive from main vault, expire daily
+- Rotate API keys every 90 days; SDK reads `apiKey` lazily so rotation is hot.
+
+## D.2 Retry & idempotency
+- All `sap.escrow.settle*` calls **must be idempotent** by `(escrow, serviceHash)`. Re-submitting yields same receipt PDA → on-chain rejects duplicates.
+- For x402: set `maxRetries: 3` only when `signer` is itself idempotent (uses nonce/blockhash properly).
+- Use `getMinimumBalanceForRentExemption` once at boot, cache it — it changes ~yearly.
+
+## D.3 Schema discipline (v0.2.0 hardening)
+- Every tool MUST have `schema_uri` AND `schema_hash`. SDK enforces.
+- Keep schemas under 2 KB inline OR reference IPFS / Arweave URI.
+- Use `inputHash` + `outputHash` so consumers can verify they invoke the right schema version.
+- Bump `toolId` (don't mutate) for breaking schema changes — preserves replay history.
+
+## D.4 Token allowlist (SOL/USDC only)
+- Mainnet USDC: `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`
+- Devnet USDC: `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`
+- Helpers: `isAcceptedPaymentToken(mint)`, `isAcceptedUsdcMint(mint)`
+- The on-chain `validate_payment_token` will reject anything else — fail fast client-side.
+
+## D.5 Indexing & queryability
+- Always store the **PDA** (not the raw seed) in your DB — re-derivation is expensive.
+- For dashboards: combine `getProgramAccounts` (cold) + WebSocket `onLogs` (hot) + Geyser (firehose).
+- Use `MemcmpFilter` on the discriminator (first 8 bytes) to scope `getProgramAccounts` queries.
+- Cap result size: SAP has ~8 live agents today, but indexer should paginate (1000 accounts/page).
+
+## D.6 Settlement receipts
+- PDA: `["sap_recv", escrow, key]` where `key = service_hash` (single) or `computeBatchRoot([...])` (batch).
+- Single-escrow: settle inline in the response handler (B.5).
+- Batch (>10 escrows): queue + flush every N seconds via worker (B.6) — saves CU.
+- Always emit `SAP-RECEIPT` HTTP header so clients can verify.
+
+## D.7 Monitoring SLOs
+| Metric | Target |
+|---|---|
+| Escrow settlement latency | p95 < 5s after request close |
+| x402 verify call | p95 < 800ms |
+| Stake floor health | always ≥ MIN_STAKE; alert if delta < 10% |
+| Tool schema availability | URI returns 200 + matches `schema_hash` |
+
+## D.8 Security
+- Pin `synapse-sap-sdk` to exact patch (`0.10.1`, not `^0.10.0`) until v1 — rapid hardening releases.
+- Run a `solana-security-review` skill pass before each deploy.
+- Never expose `MERCHANT_KEYPAIR` to client bundles. All SDK calls **must** be server-only (Next.js: `import 'server-only'` at top of `client.ts`).
+- Validate `escrowPda` ownership before settling — prevents griefing via spoofed settle requests.
+
+---
+
+# 📦 APPENDIX E — Cheat-sheet imports
+
+```ts
+// SAP SDK (v0.10.1)
+import {
+  SapClient,
+  // PDAs
+  deriveAgent, deriveTool, deriveStake, deriveEscrow, deriveSettlementReceipt,
+  // utils
+  sha256, hashToArray, computeBatchRoot,
+  // hardening constants
+  MIN_AGENT_STAKE_LAMPORTS, MAX_DELEGATE_DURATION_SECS,
+  // tokens
+  USDC_MINT_MAINNET, USDC_MINT_DEVNET,
+  isAcceptedPaymentToken, isAcceptedUsdcMint,
+} from '@oobe-protocol-labs/synapse-sap-sdk';
+
+// Synapse Client SDK (v2.0.6)
+import { SynapseClient, Pubkey } from '@oobe-protocol-labs/synapse-client-sdk';
+import { SynapseAnchorSap }       from '@oobe-protocol-labs/synapse-client-sdk/ai/sap';
+import { SynapseAgentKit, TokenPlugin, DeFiPlugin, NFTPlugin, MiscPlugin, BlinksPlugin }
+                                  from '@oobe-protocol-labs/synapse-client-sdk/ai/plugins';
+import { SynapseMcpServer, McpClientBridge } from '@oobe-protocol-labs/synapse-client-sdk/ai/mcp';
+import {
+  X402Paywall, X402Client, FacilitatorClient,
+  createFacilitator, KnownFacilitator, FacilitatorDiscovery,
+  SOLANA_MAINNET, SOLANA_DEVNET, USDC_SOLANA_MAINNET, USDC_SOLANA_DEVNET,
+} from '@oobe-protocol-labs/synapse-client-sdk';
+import { synapseResponse, withSynapseError, createSynapseProvider }
+                                  from '@oobe-protocol-labs/synapse-client-sdk/next';
+```

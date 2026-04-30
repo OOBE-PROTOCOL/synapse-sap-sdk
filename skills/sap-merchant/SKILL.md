@@ -4393,3 +4393,150 @@ for (const p of payments) {
 > **See also:**
 > - [skills.md](./skills.md) — Full Synapse Client SDK reference (RPC, DAS, AI tools, plugins, MCP, gateway, Next.js)
 > - [cli/README.md](../cli/README.md) — `synapse-sap` CLI — 10 command groups, 40+ subcommands for terminal-based protocol access
+
+
+---
+
+# 🏗 BUILD A MERCHANT SERVER END-TO-END (v0.10.1 + Synapse Client 2.0.6)
+
+> Hands-on pipeline. Pair this with `sap-overview` Appendix B for full context.
+
+## Stack
+- `@oobe-protocol-labs/synapse-sap-sdk@0.10.1`
+- `@oobe-protocol-labs/synapse-client-sdk@2.0.6`
+- Node 20+ / Next.js 14 (App Router) optional
+
+## Quick contract
+- Agent MUST hold **all four**: stake ≥ 0.1 SOL, ≥1 tool, every tool with `schema_uri` + `schema_hash`, payment token in {SOL, USDC}.
+- Settlement: emit `SAP-RECEIPT` header with PDA from `deriveSettlementReceipt(escrow, key)` — `key = service_hash` (single) or `computeBatchRoot([...])` (batch).
+
+## Pipeline (one-shot bootstrap)
+
+```ts
+import { SynapseClient } from '@oobe-protocol-labs/synapse-client-sdk';
+import { SynapseAnchorSap } from '@oobe-protocol-labs/synapse-client-sdk/ai/sap';
+import {
+  MIN_AGENT_STAKE_LAMPORTS, USDC_MINT_MAINNET,
+  isAcceptedPaymentToken, deriveSettlementReceipt, computeBatchRoot,
+} from '@oobe-protocol-labs/synapse-sap-sdk';
+import { Keypair } from '@solana/web3.js';
+import { sha256 } from '@noble/hashes/sha256';
+
+const wallet = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(process.env.MERCHANT_KEYPAIR!)));
+const synapse = new SynapseClient({ endpoint: process.env.SYNAPSE_RPC!, apiKey: process.env.SYNAPSE_API_KEY });
+const sap     = SynapseAnchorSap.fromSynapseClient(synapse, wallet);
+
+// 1) register agent
+const agent = await sap.agent.register({
+  name: 'my-merchant',
+  description: 'Weather oracle',
+  metadataUri: 'https://my-merchant.com/agent.json',
+  capabilities: ['weather.lookup'],
+});
+
+// 2) stake the FLOOR (mandatory for escrow acceptance)
+await sap.stake.deposit({ agent, lamports: MIN_AGENT_STAKE_LAMPORTS });
+
+// 3) publish a TOOL with schema (REQUIRED in v0.2.0)
+const schema = readFileSync('schemas/weather.json');
+await sap.tool.publish({
+  agent,
+  toolId: 'weather-lookup',
+  name: 'Weather Lookup',
+  description: 'Hourly forecast',
+  schemaUri: 'https://my-merchant.com/schemas/weather.json',
+  schemaHash: sha256(schema),
+  inputHash:  sha256(Buffer.from(JSON.stringify(parsedSchema.input))),
+  outputHash: sha256(Buffer.from(JSON.stringify(parsedSchema.output))),
+  pricing: { tokenMint: USDC_MINT_MAINNET, amount: 1_000n },
+});
+
+// 4) sanity-check token allowlist
+if (!isAcceptedPaymentToken(USDC_MINT_MAINNET)) throw new Error('token not allowed');
+```
+
+## HTTP gate (x402 + SAP settlement)
+
+```ts
+import { X402Paywall, SOLANA_MAINNET, USDC_SOLANA_MAINNET }
+  from '@oobe-protocol-labs/synapse-client-sdk';
+
+const paywall = new X402Paywall({
+  enabled: true,
+  payTo: agentVaultPda.toBase58(),                  // settle straight into vault
+  facilitator: { url: process.env.X402_FACILITATOR_URL! },
+  defaultNetwork: SOLANA_MAINNET,
+  defaultAsset:   USDC_SOLANA_MAINNET,
+  defaultPrice:   '1000',                            // 0.001 USDC
+});
+
+export async function POST(req: Request) {
+  const headers = Object.fromEntries(req.headers);
+  const gate = await paywall.processRequest('weather.lookup', headers);
+  if (gate.type === 'payment-required')
+    return new Response(JSON.stringify(gate.body), { status: 402, headers: gate.headers });
+
+  const body   = await req.json();
+  const result = await runWeather(body);
+
+  let extra: Record<string,string> = {};
+  if (gate.type === 'payment-valid') {
+    const settle = await paywall.settleAfterResponse(gate.paymentPayload, gate.requirements);
+    if (settle.responseHeader) extra['PAYMENT-RESPONSE'] = settle.responseHeader;
+  }
+
+  // on-chain SAP settlement
+  if (body.escrowPda) {
+    const escrow = new PublicKey(body.escrowPda);
+    const serviceHash = sha256(Buffer.from(JSON.stringify({ in: body, out: result })));
+    const [receipt] = deriveSettlementReceipt(escrow, serviceHash);
+    await sap.escrow.settle({ escrow, payer: wallet.publicKey, receipt, serviceHash });
+    extra['SAP-RECEIPT'] = receipt.toBase58();
+  }
+
+  return new Response(JSON.stringify(result), { headers: extra });
+}
+```
+
+## Batch settlement (high-throughput)
+
+```ts
+const root = computeBatchRoot(batch.map(b => b.serviceHash));
+const [batchReceipt] = deriveSettlementReceipt(batch[0].escrow, root);
+await sap.escrow.settleBatch({ escrows: batch, batchRoot: root, batchReceipt });
+```
+
+## Extending an existing server
+
+1. **New tool**: `sap.tool.publish` is additive — no migration. Hot-route in HTTP via a `Map<toolId, handler>`.
+2. **Pricing change**: `sap.tool.updatePricing({ amount: 2_000n })` + push new `defaultPrice` to paywall config.
+3. **Top-up stake**: read `sap.stake.get(agent)`, deposit delta if < `MIN_AGENT_STAKE_LAMPORTS`.
+4. **Schema change**: bump `toolId` (e.g. `weather-lookup-v2`) — preserves replay history.
+
+## MCP exposure (LLM-callable)
+
+```ts
+import { SynapseAgentKit, TokenPlugin } from '@oobe-protocol-labs/synapse-client-sdk/ai/plugins';
+import { SynapseMcpServer } from '@oobe-protocol-labs/synapse-client-sdk/ai/mcp';
+
+const kit = new SynapseAgentKit({ rpcUrl: process.env.SYNAPSE_RPC! })
+  .use(TokenPlugin)
+  .use(myMerchantPlugin);                            // wraps your tool handlers as MCP tools
+
+await new SynapseMcpServer(kit, { transport: 'stdio', name: 'my-merchant' }).start();
+```
+
+## Best-practices checklist
+- [ ] `import 'server-only'` at top of any file touching the keypair
+- [ ] Pin SDK to exact patch (`0.10.1` not `^0.10.0`)
+- [ ] Validate `escrowPda` ownership + status before settling (anti-griefing)
+- [ ] Idempotent settle: `(escrow, serviceHash)` → same receipt PDA
+- [ ] WebSocket (`client.ws.onLogs`) + Geyser stream for indexer
+- [ ] Run `solana-security-review` skill before each deploy
+- [ ] Rotate `MERCHANT_KEYPAIR` via Squads multisig if treasury > 10 SOL
+- [ ] Set `defaultAsset` to USDC mainnet on prod, devnet USDC on staging
+- [ ] Cap `maxAmountPerCall` on x402 client side
+- [ ] Emit Prometheus metrics: settle latency p95, paywall verify p95, stake floor delta
+
+## Full reference
+See [sap-overview/SKILL.md](../sap-overview/SKILL.md) — Appendices A–E (provider catalog, plugin system, x402, Next.js, env vars, cheat-sheet).
