@@ -23,6 +23,8 @@ import {
   deriveAgent,
   deriveAgentStats,
   deriveEscrow,
+  deriveStake,
+  deriveSettlementReceipt,
 } from "../pda";
 import type {
   EscrowAccountData,
@@ -34,6 +36,8 @@ import {
   buildRpcOptions,
 } from "../utils/priority-fee";
 import type { SettleOptions } from "../utils/priority-fee";
+import { computeBatchRoot, hashToArray } from "../utils/hash";
+import { isAcceptedPaymentToken } from "../constants/payments";
 
 /**
  * @name EscrowModule
@@ -105,9 +109,17 @@ export class EscrowModule extends BaseModule {
     args: CreateEscrowArgs,
     splAccounts: AccountMeta[] = [],
   ): Promise<TransactionSignature> {
+    // v0.10.0 client-side guard — surface the on-chain rejection earlier.
+    if (!isAcceptedPaymentToken(args.tokenMint ?? null)) {
+      throw new Error(
+        "createEscrow: tokenMint must be null (SOL) or USDC (mainnet/devnet). " +
+        "On-chain will reject with PaymentTokenNotAllowed.",
+      );
+    }
+
     const [agentPda] = deriveAgent(agentWallet);
     const [escrowPda] = this.deriveEscrow(agentPda);
-    const [statsPda] = deriveAgentStats(agentPda);
+    const [stakePda] = deriveStake(agentPda);
 
     return this.methods
       .createEscrow(
@@ -122,7 +134,7 @@ export class EscrowModule extends BaseModule {
       .accounts({
         depositor: this.walletPubkey,
         agent: agentPda,
-        agentStats: statsPda,
+        agentStake: stakePda,
         escrow: escrowPda,
         systemProgram: SystemProgram.programId,
       })
@@ -181,6 +193,7 @@ export class EscrowModule extends BaseModule {
     const [agentPda] = deriveAgent(this.walletPubkey);
     const [escrowPda] = deriveEscrow(agentPda, depositorWallet);
     const [statsPda] = deriveAgentStats(agentPda);
+    const [receiptPda] = deriveSettlementReceipt(escrowPda, serviceHash);
 
     const preIxs = buildPriorityFeeIxs(opts);
     const rpcOpts = buildRpcOptions(opts);
@@ -192,6 +205,7 @@ export class EscrowModule extends BaseModule {
         agent: agentPda,
         agentStats: statsPda,
         escrow: escrowPda,
+        settlementReceipt: receiptPda,
         systemProgram: SystemProgram.programId,
       })
       .remainingAccounts(splAccounts);
@@ -255,17 +269,26 @@ export class EscrowModule extends BaseModule {
    * @name settleBatch
    * @description Batch settlement — process up to 10 settlements in a single
    *   transaction. Must be called by the agent owner wallet.
+   *
    * @param depositorWallet - The wallet of the client who funded the escrow.
    * @param settlements - Array of settlement entries (up to 10).
+   * @param batchRoot - Optional pre-computed batch root
+   *   (`sha256(s_0 || s_1 || ... || s_{N-1})`). When omitted the SDK
+   *   computes it from `settlements[*].serviceHash`. **Required on-chain
+   *   since v0.10.0** to seed the anti-replay receipt PDA.
    * @param splAccounts - Remaining accounts for SPL token transfers. Defaults to `[]`.
    * @param opts - Optional {@link SettleOptions} for priority fees and RPC tuning.
    * @returns {Promise<TransactionSignature>} The transaction signature.
+   *
    * @since v0.1.0
    * @updated v0.6.2 — Added optional `opts` parameter for priority fees.
+   * @updated v0.10.0 — Added `batchRoot` argument and required
+   *   `settlementReceipt` PDA on-chain (anti-replay).
    */
   async settleBatch(
     depositorWallet: PublicKey,
     settlements: Settlement[],
+    batchRoot?: Uint8Array | number[] | null,
     splAccounts: AccountMeta[] = [],
     opts?: SettleOptions,
   ): Promise<TransactionSignature> {
@@ -273,16 +296,26 @@ export class EscrowModule extends BaseModule {
     const [escrowPda] = deriveEscrow(agentPda, depositorWallet);
     const [statsPda] = deriveAgentStats(agentPda);
 
+    const rootBytes =
+      batchRoot && batchRoot !== null
+        ? batchRoot instanceof Uint8Array
+          ? batchRoot
+          : Uint8Array.from(batchRoot)
+        : computeBatchRoot(settlements.map((s) => s.serviceHash));
+    const rootArr = hashToArray(rootBytes);
+    const [receiptPda] = deriveSettlementReceipt(escrowPda, rootBytes);
+
     const preIxs = buildPriorityFeeIxs(opts);
     const rpcOpts = buildRpcOptions(opts);
 
     let builder = this.methods
-      .settleBatch(settlements)
+      .settleBatch(settlements, rootArr)
       .accounts({
         wallet: this.walletPubkey,
         agent: agentPda,
         agentStats: statsPda,
         escrow: escrowPda,
+        settlementReceipt: receiptPda,
         systemProgram: SystemProgram.programId,
       })
       .remainingAccounts(splAccounts);

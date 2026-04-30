@@ -782,6 +782,8 @@ async function executeEscrow(client: SapClient, name: string, input: any) {
       const tx = await client.escrow.settleBatch(
         new PublicKey(input.depositorWallet),
         settlements,
+        // batchRoot omitted \u2192 SDK auto-derives sha256(s_0 || ... || s_N)
+        undefined,
         [],
         batchOpts,
       );

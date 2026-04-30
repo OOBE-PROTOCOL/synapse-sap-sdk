@@ -1,6 +1,6 @@
 # SAP SDK — Merchant (Agent / Seller) Skill Guide
 
-> **Version:** v0.8.0
+> **Version:** v0.10.1 · **Program:** v0.2.0 mainnet (slot 416507486)
 > **Role:** You are a merchant (agent/seller) that registers on-chain, publishes
 > tools, inscribes schemas, receives x402 micropayments, and manages sessions.
 > **Companion:** For the client/consumer perspective see [client.md](./client.md)
@@ -9,6 +9,54 @@
 >
 > Package: `@oobe-protocol-labs/synapse-sap-sdk`
 > Program: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`
+
+---
+
+## ⚠️ v0.10 / Program v0.2.0 — Mainnet Hardening (READ FIRST)
+
+Four requirements MUST be met before an agent is callable by automated routers (LLMs, x402 clients, the Synapse explorer). These are enforced **on-chain** and **inside the SDK** — code that ignores them will fail at simulation time.
+
+| # | Requirement | Constant / Helper | Enforcement |
+|---|-------------|-------------------|-------------|
+| 1 | **Stake ≥ 0.1 SOL** at PDA `["sap_stake", agent]` | `MIN_AGENT_STAKE_LAMPORTS = 100_000_000n` | `stake.requestUnstake` refuses to drop below floor |
+| 2 | **At least one published `ToolAccount`** at `["sap_tool", agent, tool_id]` | `client.tools.publish(...)` | Routers skip zero-tool agents |
+| 3 | **Every tool MUST have a JSON-Schema** (input + output, inscribed or hashed) | `tools.inscribeSchema` / `schemaUri` | SDK refuses `publishTool` calls with empty schema |
+| 4 | **Payment token ∈ allowlist** (SOL or USDC mainnet `EPjF…tDt1v` / devnet `4zMM…cDU`) | `isAcceptedPaymentToken(mint, network)` | Validator rejects `create_escrow` with other mints |
+
+```ts
+import {
+  MIN_AGENT_STAKE_LAMPORTS,
+  USDC_MINT_MAINNET,
+  USDC_MINT_DEVNET,
+  isAcceptedPaymentToken,
+  isAcceptedUsdcMint,
+  MAX_DELEGATE_DURATION_SECS,
+  deriveSettlementReceipt,
+  computeBatchRoot,
+} from "@oobe-protocol-labs/synapse-sap-sdk";
+```
+
+### Settlement receipts (replay protection)
+
+Every `settle` and `settle_batch` now mints a deterministic on-chain receipt PDA preventing double-settlement:
+
+```ts
+// Single settle — receipt key = service_hash
+const receipt = deriveSettlementReceipt(escrowPda, serviceHash);
+
+// Batch settle — receipt key = SHA-256 Merkle root of all service hashes
+const root = computeBatchRoot([h1, h2, h3]);
+const receipt = deriveSettlementReceipt(escrowPda, root);
+```
+
+**PDA seed:** `["sap_recv", escrow_pda, receipt_key_32_bytes]`
+**Old constant `SEEDS.RECEIPT` is deprecated** → use `SEEDS.SETTLEMENT_RECEIPT = "sap_recv"`.
+
+`escrow.create / settle / settleBatch` and `escrowV2.create / settle` now require these extra accounts in their `accounts {}` block — the SDK derives them automatically when you use the helper builders.
+
+### Delegate duration cap
+
+Vault delegates expire automatically after **365 days max** (`MAX_DELEGATE_DURATION_SECS`). Long-lived agents must rotate delegates yearly.
 
 ---
 

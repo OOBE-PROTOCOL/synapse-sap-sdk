@@ -1,10 +1,68 @@
 # SAP SDK — Client / Consumer Skill Guide
 
-> **Version:** v0.8.0
+> **Version:** v0.10.1 · **Program:** v0.2.0 mainnet (slot 416507486)
 > **Role:** You are a client (consumer) that discovers on-chain agents, creates escrows, calls x402 endpoints, and verifies settlements.
 > **Companion:** For the merchant/seller perspective see [merchant.md](./merchant.md)
 > **Parent Reference:** For the full Synapse Client SDK (RPC, DAS, AI tools, plugins, MCP, gateway, x402, Next.js) see [skills.md](./skills.md)
 > **CLI Access:** All consumer operations (discovery, escrow, x402 calls) are also available via the `synapse-sap` CLI — see [cli/README.md](../cli/README.md)
+
+---
+
+## ⚠️ v0.10 / Program v0.2.0 — Consumer Impact (READ FIRST)
+
+The protocol now hardens merchant trust assumptions. As a **consumer**, this affects how you filter agents and how you build escrows:
+
+### Agent filtering — only call "merchant-ready" agents
+
+Before creating an escrow, verify the agent satisfies all four requirements:
+
+```ts
+import {
+  MIN_AGENT_STAKE_LAMPORTS,
+  isAcceptedPaymentToken,
+} from "@oobe-protocol-labs/synapse-sap-sdk";
+
+async function isMerchantReady(client, agentPda, paymentMint) {
+  const stake = await client.stake.fetch(agentPda).catch(() => null);
+  if (!stake || stake.amount < MIN_AGENT_STAKE_LAMPORTS) return false;
+
+  const tools = await client.tools.listForAgent(agentPda);
+  if (tools.length === 0) return false;
+  if (tools.some(t => !t.hasInscribedSchema)) return false;
+
+  if (!isAcceptedPaymentToken(paymentMint, client.network)) return false;
+  return true;
+}
+```
+
+Agents that fail any check are **not callable** by the on-chain validator. Don't even try to escrow with them.
+
+### Token allowlist (escrow.create)
+
+Only **native SOL** or **USDC** are accepted on mainnet/devnet. Any other SPL mint will revert at simulation:
+
+```ts
+import { USDC_MINT_MAINNET, USDC_MINT_DEVNET } from "@oobe-protocol-labs/synapse-sap-sdk";
+```
+
+### Settlement receipts (verifiable on-chain proof)
+
+After the merchant settles, you can independently derive the receipt PDA to confirm a specific call was settled (replay protection):
+
+```ts
+import { deriveSettlementReceipt, computeBatchRoot } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+// Single settle
+const receipt = deriveSettlementReceipt(escrowPda, serviceHash);
+const exists = await connection.getAccountInfo(receipt);
+if (exists) console.log("Call was settled — receipt mint confirms it");
+
+// Batch settle — derive the Merkle root first
+const root = computeBatchRoot([h1, h2, h3]);
+const batchReceipt = deriveSettlementReceipt(escrowPda, root);
+```
+
+**PDA seed:** `["sap_recv", escrow_pda, receipt_key_32_bytes]` — `SEEDS.SETTLEMENT_RECEIPT`.
 
 ---
 

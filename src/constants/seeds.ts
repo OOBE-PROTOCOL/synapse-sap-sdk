@@ -61,7 +61,15 @@ export const SEEDS = {
   SUBSCRIPTION: "sap_sub",
   SHARD: "sap_shard",
   INDEX_PAGE: "sap_idx_page",
-  /** @since v0.7.0 — Receipt batch merkle root PDA */
+  /**
+   * @since v0.10.0 — Anti-replay receipt PDA bound to (escrow, service_hash) or (escrow, batch_root).
+   * Created via `init` on every settle_calls / settle_batch / settle_calls_v2; replays fail.
+   */
+  SETTLEMENT_RECEIPT: "sap_recv",
+  /**
+   * @deprecated v0.10.0 — Was reserved for receipt batch merkle root (never used on-chain).
+   * Use {@link SEEDS.SETTLEMENT_RECEIPT} (`sap_recv`) instead. Will be removed in v0.11.0.
+   */
   RECEIPT: "sap_receipt",
 } as const;
 

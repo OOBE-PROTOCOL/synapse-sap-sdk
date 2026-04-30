@@ -57,3 +57,13 @@ export {
   TOOL_CATEGORY_ADDRESSES,
   TOOL_CATEGORY_ADDRESS_LIST,
 } from "./addresses";
+
+// ── Payment-token allowlist & stake collateral (v0.10.0) ─────
+export {
+  USDC_MINT_MAINNET,
+  USDC_MINT_DEVNET,
+  MIN_AGENT_STAKE_LAMPORTS,
+  MAX_DELEGATE_DURATION_SECS,
+  isAcceptedUsdcMint,
+  isAcceptedPaymentToken,
+} from "./payments";

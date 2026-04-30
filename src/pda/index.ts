@@ -878,3 +878,42 @@ export const deriveReceiptBatch = (
     ],
     programId,
   );
+
+/**
+ * Derive the **SettlementReceipt** PDA (v0.10.0 anti-replay).
+ *
+ * Seeds: `["sap_recv", escrow_pda, service_hash_or_batch_root]`
+ *
+ * Created via `init` on every `settle_calls`, `settle_batch`, and
+ * `settle_calls_v2`. The PDA's existence after the first call blocks
+ * any future replay of the same `service_hash` (or `batch_root`)
+ * against the same escrow.
+ *
+ * @name deriveSettlementReceipt
+ * @description Compute the receipt PDA that gates settlement replay.
+ * @param escrowPda     - Parent escrow PDA (V1 `EscrowAccount` or V2 `EscrowAccountV2`).
+ * @param receiptKey    - 32-byte `service_hash` (single settle / V2 settle)
+ *                        or `batch_root = sha256(s_0 || ... || s_{N-1})` (settle_batch).
+ * @param programId     - Override program ID.
+ * @returns {PdaResult} `[pda, bump]` tuple.
+ * @category PDA
+ * @since v0.10.0
+ */
+export const deriveSettlementReceipt = (
+  escrowPda: PublicKey,
+  receiptKey: Uint8Array | number[] | Buffer,
+  programId = SAP_PROGRAM_ID,
+): PdaResult => {
+  const buf = Buffer.isBuffer(receiptKey)
+    ? receiptKey
+    : Buffer.from(receiptKey as Uint8Array);
+  if (buf.length !== 32) {
+    throw new Error(
+      `deriveSettlementReceipt: receiptKey must be 32 bytes, got ${buf.length}`,
+    );
+  }
+  return findPda(
+    [toSeedBuf(SEEDS.SETTLEMENT_RECEIPT), escrowPda.toBuffer(), buf],
+    programId,
+  );
+};

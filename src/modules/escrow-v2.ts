@@ -23,6 +23,8 @@ import {
   deriveEscrowV2,
   derivePendingSettlement as derivePendingPda,
   deriveDispute as deriveDisputePda,
+  deriveStake,
+  deriveSettlementReceipt,
 } from "../pda";
 import type {
   EscrowAccountV2Data,
@@ -35,6 +37,7 @@ import {
   buildRpcOptions,
 } from "../utils/priority-fee";
 import type { SettleOptions } from "../utils/priority-fee";
+import { isAcceptedPaymentToken } from "../constants/payments";
 
 /**
  * @name EscrowV2Module
@@ -83,8 +86,17 @@ export class EscrowV2Module extends BaseModule {
     args: CreateEscrowV2Args,
     splAccounts: AccountMeta[] = [],
   ): Promise<TransactionSignature> {
+    // v0.10.0: payment-token allowlist (SOL or USDC only).
+    if (!isAcceptedPaymentToken(args.tokenMint ?? null)) {
+      throw new Error(
+        "createEscrowV2: tokenMint must be null (SOL) or USDC (mainnet/devnet). " +
+        "On-chain will reject with PaymentTokenNotAllowed.",
+      );
+    }
+
     const [agentPda] = deriveAgent(agentWallet);
     const [escrowPda] = this.deriveEscrow(agentPda, undefined, args.escrowNonce);
+    const [stakePda] = deriveStake(agentPda);
 
     return this.methods
       .createEscrowV2(
@@ -104,6 +116,7 @@ export class EscrowV2Module extends BaseModule {
       .accounts({
         depositor: this.walletPubkey,
         agent: agentPda,
+        agentStake: stakePda,
         escrow: escrowPda,
         systemProgram: SystemProgram.programId,
       })
@@ -142,6 +155,7 @@ export class EscrowV2Module extends BaseModule {
     const [agentPda] = deriveAgent(this.walletPubkey);
     const [escrowPda] = this.deriveEscrow(agentPda, depositorWallet, nonce);
     const [statsPda] = deriveAgentStats(agentPda);
+    const [receiptPda] = deriveSettlementReceipt(escrowPda, serviceHash);
 
     const preIxs = buildPriorityFeeIxs(opts);
     const rpcOpts = buildRpcOptions(opts);
@@ -153,6 +167,7 @@ export class EscrowV2Module extends BaseModule {
         agent: agentPda,
         agentStats: statsPda,
         escrow: escrowPda,
+        settlementReceipt: receiptPda,
         systemProgram: SystemProgram.programId,
       })
       .remainingAccounts(splAccounts);

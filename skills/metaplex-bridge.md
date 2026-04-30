@@ -373,5 +373,7 @@ The client wallet adapter co-signs (fee-payer + asset owner) and submits — the
 |---|---|---|
 | `mplOnChain: false` despite asset existing | umi created without `httpHeaders` → 401 from gated RPC | Pass `rpcHeaders` to every read method |
 | `getProgramAccounts` returns 502 on Synapse RPC | Heavy method blocked upstream | Use DAS `getAssetsByOwner` first, fall back to on-chain only as Tier 2 |
-| `eip8004Json: false` on a real Metaplex agent | URI points to `api.metaplex.com/v1/agents/...` (foreign directory) | Migrate plugin URI to your SAP host with `buildUpdateAgentIdentityUriIx` |
+| `eip8004Json: false` on a real Metaplex agent | URI points to a peer registry such as `api.metaplex.com/v1/agents/...` | **Not a bug.** This is a coordination state, not an error. The agent is valid on the public Metaplex Agents Registry; the URI simply isn't bound to your SAP host. Migrate **only** if you need SAP-host gated execution — use `buildUpdateAgentIdentityUriIx`. Otherwise treat it as `mpl + sap` peer-coordinated. |
 | `linked: false` after a fresh attach | Caller forgot `rpcHeaders` on the verification call | Both write *and* verify must use the same authenticated RPC config |
+
+> **Coordination note.** `tripleCheckLink.linked === true` is the *strictest* state (all 3 layers). For UX, treat `mplOnChain && sapOnChain` as **dual-registered** even when `eip8004Json` is false — the agent exists on both registries; only the URI binding direction differs. SAP Explorer surfaces this as `plugin ∩ registry` (see [`docs/11-metaplex-bridge.md` §11.11](../docs/11-metaplex-bridge.md#1111-explorer-coordination-signal)).
