@@ -2,7 +2,7 @@
   "address": "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ",
   "metadata": {
     "name": "synapse_agent_sap",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "spec": "0.1.0",
     "description": "Created with Anchor"
   },
@@ -2694,6 +2694,37 @@
           ]
         },
         {
+          "name": "agent_stake",
+          "docs": [
+            "v0.10 hardening: agent MUST hold at least `AgentStake::MIN_STAKE`",
+            "in collateral before any new escrow can be opened.  This guarantees",
+            "every accepted client has a slashable bond to claim against in case",
+            "of dispute."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
           "name": "escrow",
           "writable": true,
           "pda": {
@@ -2791,6 +2822,35 @@
         },
         {
           "name": "agent"
+        },
+        {
+          "name": "agent_stake",
+          "docs": [
+            "v0.10 hardening: agent MUST have an active stake ≥ MIN_STAKE",
+            "before any new escrow can be opened."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
         },
         {
           "name": "escrow",
@@ -6956,7 +7016,9 @@
     {
       "name": "settle_batch",
       "docs": [
-        "Batch settle up to 10 settlements in one TX. Volume curve spans batch."
+        "Batch settle up to 10 settlements in one TX. Volume curve spans batch.",
+        "v0.10: requires `batch_root = sha256(s_0 || s_1 || ... || s_{N-1})`",
+        "to seed the anti-replay receipt PDA."
       ],
       "discriminator": [
         22,
@@ -7056,6 +7118,44 @@
               }
             ]
           }
+        },
+        {
+          "name": "settlement_receipt",
+          "docs": [
+            "v0.10 anti-replay: PDA bound to the batch_root (sha256 of all",
+            "service_hashes in order).  Replaying the same batch fails the",
+            "`init` constraint."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  114,
+                  101,
+                  99,
+                  118
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow"
+              },
+              {
+                "kind": "arg",
+                "path": "batch_root"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -7067,6 +7167,15 @@
                 "name": "Settlement"
               }
             }
+          }
+        },
+        {
+          "name": "batch_root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
           }
         }
       ]
@@ -7180,6 +7289,45 @@
               }
             ]
           }
+        },
+        {
+          "name": "settlement_receipt",
+          "docs": [
+            "v0.10 anti-replay: an `init` of this PDA fails if the same",
+            "`service_hash` was already used to settle this escrow.",
+            "Receipt PDAs are intentionally NOT closeable to preserve the",
+            "uniqueness invariant for the lifetime of the escrow."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  114,
+                  101,
+                  99,
+                  118
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow"
+              },
+              {
+                "kind": "arg",
+                "path": "service_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -7308,6 +7456,41 @@
               {
                 "kind": "arg",
                 "path": "escrow_nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "settlement_receipt",
+          "docs": [
+            "v0.10 anti-replay: PDA bound to (escrow, service_hash).",
+            "In CoSigned mode this gates the immediate transfer; in",
+            "DisputeWindow mode this gates the pending-amount bump so the",
+            "same `service_hash` cannot be re-applied to inflate pending."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  114,
+                  101,
+                  99,
+                  118
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow"
+              },
+              {
+                "kind": "arg",
+                "path": "service_hash"
               }
             ]
           }
@@ -8484,6 +8667,19 @@
         26,
         32,
         179
+      ]
+    },
+    {
+      "name": "SettlementReceipt",
+      "discriminator": [
+        52,
+        249,
+        252,
+        121,
+        4,
+        232,
+        187,
+        4
       ]
     },
     {
@@ -9980,6 +10176,41 @@
       "code": 6136,
       "name": "InvalidReceiptProof",
       "msg": "bad receipt proof"
+    },
+    {
+      "code": 6137,
+      "name": "SettlementReplay",
+      "msg": "settlement replay"
+    },
+    {
+      "code": 6138,
+      "name": "PaymentTokenNotAllowed",
+      "msg": "token not allowed"
+    },
+    {
+      "code": 6139,
+      "name": "AgentStakeRequired",
+      "msg": "agent stake required"
+    },
+    {
+      "code": 6140,
+      "name": "DelegateExpiryInvalid",
+      "msg": "delegate expiry invalid"
+    },
+    {
+      "code": 6141,
+      "name": "EscrowNotClosed",
+      "msg": "escrow not closed"
+    },
+    {
+      "code": 6142,
+      "name": "VolumeCurveNotDescending",
+      "msg": "curve not descending"
+    },
+    {
+      "code": 6143,
+      "name": "DuplicateServiceHash",
+      "msg": "dup service hash"
     }
   ],
   "types": [
@@ -13120,6 +13351,43 @@
           },
           {
             "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SettlementReceipt",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "escrow",
+            "type": "pubkey"
+          },
+          {
+            "name": "service_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "calls_settled",
+            "type": "u64"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "settled_at",
             "type": "i64"
           }
         ]

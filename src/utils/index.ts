@@ -14,7 +14,7 @@
  * ```
  */
 
-export { sha256, hashToArray } from "./hash";
+export { sha256, hashToArray, computeBatchRoot } from "./hash";
 export { assert } from "./validation";
 export { serializeAccount, serializeValue } from "./serialization";
 

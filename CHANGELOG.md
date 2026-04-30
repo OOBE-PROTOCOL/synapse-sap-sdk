@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] — 2026-04-30 — Top-level export fix
+
+### Fixed
+- Top-level `index.ts` now re-exports the v0.10 hardening symbols that were
+  reachable only via deep paths in `0.10.0`:
+  - `deriveSettlementReceipt` (from `./pda`)
+  - `computeBatchRoot` (from `./utils`)
+  - `MIN_AGENT_STAKE_LAMPORTS`, `MAX_DELEGATE_DURATION_SECS`,
+    `USDC_MINT_MAINNET`, `USDC_MINT_DEVNET`,
+    `isAcceptedPaymentToken`, `isAcceptedUsdcMint` (from `./constants`)
+- Skills documentation (`skills/merchant.md`, `skills/client.md`) updated
+  with v0.10 hardening section and merchant readiness checklist.
+
+## [0.10.0] — 2026-04-29 — Hardening Release (paired with program v0.2.0)
+
+> **Breaking client-side changes** to `escrow.create`, `escrow.settle`,
+> `escrow.settleBatch`, `escrowV2.create`, `escrowV2.settle`. Pin to
+> SAP program **`>= 0.2.0`** when upgrading.
+
+### Added
+
+- `constants/payments`:
+  - `USDC_MINT_MAINNET`, `USDC_MINT_DEVNET`
+  - `MIN_AGENT_STAKE_LAMPORTS = 100_000_000n` (0.1 SOL)
+  - `MAX_DELEGATE_DURATION_SECS = 365 * 86_400`
+  - `isAcceptedPaymentToken(mint)` / `isAcceptedUsdcMint(mint)`
+- `pda.deriveSettlementReceipt(escrow, key)` — derives the new
+  `["sap_recv", escrow, key]` PDA (key = service hash for single-call
+  settle, batch root for `settleBatch`).
+- `utils/hash.computeBatchRoot(serviceHashes)` — sha256 over the
+  concatenated 32-byte service hashes.
+- `SEEDS.SETTLEMENT_RECEIPT = "sap_recv"`.
+
+### Changed (Breaking)
+
+- `escrow.create()` and `escrowV2.create()` now derive and pass the
+  agent's `AgentStake` PDA. Throws client-side if `tokenMint` is not in
+  the SOL/USDC allowlist (mirrors `PaymentTokenNotAllowed` on-chain).
+- `escrow.settle()` and `escrowV2.settle()` derive and pass
+  `settlementReceipt` PDA + `systemProgram`.
+- `escrow.settleBatch(depositorWallet, settlements, batchRoot?, splAccounts?, opts?)`
+  — new positional `batchRoot?` arg (auto-computed if omitted via
+  `computeBatchRoot()`). Existing call sites passing
+  `(wallet, settlements, splAccounts, opts)` MUST be updated.
+
+### Deprecated
+
+- `SEEDS.RECEIPT = "sap_receipt"` — superseded by `SEEDS.SETTLEMENT_RECEIPT`.
+
+### Fixed
+
+- `EscrowModule.create()` no longer passes a stray `agentStats` account
+  that was not in the on-chain V1 `CreateEscrowAccountConstraints`.
+
 ## [0.9.3] - 2026-04-24
 
 > **Canonical Metaplex Core Bridge release.**

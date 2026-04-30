@@ -184,11 +184,22 @@ export {
   deriveLedger,
   deriveLedgerPage,
   deriveReceiptBatch,
+  deriveSettlementReceipt,
 } from "./pda";
 
 // ── Utilities ────────────────────────────────────────
-export { sha256, hashToArray, assert } from "./utils";
+export { sha256, hashToArray, assert, computeBatchRoot } from "./utils";
 export { serializeAccount, serializeValue } from "./utils";
+
+// v0.10 — payment + stake constants
+export {
+  USDC_MINT_MAINNET,
+  USDC_MINT_DEVNET,
+  MIN_AGENT_STAKE_LAMPORTS,
+  MAX_DELEGATE_DURATION_SECS,
+  isAcceptedUsdcMint,
+  isAcceptedPaymentToken,
+} from "./constants";
 
 // v0.6.0 — Network normalizer
 export {

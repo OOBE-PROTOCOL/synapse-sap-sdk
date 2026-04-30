@@ -1,7 +1,8 @@
 # Synapse Client SDK — Agent Skills Reference
 
 > **Package**: `@oobe-protocol-labs/synapse-client-sdk`  
-> **Version**: 2.0.6  
+> **Version**: 2.0.7  
+> **SAP SDK Companion**: `@oobe-protocol-labs/synapse-sap-sdk@0.10.1` (Program v0.2.0 mainnet, slot 416507486)
 > **Runtime**: Node.js ≥ 18 · TypeScript ≥ 5.0  
 > **License**: MIT
 

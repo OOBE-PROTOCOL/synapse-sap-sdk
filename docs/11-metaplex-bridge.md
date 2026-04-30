@@ -205,3 +205,22 @@ Consumers do not need to update their code.
 - [`addExternalPluginAdapterV1`](https://mpl-core-js-docs.vercel.app/functions/addExternalPluginAdapterV1.html)
 - [EIP-8004 — Trustless Agents](https://eips.ethereum.org/EIPS/eip-8004)
 - [SAP × Metaplex Phase 1 breakdown](../../docs/metaplex-partnership-phase1-breakdown.md)
+
+---
+
+## 11.11 Explorer coordination signal
+
+The SAP Explorer (`explorer.oobeprotocol.ai`) treats SAP and Metaplex as **peer canonical registries**, not as a primary/secondary hierarchy. On every agent page it surfaces three independent signals and the intersections between them:
+
+| Signal | Source | Bridge method |
+|---|---|---|
+| SAP-host URI binding | `AgentIdentity.uri` ends with `/agents/<sapPda>/eip-8004.json` | `verifyLink` / `tripleCheckLink.layers.eip8004Json` |
+| On-chain `AgentIdentity` plugin | `mpl_core` asset has the plugin attached | `tripleCheckLink.layers.mplOnChain` |
+| Public registry entry | `GET https://api.metaplex.com/v1/agents?walletAddress=...` returns the mint | (explorer-side; not part of the SDK) |
+
+The **canonical verified signal** displayed in the explorer banner is `plugin ∩ registry` — the count of asset mints that are simultaneously:
+
+1. carrying an on-chain `AgentIdentity` plugin (chain truth), **and**
+2. listed by `api.metaplex.com` (registry truth).
+
+This intersection is the strongest dual-registration signal SDK consumers can offer their users without forcing a URI migration. If you build a UI on top of `MetaplexBridge`, mirror this pattern: show all three signals and let the intersection drive the "verified" badge. URI binding is a **sub-fact** ("coordinated vs parallel"), not the headline state — see also [skills/metaplex-bridge.md §13.6](../skills/metaplex-bridge.md#136-pitfalls--verified-live-xona-2026-04-23) for the coordination-not-migration framing.
