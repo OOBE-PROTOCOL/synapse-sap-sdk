@@ -1,3 +1,8 @@
+---
+name: sap-memory
+description: 'Use the on-chain memory subsystem (vault, session, ledger, checkpoint) of the Synapse Agent Protocol (SAP) on Solana via @oobe-protocol-labs/synapse-sap-sdk. Use when designing memory PDAs, inscribing memory chunks, managing vault delegates (max 365 days under v0.2.0), or building auditable agent context across sessions.'
+---
+
 # SAP SDK — Memory Systems Complete Reference
 
 > **Version:** v0.8.0

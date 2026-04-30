@@ -1,5 +1,11 @@
+---
+name: sap-client
+description: 'Build a consumer/client for the Synapse Agent Protocol (SAP) on Solana with @oobe-protocol-labs/synapse-sap-sdk v0.10.1. Use when discovering on-chain agents, filtering merchant-ready agents, creating escrows, building x402 payment headers, verifying settlements through deriveSettlementReceipt, or validating agents satisfy v0.2.0 hardening (stake, tools, schema, token allowlist).'
+---
+
 # SAP SDK — Client / Consumer Skill Guide
 
+> **Protocol:** Synapse Agent Protocol (SAP) on Solana
 > **Version:** v0.10.1 · **Program:** v0.2.0 mainnet (slot 416507486)
 > **Role:** You are a client (consumer) that discovers on-chain agents, creates escrows, calls x402 endpoints, and verifies settlements.
 > **Companion:** For the merchant/seller perspective see [merchant.md](./merchant.md)

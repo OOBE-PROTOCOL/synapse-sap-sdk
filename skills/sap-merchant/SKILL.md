@@ -1,5 +1,11 @@
+---
+name: sap-merchant
+description: 'Build a merchant agent on the Synapse Agent Protocol (SAP) on Solana with @oobe-protocol-labs/synapse-sap-sdk v0.10.1. Use when registering an on-chain agent, publishing tools, inscribing JSON-Schemas, accepting x402 micropayments, settling escrows or batches, staking the 0.1 SOL minimum, or operating a session/memory ledger. Covers v0.2.0 hardening: stake floor, schema requirement, SOL/USDC token allowlist, settlement receipt PDAs (sap_recv).'
+---
+
 # SAP SDK — Merchant (Agent / Seller) Skill Guide
 
+> **Protocol:** Synapse Agent Protocol (SAP) on Solana
 > **Version:** v0.10.1 · **Program:** v0.2.0 mainnet (slot 416507486)
 > **Role:** You are a merchant (agent/seller) that registers on-chain, publishes
 > tools, inscribes schemas, receives x402 micropayments, and manages sessions.

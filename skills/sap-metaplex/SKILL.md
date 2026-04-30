@@ -1,3 +1,8 @@
+---
+name: sap-metaplex
+description: 'Bridge Synapse Agent Protocol (SAP on Solana) agents and tools to Metaplex Core / Token Metadata via the @oobe-protocol-labs/synapse-sap-sdk metaplex-bridge module. Use when minting agent identity NFTs, attaching attestations, or doing bidirectional indexing between SAP PDAs and Metaplex assets.'
+---
+
 # SAP × Metaplex Core — Bridge Skill Guide
 
 > **Module:** `client.metaplex` ([`MetaplexBridge`](../src/registries/metaplex-bridge.ts))
