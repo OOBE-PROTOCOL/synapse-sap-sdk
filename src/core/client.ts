@@ -46,6 +46,7 @@ import { X402Registry } from "../registries/x402";
 import { SessionManager } from "../registries/session";
 import { AgentBuilder } from "../registries/builder";
 import { MetaplexBridge } from "../registries/metaplex-bridge";
+import { FairScaleRegistry, type FairScaleConfig } from "../registries/fairscale";
 
 // IDL is embedded inside the SDK — no external workspace dependency
 import idl from "../idl/synapse_agent_sap.json";
@@ -134,6 +135,8 @@ export class SapClient {
   #x402?: X402Registry;
   #session?: SessionManager;
   #metaplex?: MetaplexBridge;
+  #fairscale?: FairScaleRegistry;
+  #fairscaleConfig?: FairScaleConfig;
 
   private constructor(program: SapProgram) {
     this.program = program;
@@ -528,5 +531,53 @@ export class SapClient {
    */
   get metaplex(): MetaplexBridge {
     return (this.#metaplex ??= new MetaplexBridge(this.program));
+  }
+
+  /**
+   * @name configureFairScale
+   * @description Set FairScale credentials / endpoints before the first
+   *   `client.fairscale` access. Calling after the registry is built has
+   *   no effect — set the API key here or via `FAIRSCALE_API_KEY` env.
+   *
+   * @param config - FairScale config (apiKey, baseUrl, humanBaseUrl, timeoutMs, fetch).
+   * @returns `this` for chaining.
+   * @category Registries
+   * @since v0.11.0
+   *
+   * @example
+   * ```ts
+   * SapClient.from(provider).configureFairScale({ apiKey: process.env.FAIRSCALE_API_KEY });
+   * ```
+   */
+  configureFairScale(config: FairScaleConfig): this {
+    this.#fairscaleConfig = config;
+    return this;
+  }
+
+  /**
+   * @name fairscale
+   * @description FairScale reputation aggregator — wraps both FairScale
+   *   REST APIs (Agent & Credit + Human Score) and exposes
+   *   `aggregate()` to merge SAP on-chain reputation with FairScale into
+   *   a single weighted signal.
+   *
+   * @returns {FairScaleRegistry} The lazily-instantiated `FairScaleRegistry` singleton.
+   * @category Registries
+   * @since v0.11.0
+   * @see {@link FairScaleRegistry}
+   *
+   * @example
+   * ```ts
+   * const merged = await client.fairscale.aggregate(agentWallet, {
+   *   weights: { sap: 0.4, fairscale: 0.6 },
+   * });
+   * if (merged.combined.tier === "elite") accept();
+   * ```
+   */
+  get fairscale(): FairScaleRegistry {
+    return (this.#fairscale ??= new FairScaleRegistry(
+      this.program,
+      this.#fairscaleConfig,
+    ));
   }
 }
