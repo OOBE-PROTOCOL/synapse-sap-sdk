@@ -7,6 +7,130 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-05-01 — FairScale Reputation Bridge
+
+> SIMD-style entry. Additive, non-breaking. Pin to SAP program **`>= 0.2.0`**.
+
+### Summary
+
+Introduce a first-class `FairScaleRegistry` on `SapClient` plus a public
+`FAIRSCALE` constants bundle, exposing every documented endpoint of the
+FairScale reputation network ([docs.fairscale.xyz](https://docs.fairscale.xyz))
+and a single `aggregate(wallet, …)` method that blends SAP on-chain
+reputation with FairScale's off-chain trust score into one weighted
+0–100 signal.
+
+### Motivation
+
+- SAP's `AgentAccountData.reputationScore` is a closed-loop, on-chain
+  signal: it only moves when an SAP escrow settles. It says nothing about
+  an agent's behaviour outside SAP (wallet history, peer reputation,
+  registry verifications, work history).
+- FairScale already aggregates that off-chain context into a stable
+  0–100 score with documented pillars, recommendation tiers, and
+  attestations.
+- Merchants, routers and dApps consuming SAP need **one number** to
+  gate calls. Doing the blend inside the SDK keeps semantics consistent
+  across the explorer, plugins, and third-party clients.
+
+### Specification
+
+#### Added
+
+- **`registries/fairscale`** module exporting:
+  - `FairScaleRegistry` — high-level client, lazy-mounted as
+    `client.fairscale`.
+  - `HumanScoreNamespace` — exposed as `client.fairscale.human` for the
+    Human Score API (`api.fairscale.xyz`).
+  - `FairScaleError extends SapError` — carries `status` (HTTP) and
+    `upstreamCode` (FairScale machine code).
+  - `FAIRSCALE` — frozen constants object: `AGENT_API`, `HUMAN_API`,
+    `CACHE_TTL_SECONDS = 900`, `BATCH_MAX_WALLETS = 25`,
+    `API_KEY_PREFIX = "zpka_"`, `X402` (USDC mint, payTo, network slug,
+    `PRICE_AGENT_USDC_BASE = 5_000`, `PRICE_CREDIT_USDC_BASE = 500_000`,
+    facilitator), `AGENT_TIER_RANGES`, `RISK_BAND_RANGES`,
+    `PLAN_QUOTAS`, `PRESET_WEIGHTS`, `DIRECTORY_SORT_FIELDS`,
+    `ERROR_CODES`. All values verified against the live docs.
+- **Endpoints surfaced on `FairScaleRegistry`:**
+  - `score(wallet, opts)` — `GET /v1/score`
+  - `trustGate(wallet, opts)` — `GET /v1/trust-gate`
+  - `scoreBatch(wallets, opts)` — `POST /v1/score/batch` with
+    automatic 25-wallet chunking
+  - `scoreAI(wallet, { preset | weights })` — `GET /v1/score/ai` with
+    client-side validation that custom weights sum to `1.0 ± 0.02`
+  - `agentProfile(wallet, opts)` — `GET /v1/agent`
+  - `scoreHistory(wallet, opts)` — `GET /v1/score-history`
+  - `directory(opts)` — `GET /v1/directory`
+  - `leaderboard(opts)` — `GET /v1/leaderboard`
+  - `credit(wallet, opts)` — `GET /v1/credit` (uses `X-Api-Key` header,
+    forwards optional `x-social-identity`, serialises `nocache: boolean`
+    to wire-format `0|1`)
+  - `human.score(wallet, opts)` / `human.fairScore` / `human.walletScore`
+    / `human.socialScore` / `human.computeScore` (force-recompute via
+    `/newScore`) / `human.fairScoreOnly`
+- **`aggregate(wallet, { weights, require, strict })`** — blends SAP
+  `AgentAccountData.reputationScore` with FairScale `score`. Weights
+  default to `{ sap: 0.5, fairscale: 0.5 }`; if one source is missing
+  the other is renormalised to 1.0 and `confidence` is reduced.
+  Returns `AggregatedReputation` with `combined: { score, tier
+  ("low"|"medium"|"high"|"elite"), confidence (0..1), weights, notes[]
+  }`.
+- **`SapClient.configureFairScale(config)`** — chainable setter for
+  `apiKey`, base URLs, timeout, custom `fetch` (Edge / test injection).
+- **Strict types** mirroring docs 1:1: `FairScaleTier`, `FairScalePreset`,
+  `FairScaleTask`, `FairScalePillars`, `FairScaleBadge` (with
+  `description`+`tier`), `FairScaleAction` (`priority`, `cta`),
+  `FairScaleRecommendationTier`, `FairScaleRedFlag`,
+  `FairScaleVerifications`, `FairScaleMeta`, `AgentScoreResult`,
+  `TrustGateResult`, `BatchScoreResult`, `DirectoryEntry`,
+  `DirectoryResult`, `LeaderboardResult`, `ScoreHistoryResult`,
+  full `CreditResult` (`credit_pillars`, `confidence`, `underwriting
+  .lending_terms` with `identity_level: kyc|strong|said|matrica|partial
+  |none`, `risk_flags`, `attestation`), `HumanScoreFeatures` (exactly
+  the 15 documented features), `HumanScoreResult`,
+  `AggregatedReputation`, `AggregateOptions`.
+
+#### Changed
+
+- `package.json` exposes the new entrypoint at
+  `./registries/fairscale` for tree-shaken consumption.
+
+### Impact
+
+- **Bundle size:** zero impact for consumers that don't import
+  `client.fairscale` (lazy singleton).
+- **Network:** FairScale calls require `FAIRSCALE_API_KEY`; without
+  one, `aggregate()` degrades gracefully to SAP-only and reduces
+  `confidence`.
+- **On-chain:** none. This release is SDK-only.
+
+### Security Considerations
+
+- `FAIRSCALE.X402.PAY_TO`, `USDC_MINT`, `NETWORK` and price constants
+  are pinned to the documented production values; treat them as the
+  source of truth and do not override unless mocking in tests.
+- `aggregate()` never sends private data to FairScale beyond the
+  wallet pubkey already on chain.
+- The optional custom `fetch` injection is the only surface that can
+  exfiltrate the API key — keep it server-side.
+
+### Backwards Compatibility
+
+Fully additive. Existing `0.10.x` callers compile unchanged. No
+behavioural change to `escrow.*`, `staking.*`, `discovery.*`,
+`metaplex.*`, or `session.*`.
+
+### Companion Surfaces
+
+- Explorer endpoint `GET /api/sap/agents/[wallet]/aggregate-reputation`
+  consumes `client.fairscale.aggregate(...)` and powers the new
+  "FairScale × SAP Aggregated Reputation" chip on every agent page.
+- Partnership proposal documenting the next two collaboration tracks
+  (on-chain attestation oracle + bidirectional directory feed):
+  `docs/partnerships/FAIRSCALE_PARTNERSHIP_PROPOSAL.md` in the parent
+  workspace.
+
+
 ## [0.10.1] — 2026-04-30 — Top-level export fix
 
 ### Fixed

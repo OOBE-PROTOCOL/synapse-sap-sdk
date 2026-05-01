@@ -1,6 +1,6 @@
 {
   "name": "@oobe-protocol-labs/synapse-sap-sdk",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "description": "TypeScript SDK for the Synapse Agent Protocol (SAP v2) on Solana Mainnet/Devnet",
   "license": "MIT",
   "main": "dist/cjs/index.js",
@@ -101,6 +101,11 @@
       "import": "./dist/esm/registries/metaplex-bridge.js",
       "require": "./dist/cjs/registries/metaplex-bridge.js",
       "types": "./dist/types/registries/metaplex-bridge.d.ts"
+    },
+    "./registries/fairscale": {
+      "import": "./dist/esm/registries/fairscale.js",
+      "require": "./dist/cjs/registries/fairscale.js",
+      "types": "./dist/types/registries/fairscale.d.ts"
     },
     "./idl": {
       "import": "./dist/esm/idl/index.js",
