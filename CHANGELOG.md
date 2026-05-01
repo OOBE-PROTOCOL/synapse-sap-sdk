@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.11.0] — 2026-05-01 — FairScale Reputation Bridge
 
-> SIMD-style entry. Additive, non-breaking. Pin to SAP program **`>= 0.2.0`**.
+> Additive, non-breaking. Pin to SAP program **`>= 0.2.0`**.
 
 ### Summary
 
