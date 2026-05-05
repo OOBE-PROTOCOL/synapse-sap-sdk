@@ -252,6 +252,7 @@ export {
   DEFAULT_SETTLE_PRIORITY_FEE,
   DEFAULT_SETTLE_COMPUTE_UNITS,
   DEFAULT_BATCH_SETTLE_COMPUTE_UNITS,
+  computeBatchSettleCu,
 } from "./utils";
 export type {
   PriorityFeeConfig,

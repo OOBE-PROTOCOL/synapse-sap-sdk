@@ -59,6 +59,61 @@ export const DEFAULT_SETTLE_COMPUTE_UNITS = 100_000;
  */
 export const DEFAULT_BATCH_SETTLE_COMPUTE_UNITS = 300_000;
 
+/**
+ * Per-settlement CU cost observed for `settle_batch` (sha256 of the
+ * service hash, dedup scan, volume-curve math, account writes).
+ *
+ * @since v0.11.0
+ * @internal
+ */
+const BATCH_SETTLE_CU_PER_ENTRY = 25_000;
+
+/**
+ * Fixed CU overhead for a `settle_batch` transaction independent of
+ * the entry count (signature verify, account loads, transfer, event).
+ *
+ * @since v0.11.0
+ * @internal
+ */
+const BATCH_SETTLE_CU_BASE = 60_000;
+
+/**
+ * Hard ceiling — Solana caps a single instruction at 1.4M CU. We
+ * stay below that so a transaction with extra preInstructions
+ * (priority-fee, ATA creation) still fits.
+ *
+ * @since v0.11.0
+ * @internal
+ */
+const BATCH_SETTLE_CU_MAX = 1_200_000;
+
+/**
+ * @name computeBatchSettleCu
+ * @description Compute the CU limit needed by `settle_batch` for a
+ * given entry count. Returned value is safe to pass to
+ * `ComputeBudgetProgram.setComputeUnitLimit`.
+ *
+ * Formula: `60_000 + n * 25_000`, clamped to 1.2M.
+ *
+ * @param entryCount - Number of settlements in the batch (1..N).
+ * @returns CU limit suitable for `setComputeUnitLimit`.
+ *
+ * @example
+ * ```ts
+ * const cu = computeBatchSettleCu(20); // 560_000
+ * ```
+ *
+ * @category Utils
+ * @since v0.11.0
+ */
+export function computeBatchSettleCu(entryCount: number): number {
+  if (!Number.isFinite(entryCount) || entryCount <= 0) {
+    return DEFAULT_BATCH_SETTLE_COMPUTE_UNITS;
+  }
+  const raw = BATCH_SETTLE_CU_BASE + Math.ceil(entryCount) * BATCH_SETTLE_CU_PER_ENTRY;
+  return Math.min(raw, BATCH_SETTLE_CU_MAX);
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  Types
 // ═══════════════════════════════════════════════════════════════════

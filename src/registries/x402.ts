@@ -88,6 +88,7 @@ import type {
 } from "../types";
 import {
   buildPriorityFeeIxs,
+  computeBatchSettleCu,
   buildRpcOptions,
 } from "../utils/priority-fee";
 import type { SettleOptions } from "../utils/priority-fee";
@@ -856,13 +857,19 @@ export class X402Registry {
       totalCalls,
     );
 
-    // Build priority fee instructions (empty array if no opts)
-    const preIxs = buildPriorityFeeIxs(opts);
-    const rpcOpts = buildRpcOptions(opts);
+    // Auto-size CU to the batch length when the caller didn't pin one.
+    // Default Solana cap (200k) is tight past ~8 entries; a CU limit
+    // costs nothing extra (only caps the maximum charge).
+    const effectiveOpts: SettleOptions = {
+      ...opts,
+      computeUnits: opts?.computeUnits ?? computeBatchSettleCu(settlements.length),
+    };
+    const preIxs = buildPriorityFeeIxs(effectiveOpts);
+    const rpcOpts = buildRpcOptions(effectiveOpts);
 
     let builder = this.methods
       .settleBatch(settlements)
-      .accounts({
+      .accountsPartial({
         wallet: this.wallet,
         agent: agentPda,
         agentStats: statsPda,
