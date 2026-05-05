@@ -283,6 +283,38 @@ export class EscrowV2Module extends BaseModule {
     return builder.rpc(rpcOpts);
   }
 
+  /**
+   * Read the current `escrow.settlement_index` from chain.
+   *
+   * In DisputeWindow mode (`settlementSecurity = 2`), every successful
+   * `settleCallsV2` increments this value. The PRE-increment value is the
+   * one to pass to {@link createPendingSettlement} for that batch.
+   *
+   * @returns the current `settlementIndex` as `bigint` (next index to use
+   *   for `createPendingSettlement` if you have NOT yet called `settle` for
+   *   it; if you HAVE just settled, subtract 1 — but prefer the event
+   *   `SettlementPendingEvent.settlement_index` over arithmetic).
+   * @since v0.12.8
+   */
+  async nextSettlementIndex(
+    agentWallet: PublicKey,
+    depositorWallet: PublicKey,
+    nonce: BN | number | bigint,
+  ): Promise<bigint> {
+    const [agentPda] = deriveAgent(agentWallet);
+    const [escrowPda] = this.deriveEscrow(agentPda, depositorWallet, nonce);
+    const escrow = await this.fetchAccountNullable<EscrowAccountV2Data>(
+      "escrowAccountV2",
+      escrowPda,
+    );
+    if (!escrow) {
+      throw new Error(
+        `nextSettlementIndex: escrow PDA ${escrowPda.toBase58()} not found on-chain`,
+      );
+    }
+    return BigInt(escrow.settlementIndex.toString());
+  }
+
   async createPendingSettlement(
     agentWallet: PublicKey,
     depositorWallet: PublicKey,
@@ -296,6 +328,25 @@ export class EscrowV2Module extends BaseModule {
     const [agentPda] = deriveAgent(agentWallet);
     const [escrowPda] = this.deriveEscrow(agentPda, depositorWallet, nonce);
     const [pendingPda] = this.derivePendingSettlement(escrowPda, settlementIndex);
+
+    // v0.12.8: preflight against the "Allocate: account already in use"
+    // SystemProgram error (custom 0x0). The pending_settlement PDA is
+    // seeded on `escrow + settlement_index`, so reusing the same index
+    // (e.g. always 0, or a stale retry value) collides with an existing
+    // account. Fail fast with an actionable message instead of burning a
+    // failed tx fee on simulation.
+    const existing = await this.provider.connection.getAccountInfo(pendingPda);
+    if (existing) {
+      const idx = this.bn(settlementIndex).toString();
+      throw new Error(
+        `createPendingSettlement: pending PDA ${pendingPda.toBase58()} ` +
+          `already exists for settlementIndex=${idx}. ` +
+          `Use EscrowV2Module.nextSettlementIndex() to read the current ` +
+          `escrow.settlement_index, or capture SettlementPendingEvent.settlement_index ` +
+          `from the preceding settleCallsV2 tx. Reusing a settlementIndex ` +
+          `causes SystemProgram Allocate (custom 0x0) failures.`,
+      );
+    }
 
     return this.methods
       .createPendingSettlement(

@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.8] — 2026-05-05 — pending-settlement collision preflight + index helper
+
+### Added
+
+- **`EscrowV2Module.nextSettlementIndex(agent, depositor, nonce)`** —
+  reads `escrow.settlement_index` from chain. Use this (or the
+  `SettlementPendingEvent.settlement_index` log from the preceding
+  `settleCallsV2` tx) as the source of truth for which index to pass
+  to `createPendingSettlement`. Eliminates the "always 0" /
+  stale-retry-index footgun.
+
+### Fixed
+
+- **`EscrowV2Module.createPendingSettlement` collision preflight** —
+  the pending PDA is seeded on `["sap_pending", escrow, settlement_index]`,
+  so reusing the same `settlementIndex` (e.g. an orchestrator that
+  always sends `0`, or retries with a stale index) causes the
+  SystemProgram `Allocate: account already in use` error
+  (custom 0x0) inside `CreatePendingSettlement`. The SDK now does a
+  `getAccountInfo` preflight on the pending PDA and throws an
+  actionable error pointing the caller to `nextSettlementIndex()`,
+  saving a failed simulation/tx fee on every retry attempt of a
+  duplicate index.
+
 ## [0.12.7] — 2026-05-05 — createEscrowV2 settlement-security preflight
 
 ### Added
