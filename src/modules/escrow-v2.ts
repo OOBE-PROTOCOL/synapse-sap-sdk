@@ -377,6 +377,49 @@ export class EscrowV2Module extends BaseModule {
     const [pendingPda] = this.derivePendingSettlement(escrowPda, settlementIndex);
     const [statsPda] = deriveAgentStats(agentPda);
 
+    // v0.12.9: preflight against ArithmeticOverflow at finalize.
+    //
+    // The on-chain handler subtracts `pending_settlement.amount` from BOTH
+    // `escrow.balance` AND `escrow.pending_amount`. If the PendingSettlement
+    // PDA was created without a preceding `settle_calls_v2` (orphan PDA from
+    // legacy probe loops, or a buggy caller that skipped the settle step),
+    // `escrow.pending_amount` is smaller than `pending_settlement.amount`
+    // and the program aborts with ArithmeticOverflow (error 6075) at
+    // escrow_v2.rs:633. Each retry burns ~5 000 lamports of base fee.
+    //
+    // Detect this BEFORE signing and throw with a clear, actionable message
+    // pointing at the orphan-recovery path.
+    const [escrowAcc, pendingAcc] = await Promise.all([
+      this.fetchAccountNullable<EscrowAccountV2Data>("escrowAccountV2", escrowPda),
+      this.fetchAccountNullable<PendingSettlementData>("pendingSettlement", pendingPda),
+    ]);
+    if (!escrowAcc) {
+      throw new Error(
+        `finalizeSettlement: escrow PDA ${escrowPda.toBase58()} not found on-chain.`,
+      );
+    }
+    if (!pendingAcc) {
+      throw new Error(
+        `finalizeSettlement: pending PDA ${pendingPda.toBase58()} not found on-chain ` +
+          `(settlementIndex=${settlementIndex.toString()}). Nothing to finalize.`,
+      );
+    }
+    const psAmount = BigInt(pendingAcc.amount.toString());
+    const escrowPendingAmount = BigInt(escrowAcc.pendingAmount.toString());
+    const escrowBalance = BigInt(escrowAcc.balance.toString());
+    if (psAmount > escrowPendingAmount || psAmount > escrowBalance) {
+      throw new Error(
+        `finalizeSettlement: orphan/inconsistent PendingSettlement detected ` +
+          `at ${pendingPda.toBase58()} (settlementIndex=${settlementIndex.toString()}). ` +
+          `pending.amount=${psAmount} but escrow.pending_amount=${escrowPendingAmount}, ` +
+          `escrow.balance=${escrowBalance}. The on-chain finalize would abort with ` +
+          `ArithmeticOverflow (6075). This PDA was almost certainly created by a ` +
+          `caller that skipped settle_calls_v2 (legacy probe loop). It cannot be ` +
+          `finalized and cannot be closed (close_pending_settlement requires ` +
+          `is_finalized=true). Skip this index permanently in your settle queue.`,
+      );
+    }
+
     return this.methods
       .finalizeSettlement()
       .accounts({
@@ -387,6 +430,76 @@ export class EscrowV2Module extends BaseModule {
         agentStats: statsPda,
       })
       .rpc();
+  }
+
+  /**
+   * Identify orphan PendingSettlement PDAs that cannot be finalized.
+   *
+   * @returns `null` if the PDA is finalizable (or already finalized / disputed).
+   *          Otherwise an object describing the inconsistency, suitable for
+   *          logging or feeding into a quarantine list. Use this from a
+   *          recovery script to scan a range of `settlement_index` values:
+   *
+   * ```ts
+   * for (let idx = 0n; idx < currentIdx; idx++) {
+   *   const orphan = await sap.escrowV2.diagnoseOrphanPending(
+   *     agentWallet, depositorWallet, nonce, idx,
+   *   );
+   *   if (orphan) log.warn({ idx, ...orphan }, "skip orphan");
+   * }
+   * ```
+   *
+   * @since v0.12.9
+   */
+  async diagnoseOrphanPending(
+    agentWallet: PublicKey,
+    depositorWallet: PublicKey,
+    nonce: BN | number | bigint,
+    settlementIndex: BN | number | bigint,
+  ): Promise<{
+    pendingPda: PublicKey;
+    psAmount: bigint;
+    escrowPendingAmount: bigint;
+    escrowBalance: bigint;
+    isFinalized: boolean;
+    isDisputed: boolean;
+    reason: "ok" | "missing" | "amount_exceeds_pending" | "amount_exceeds_balance" | "already_finalized" | "disputed";
+  } | null> {
+    const [agentPda] = deriveAgent(agentWallet);
+    const [escrowPda] = this.deriveEscrow(agentPda, depositorWallet, nonce);
+    const [pendingPda] = this.derivePendingSettlement(escrowPda, settlementIndex);
+    const [escrowAcc, pendingAcc] = await Promise.all([
+      this.fetchAccountNullable<EscrowAccountV2Data>("escrowAccountV2", escrowPda),
+      this.fetchAccountNullable<PendingSettlementData>("pendingSettlement", pendingPda),
+    ]);
+    if (!escrowAcc) return null;
+    if (!pendingAcc) {
+      return {
+        pendingPda,
+        psAmount: 0n,
+        escrowPendingAmount: BigInt(escrowAcc.pendingAmount.toString()),
+        escrowBalance: BigInt(escrowAcc.balance.toString()),
+        isFinalized: false,
+        isDisputed: false,
+        reason: "missing",
+      };
+    }
+    const psAmount = BigInt(pendingAcc.amount.toString());
+    const escrowPendingAmount = BigInt(escrowAcc.pendingAmount.toString());
+    const escrowBalance = BigInt(escrowAcc.balance.toString());
+    const base = {
+      pendingPda,
+      psAmount,
+      escrowPendingAmount,
+      escrowBalance,
+      isFinalized: pendingAcc.isFinalized,
+      isDisputed: pendingAcc.isDisputed,
+    };
+    if (pendingAcc.isFinalized) return { ...base, reason: "already_finalized" };
+    if (pendingAcc.isDisputed) return { ...base, reason: "disputed" };
+    if (psAmount > escrowPendingAmount) return { ...base, reason: "amount_exceeds_pending" };
+    if (psAmount > escrowBalance) return { ...base, reason: "amount_exceeds_balance" };
+    return null;
   }
 
   async fileDispute(
