@@ -113,3 +113,6 @@ export type {
   SapErrorEntry,
   DecodedAnchorError,
 } from "./anchor-errors";
+
+// ── v0.13.0  Volume-curve mirror for client-side amount preview ──
+export { calculateSettleAmount } from "./volume-curve";

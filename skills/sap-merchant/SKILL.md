@@ -4628,6 +4628,27 @@ See [sap-overview/SKILL.md](../sap-overview/SKILL.md) — Appendices A–E (prov
 
 ## Common Pitfalls — Lessons learned in production (v0.12.5 → v0.13.0)
 
+> **v0.13.0 — DisputeWindow is now a single SDK call.** `escrowV2.settle()`
+> auto-bundles `settleCallsV2 + createPendingSettlement` into the SAME tx
+> when the escrow is DisputeWindow. The SDK reads the escrow once, picks
+> the PRE-increment `settlement_index`, mirrors the on-chain volume-curve
+> math via `calculateSettleAmount(...)`, and posts both IXs atomically.
+>
+> **Caller obligation collapses to TWO phases:**
+> 1. `await sap.escrowV2.settle(depositor, nonce, calls, hash)` — does
+>    settleCallsV2 + createPendingSettlement in one tx.
+> 2. wait `disputeWindowSlots` slots → `await sap.escrowV2.finalizeSettlement(
+>    agentWallet, depositor, nonce, idx)`.
+>
+> Old 3-call code (settle → createPendingSettlement → finalize) keeps
+> compiling, but the manual `createPendingSettlement` will now throw
+> `pending PDA already exists` from the v0.13.0 collision preflight —
+> that's the SDK telling you to delete that line.
+>
+> Opt-out: pass `{ skipAutoPending: true }` to `settle()` for advanced
+> flows (e.g. batched receipt-merkle root aggregation across multiple
+> settles). In that case you must call `createPendingSettlement` yourself.
+
 > **v0.13.0 — defensive pipelines are now built-in.** Every fund-touching
 > SDK method (`escrow.*`, `escrowV2.*`, `staking.*`, `vault.addDelegate`,
 > `tools.publish*`) runs a `getAccountInfo`-only preflight that throws a
@@ -4736,7 +4757,7 @@ deprecated SelfReport).
 (~15 minutes at 400 ms/slot) so the depositor has a realistic chance to dispute
 before auto-release.
 
-### 5. `Allocate: account already in use` (custom 0x0) — read `settlement_index` from chain
+### 5. `Allocate: account already in use` (custom 0x0) — **fixed by v0.13.0 auto-bundle**
 
 **Symptom:** `CreatePendingSettlement` simulation fails with:
 ```
@@ -4746,29 +4767,39 @@ Program 11111111111111111111111111111111 failed: custom program error: 0x0
 ```
 Every retry burns ~5 000 lamports of base fee. The settle queue stalls.
 
-**Root cause:** the orchestrator is passing a stale or hardcoded
+**Root cause:** the orchestrator was passing a stale or hardcoded
 `settlementIndex` (very often `0`). The PDA at
-`["sap_pending", escrow, settlement_index]` already exists from a previous
-settlement and SystemProgram refuses to allocate over it.
+`["sap_pending", escrow, settlement_index]` already existed from a previous
+settlement and SystemProgram refused to allocate over it.
 
-**Fix (v0.12.8+):** ALWAYS read the current index from chain right before
-building the IX:
+**Fix (v0.13.0+):** **stop calling `createPendingSettlement` manually.**
+`escrowV2.settle()` now bundles both IXs in one tx and reads
+`escrow.settlement_index` itself to pick the right PDA seed. The SDK still
+runs the collision preflight on the auto-bundled IX, so an actual race or
+orphan PDA still throws **before** signing — never burns fees.
 
 ```ts
-// ✅ canonical pattern
-const idx = await sap.escrowV2.nextSettlementIndex(agentPda, depositorWallet, nonce);
-await sap.escrowV2.settle(/* ... */);
-await sap.escrowV2.createPendingSettlement(
-  agentWallet, depositorWallet, nonce,
-  idx,           // ← never `0`, never reused
-  callsToSettle, amountLamports, serviceHash,
-  merkleRoot,
+// ✅ v0.13.0 canonical pattern — single call, atomic
+await sap.escrowV2.settle(
+  depositorWallet,
+  nonce,
+  callsToSettle,
+  serviceHash,
 );
+// settlement_index, amount, pending PDA — all handled inside.
 ```
 
-Or subscribe and use the index emitted by `SettlementPendingEvent`. The SDK
-now runs a `getAccountInfo(pendingPda)` preflight and throws BEFORE signing
-if the PDA already exists.
+If you intentionally drive the 2-tx flow (`{ skipAutoPending: true }`),
+read the index right before building the IX:
+
+```ts
+const idx = await sap.escrowV2.nextSettlementIndex(agentPda, depositorWallet, nonce);
+await sap.escrowV2.settle(/* … */, { skipAutoPending: true });
+await sap.escrowV2.createPendingSettlement(
+  agentWallet, depositorWallet, nonce, idx, callsToSettle, amountLamports,
+  serviceHash, merkleRoot,
+);
+```
 
 ### 6. `settle()` returns the pending sig, finalize never runs — log both phases
 
@@ -4799,34 +4830,39 @@ log.info({ phase: "finalize", sig: sigFinalize });
 If finalize errors with anything other than `DisputeWindowNotElapsed`, treat
 it as fatal — don't silently re-queue.
 
-### 6b. `ArithmeticOverflow` (error 6075) at finalize — orphan PendingSettlement PDAs
+### 6b. `ArithmeticOverflow` (error 6075) at finalize — **prevented by v0.13.0 auto-bundle**
 
-**Symptom:** `finalizeSettlement` fails with:
+**Symptom (legacy v0.12.x callers):** `finalizeSettlement` fails with:
 ```
 AnchorError thrown in programs/synapse-agent-sap/src/instructions/escrow_v2.rs:633.
 Error Code: ArithmeticOverflow. Error Number: 6075. Error Message: overflow.
 ```
-Sentinel retries forever for sequential indices (e.g. 8 → 19), burning
-~5 000 lamports per retry. Funds never move; `escrow.pending_amount` stays
-at `0`; the orphan PDAs **cannot be closed** (`close_pending_settlement`
-requires `is_finalized=true`).
+Sentinel retries forever for sequential indices, burning ~5 000 lamports per
+retry. Funds never move; `escrow.pending_amount` stays at `0`; the orphan
+PDAs **cannot be closed** (`close_pending_settlement` requires
+`is_finalized=true`).
 
 **Root cause:** the on-chain `create_pending_settlement` IX accepts arbitrary
-`amount` / `calls_to_settle` from the caller and is **not linked** to the
-preceding `settle_calls_v2`. Any caller that calls `createPendingSettlement`
-without first calling `settle` (legacy probe loops) creates a PDA whose
-`amount` was never added to `escrow.pending_amount`. Finalize then runs
+`amount` from the caller and is **not linked** to a preceding `settle_calls_v2`.
+A caller that called `createPendingSettlement` directly (or with a
+miscomputed `amount`) created a PDA whose `amount` was never added to
+`escrow.pending_amount`. Finalize then runs
 `escrow.pending_amount.checked_sub(pending.amount)` → underflow → 6075.
 
-**Fix (v0.12.9+):** the SDK preflights both accounts before signing
-`finalizeSettlement`. If `pending.amount > escrow.pending_amount` OR
-`pending.amount > escrow.balance`, it throws a clear error telling you to
-**permanently skip that index**. Use the new diagnostic to walk the range
-and quarantine orphans on startup:
+**Fix (v0.13.0+) — structural:** `escrowV2.settle()` auto-bundles
+`settleCallsV2 + createPendingSettlement` in the same tx, computes `amount`
+via the on-chain volume-curve mirror (`calculateSettleAmount`), and uses the
+PRE-increment `settlement_index` for the PDA seed. **It is no longer
+possible** to create an orphan PendingSettlement through the SDK.
+
+**Fix (v0.12.9+) — defensive:** `finalizeSettlement` still preflights both
+accounts. If `pending.amount > escrow.pending_amount` OR
+`pending.amount > escrow.balance`, it throws a clear `SapPreflightError`
+telling you to **permanently skip that index**. Use this to clean up
+orphans left over from pre-v0.13.0 callers:
 
 ```ts
-// Run once on startup (or whenever escrow.pending_amount === 0 but
-// the queue holds pending indices waiting for finalize).
+// Run once on startup to quarantine pre-v0.13.0 orphans.
 const top = await sap.escrowV2.nextSettlementIndex(agentPda, depositor, nonce);
 const skip: bigint[] = [];
 for (let idx = 0n; idx < top; idx++) {
@@ -4841,13 +4877,10 @@ for (let idx = 0n; idx < top; idx++) {
 // Persist `skip` (file / db) and never enqueue these indices again.
 ```
 
-> ⚠️ **Program-level limitation.** Orphan PDAs **cannot be reclaimed**
-> without a program upgrade. Each one locks ~0.0015 SOL of rent. The
-> structural fix requires either merging `create_pending_settlement` into
-> `settle_calls_v2`, adding a `force_close_orphan_pending_settlement`
-> admin IX, or constraining `create_pending_settlement.amount <=
-> escrow.pending_amount`. Until then the only correct sentinel-side
-> behavior is **skip + alert**.
+> ⚠️ **Pre-v0.13.0 orphan PDAs cannot be reclaimed** without a program
+> upgrade. Each one locks ~0.0015 SOL of rent. The structural fix in the
+> SDK eliminates new orphans; reclaiming old ones requires an admin
+> `force_close_orphan_pending_settlement` IX on a future program release.
 
 ### 7. `Directory import .../dist/esm/core not supported` — Node ESM strictness
 
@@ -4876,44 +4909,39 @@ dist is actually loaded** (the live process can hold an older dist in memory).
 
 ---
 
-### Quick-reference: minimum settle loop (v0.12.8+)
+### Quick-reference: minimum settle loop (v0.13.0+)
 
 ```ts
-// Run this for every escrow ready to settle:
+// Run this for every escrow ready to settle.
+// One call covers settleCallsV2 + createPendingSettlement atomically.
 async function settleOne(
   agentWallet: PublicKey,
   depositorWallet: PublicKey,
   nonce: number,
   callsToSettle: BN,
   serviceHash: number[],
-  merkleRoot: number[],
-  coSigner?: Keypair,                 // only if security == 1
+  coSigner?: Keypair,                 // only for CoSigned escrows (security == 1)
 ) {
-  const [agentPda] = deriveAgent(agentWallet);
-
-  // 1. read current index from chain (single source of truth)
+  // 1. Capture the index BEFORE the auto-bundle bumps it on-chain.
+  //    finalize needs this exact value.
   const idx = await sap.escrowV2.nextSettlementIndex(
-    agentPda, depositorWallet, nonce,
+    agentWallet, depositorWallet, nonce,
   );
 
-  // 2. settle phase
+  // 2. settleCallsV2 + (auto) createPendingSettlement — one tx.
+  //    For CoSigned escrows this single IX moves funds and skips
+  //    the auto-bundle; finalize is not needed.
+  //    For DisputeWindow escrows, both IXs go in atomically.
   const sigSettle = await sap.escrowV2.settle(
     depositorWallet, nonce, callsToSettle, serviceHash,
     [], FAST_SETTLE_OPTIONS, coSigner,
   );
-  log.info({ phase: "settle", sig: sigSettle, idx });
+  log.info({ phase: "settle+pending", sig: sigSettle, idx });
 
-  // 3. pending phase (DisputeWindow only — for SelfReport/CoSigned the
-  //    settle call already moved funds; skip 3 + 4)
-  if (escrow.settlementSecurity === 2) {
-    const sigPending = await sap.escrowV2.createPendingSettlement(
-      agentWallet, depositorWallet, nonce, idx,
-      callsToSettle, amountLamports, serviceHash, merkleRoot,
-    );
-    log.info({ phase: "pending", sig: sigPending, idx });
-
-    // 4. finalize after dispute window (separate retry unit)
-    await waitForSlot(currentSlot + escrow.disputeWindowSlots + 1);
+  // 3. CoSigned: done. DisputeWindow: wait the window, then finalize.
+  const escrow = await sap.escrowV2.fetch(agentPda, depositorWallet, nonce);
+  if (isDisputeWindow(escrow.settlementSecurity)) {
+    await waitForSlot(currentSlot + escrow.disputeWindowSlots.toNumber() + 1);
     const sigFinalize = await sap.escrowV2.finalizeSettlement(
       agentWallet, depositorWallet, nonce, idx,
     );
@@ -4921,4 +4949,14 @@ async function settleOne(
   }
 }
 ```
+
+> **Migration from v0.12.x:** delete the manual `createPendingSettlement`
+> call between `settle()` and `finalizeSettlement()`. If you keep it, the
+> v0.13.0 collision preflight will throw `pending PDA already exists` —
+> the SDK telling you the auto-bundle already created it.
+>
+> To keep the legacy 2-tx flow (e.g. for batched off-chain receipt-merkle
+> aggregation across multiple settles), pass
+> `{ skipAutoPending: true }` to `settle()` and continue to call
+> `createPendingSettlement` manually with the index captured above.
 
