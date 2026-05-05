@@ -95,6 +95,45 @@ export class EscrowV2Module extends BaseModule {
       );
     }
 
+    // v0.12.7 preflight: mirror the on-chain settlement-security guards
+    // (escrow_v2.rs:106-115) so callers fail fast with a clear message
+    // instead of paying for a tx that aborts with `InvalidSettlementSecurity`
+    // or `CoSignerRequired`.
+    const security = args.settlementSecurity;
+    if (security === 0) {
+      throw new Error(
+        "createEscrowV2: settlementSecurity=0 (SelfReport) is deprecated since " +
+        "v0.7. Use 1 (CoSigned) or 2 (DisputeWindow). On-chain rejects with " +
+        "SelfReportDeprecated.",
+      );
+    }
+    if (security === 1 && !args.coSigner) {
+      throw new Error(
+        "createEscrowV2: settlementSecurity=1 (CoSigned) requires `coSigner` " +
+        "to be set. On-chain rejects with CoSignerRequired.",
+      );
+    }
+    if (security === 2) {
+      // The on-chain check is `dispute_window_slots > 0` — i.e. >= 1 slot.
+      // Zero would let an agent settle and immediately drain pending funds
+      // before any depositor could possibly file a dispute, defeating the
+      // entire DisputeWindow security model. Enforce client-side too.
+      const slots = BigInt(this.bn(args.disputeWindowSlots).toString());
+      if (slots < 1n) {
+        throw new Error(
+          "createEscrowV2: settlementSecurity=2 (DisputeWindow) requires " +
+          "`disputeWindowSlots >= 1` to prevent the zero-window abuse vector. " +
+          "Recommended minimum is 2_160 slots (~15 min). On-chain rejects " +
+          "with InvalidSettlementSecurity.",
+        );
+      }
+    }
+    if (security !== 0 && security !== 1 && security !== 2) {
+      throw new Error(
+        `createEscrowV2: settlementSecurity must be 1 (CoSigned) or 2 (DisputeWindow), got ${String(security)}.`,
+      );
+    }
+
     const [agentPda] = deriveAgent(agentWallet);
     const [escrowPda] = this.deriveEscrow(agentPda, undefined, args.escrowNonce);
     const [stakePda] = deriveStake(agentPda);
