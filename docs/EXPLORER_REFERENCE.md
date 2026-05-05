@@ -736,7 +736,7 @@ import {
 | `deposit_escrow` | amount: u64 | EscrowDepositedEvent |
 | `settle_calls` | calls_to_settle: u64, service_hash: [u8;32] | PaymentSettledEvent |
 | `withdraw_escrow` | amount: u64 | EscrowWithdrawnEvent |
-| `settle_batch` | settlements: Vec\<Settlement\> (max 10) | BatchSettledEvent |
+| `settle_batch` | settlements: Vec\<Settlement\> (max 10), batch_root: [u8;32] | BatchSettledEvent |
 
 Note: `close_escrow` (1 instruction) does not emit an event. Proof of the escrow lifecycle lives in the `EscrowCreatedEvent`, `PaymentSettledEvent`, `EscrowWithdrawnEvent`, and `BatchSettledEvent` TX logs.
 

@@ -200,6 +200,21 @@ console.log(batch.totalAmount.toString());
 console.log(batch.settlementCount);  // 3
 ```
 
+> **v0.12.5 — settleBatch auto-CU + resolver fix**
+>
+> Both `client.x402.settleBatch` and `client.escrow.settleBatch` now:
+> - Bypass Anchor's recursive PDA resolver via `.accountsPartial(...)`. This
+>   eliminates the `Reached maximum depth for account resolution` error
+>   triggered by the v0.10 `settle_batch` IDL (where `escrow` and
+>   `settlement_receipt` are seeded on each other and on a TX argument).
+> - Auto-inject a `setComputeUnitLimit` based on entry count using
+>   `computeBatchSettleCu(n)` (`60_000 + n * 25_000`, capped 1.2M CU).
+>   The default Solana cap of 200k overflows past ~8 entries; the SDK now
+>   sets a tight ceiling for free (CU limit doesn't add lamports).
+> - The hard on-chain cap is still **10 settlements per TX** (program
+>   `require!(settlements.len() <= 10)`). Pass `opts.computeUnits` to override
+>   the auto-sized value.
+
 ### Get Balance
 
 Check the current escrow state — balance, remaining calls, expiry, and affordability:
