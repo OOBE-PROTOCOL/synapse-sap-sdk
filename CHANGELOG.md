@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.5] — 2026-05-05 — settleBatch resolver fix + auto CU
+
+### Fixed
+
+- **`settleBatch` "Reached maximum depth for account resolution"** —
+  Anchor TS `AccountsResolver` recursed on the v0.10 `settle_batch` IDL
+  (escrow PDA seeded on `escrow.depositor`, `settlement_receipt`
+  seeded on `escrow + arg(batch_root)`) and exhausted its depth budget
+  before reaching a fixed point. Both `EscrowModule.settleBatch` and
+  `X402Registry.settleBatch` now use `.accountsPartial(...)`, bypassing
+  the resolver entirely. All PDAs are still derived deterministically
+  client-side via `deriveAgent` / `deriveEscrow` / `deriveAgentStats`
+  / `deriveSettlementReceipt`, so the on-chain semantics are unchanged.
+
+### Added
+
+- **`computeBatchSettleCu(n)`** in `utils/priority-fee` — derives a
+  safe `setComputeUnitLimit` for `settle_batch` from the entry count
+  (`60_000 + n * 25_000`, capped at 1.2M CU). Both `settleBatch`
+  call sites auto-inject this when the caller doesn't pin
+  `opts.computeUnits`. Setting the CU limit is free — it caps the
+  maximum charge, it does not add lamports — so the default cost
+  profile is unchanged while batches past ~8 entries no longer hit
+  the 200k default ceiling.
+
 ## [0.11.0] — 2026-05-01 — FairScale Reputation Bridge
 
 > Additive, non-breaking. Pin to SAP program **`>= 0.2.0`**.

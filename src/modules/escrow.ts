@@ -33,6 +33,7 @@ import type {
 } from "../types";
 import {
   buildPriorityFeeIxs,
+  computeBatchSettleCu,
   buildRpcOptions,
 } from "../utils/priority-fee";
 import type { SettleOptions } from "../utils/priority-fee";
@@ -305,12 +306,22 @@ export class EscrowModule extends BaseModule {
     const rootArr = hashToArray(rootBytes);
     const [receiptPda] = deriveSettlementReceipt(escrowPda, rootBytes);
 
-    const preIxs = buildPriorityFeeIxs(opts);
-    const rpcOpts = buildRpcOptions(opts);
+    // Auto-size CU to the batch length so callers don't have to think
+    // about it. The default Solana cap (200k) overflows past ~8
+    // settlements; we compute a tight ceiling and let the caller
+    // override via `opts.computeUnits` if they want.
+    // Setting the CU limit is FREE — it doesn't add lamports, only
+    // caps the maximum the runtime is allowed to charge.
+    const effectiveOpts: SettleOptions = {
+      ...opts,
+      computeUnits: opts?.computeUnits ?? computeBatchSettleCu(settlements.length),
+    };
+    const preIxs = buildPriorityFeeIxs(effectiveOpts);
+    const rpcOpts = buildRpcOptions(effectiveOpts);
 
     let builder = this.methods
       .settleBatch(settlements, rootArr)
-      .accounts({
+      .accountsPartial({
         wallet: this.walletPubkey,
         agent: agentPda,
         agentStats: statsPda,
