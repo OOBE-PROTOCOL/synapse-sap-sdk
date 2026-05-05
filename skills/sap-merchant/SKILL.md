@@ -2299,7 +2299,7 @@ interface CreateEscrowV2Args {
   tokenMint: PublicKey | null;             // null = SOL, set for SPL tokens
   tokenDecimals: number;                   // 9 for SOL, 6 for USDC, etc.
   settlementSecurity: number;              // 0=SelfReport (deprecated), 1=CoSigned, 2=DisputeWindow
-  disputeWindowSlots: BN | number | bigint;// slots before auto-release (DisputeWindow only)
+  disputeWindowSlots: BN | number | bigint;// slots before auto-release (DisputeWindow only). MUST be >= 1 (v0.12.7); recommended >= 2_160 (~15 min) to close the zero-window abuse vector.
   coSigner: PublicKey | null;              // required for CoSigned mode
   arbiter: PublicKey | null;               // DEPRECATED in v0.7 — ignored, use receipt batches
 }

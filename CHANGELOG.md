@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.7] — 2026-05-05 — createEscrowV2 settlement-security preflight
+
+### Added
+
+- **`EscrowV2Module.create` settlement-security preflight** — mirrors
+  the on-chain guards at `escrow_v2.rs:106-115` so callers fail fast
+  with an actionable message instead of paying for a tx that aborts:
+  - `settlementSecurity = 0` (SelfReport) → rejected client-side
+    (deprecated since v0.7).
+  - `settlementSecurity = 1` (CoSigned) requires `coSigner` to be set.
+  - `settlementSecurity = 2` (DisputeWindow) requires
+    **`disputeWindowSlots >= 1`** to close the **zero-window abuse
+    vector**: a window of 0 slots would let the agent settle and drain
+    `pending_amount` before any depositor could file a dispute,
+    defeating the entire DisputeWindow security model. Recommended
+    minimum: 2_160 slots (~15 min).
+  - Any other `settlementSecurity` value is rejected.
+
 ## [0.12.6] — 2026-05-05 — v2 settle co-signer support
 
 ### Fixed
