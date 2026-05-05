@@ -4626,7 +4626,44 @@ See [sap-overview/SKILL.md](../sap-overview/SKILL.md) — Appendices A–E (prov
 
 ---
 
-## Common Pitfalls — Lessons learned in production (v0.12.5 → v0.12.8)
+## Common Pitfalls — Lessons learned in production (v0.12.5 → v0.13.0)
+
+> **v0.13.0 — defensive pipelines are now built-in.** Every fund-touching
+> SDK method (`escrow.*`, `escrowV2.*`, `staking.*`, `vault.addDelegate`,
+> `tools.publish*`) runs a `getAccountInfo`-only preflight that throws a
+> typed `SapPreflightError` *before* the tx is signed. The error carries:
+>
+> - `predictedCode` (e.g. `6062`),
+> - `predictedName` (e.g. `"InsufficientEscrowBalance"`),
+> - a friendly English `message` with the actionable hint,
+> - and `hint` (the diagnostic context).
+>
+> Branch on the typed name, NOT the message string:
+> ```ts
+> import { SapPreflightError } from "@oobe-protocol-labs/synapse-sap-sdk/utils";
+> try { await sap.escrowV2.close(agent, nonce); }
+> catch (e) {
+>   if (e instanceof SapPreflightError && e.predictedName === "EscrowNotClosed") {
+>     // pendingAmount > 0 — run diagnoseOrphanPending across the index range
+>   }
+>   throw e;
+> }
+> ```
+>
+> The full 147-entry SAP error table is exported as `SAP_ERRORS` and the
+> universal error decoder as `decodeAnchorError(err)` — use them on RPC
+> errors that escape the preflight (e.g. account-state races):
+> ```ts
+> import { decodeAnchorError } from "@oobe-protocol-labs/synapse-sap-sdk/utils";
+> try { await sap.escrow.settle(...); }
+> catch (e) {
+>   const dec = decodeAnchorError(e);
+>   if (dec) console.error(`SAP ${dec.code} ${dec.name}: ${dec.friendly}`);
+> }
+> ```
+>
+> All pitfalls below are now caught client-side; the section is preserved as
+> the canonical reference for *what each on-chain check actually means*.
 
 Every item below is a real bug that bricked a live merchant loop. Read this section
 before writing any settlement code — every line saves either a burned tx fee or a

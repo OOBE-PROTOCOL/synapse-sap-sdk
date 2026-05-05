@@ -6396,10 +6396,19 @@ import { synapseResponse, withSynapseError, createSynapseProvider }
 
 ---
 
-## Appendix Z — Production lessons learned (v0.12.5 → v0.12.8)
+## Appendix Z — Production lessons learned (v0.12.5 → v0.13.0)
 
 Every entry below is a real production bug. The merchant skill ([sap-merchant/SKILL.md](../sap-merchant/SKILL.md#common-pitfalls--lessons-learned-in-production-v0125--v0128))
 has the long-form version; this is the executive summary every agent must know.
+
+> **v0.13.0 — defensive pipelines**: every fund-touching SDK method
+> (`escrow.*`, `escrowV2.*`, `staking.*`, `vault.addDelegate`,
+> `tools.publish*`) now runs a `getAccountInfo`-only preflight that throws
+> a typed `SapPreflightError` *before* the tx is signed. The full 147-entry
+> SAP error table is exported as `SAP_ERRORS` from
+> `@oobe-protocol-labs/synapse-sap-sdk/utils`, and `decodeAnchorError(err)`
+> handles every Anchor/RPC/sim error shape. Branch on `err.predictedName`,
+> not error message strings.
 
 | # | Symptom | Root cause | Fix (caller side) |
 |---|---------|------------|-------------------|

@@ -1013,6 +1013,25 @@ await client.escrowV2.create(agentWallet, {
 > For `DisputeWindow` use **`disputeWindowSlots >= 2_160`** (~15 min @
 > 400ms/slot) so the depositor has a realistic chance to dispute.
 
+> **v0.13.0 — defensive preflights now apply to every fund-touching client call**
+>
+> `escrow.deposit/withdraw/close`, `escrowV2.deposit/withdraw/close` all
+> verify on-chain state via `getAccountInfo` and throw a typed
+> `SapPreflightError` with `predictedName` (e.g. `InsufficientEscrowBalance`,
+> `EscrowNotEmpty`, `EscrowNotClosed`) **before signing**. No more wasted
+> base fees on guaranteed-failing transactions.
+>
+> ```ts
+> import { SapPreflightError, decodeAnchorError } from "@oobe-protocol-labs/synapse-sap-sdk/utils";
+> try { await client.escrowV2.withdraw(agent, nonce, new BN(big_amount)); }
+> catch (e) {
+>   if (e instanceof SapPreflightError) {
+>     // e.predictedName === "InsufficientEscrowBalance"
+>     // e.hint = "requested 1000000, withdrawable 50000 (balance 100000 − pending 50000)"
+>   }
+> }
+> ```
+
 ```ts
 // Deposit more funds
 await client.escrowV2.deposit(agentWallet, new BN(50_000));
