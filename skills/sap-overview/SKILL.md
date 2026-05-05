@@ -6393,3 +6393,66 @@ import {
 import { synapseResponse, withSynapseError, createSynapseProvider }
                                   from '@oobe-protocol-labs/synapse-client-sdk/next';
 ```
+
+---
+
+## Appendix Z — Production lessons learned (v0.12.5 → v0.12.8)
+
+Every entry below is a real production bug. The merchant skill ([sap-merchant/SKILL.md](../sap-merchant/SKILL.md#common-pitfalls--lessons-learned-in-production-v0125--v0128))
+has the long-form version; this is the executive summary every agent must know.
+
+| # | Symptom | Root cause | Fix (caller side) |
+|---|---------|------------|-------------------|
+| 1 | `Reached maximum depth for account resolution` (no tx sent) | Anchor TS resolver loops on circular PDA seeds (`escrow` ↔ `settlement_receipt`) | Use `.accountsPartial(...)` not `.accounts(...)` for any IX touching `settlement_receipt`. SDK does this since v0.12.5 |
+| 2 | `Computational budget exceeded` on batches > 8 | Default 200k CU cap; `setComputeUnitLimit` is FREE | Let `settleBatch` auto-size with `computeBatchSettleCu(n)` (v0.12.5) — don't override unless heavy SPL legs |
+| 3 | `InvalidCoSigner` (error 6093) on CoSigned settle | SDK passed pubkey but never registered the keypair as signer | Pass co-signer **`Keypair`** as 7th arg to `escrowV2.settle(...)` (v0.12.6) |
+| 4 | `InvalidSettlementSecurity` on createEscrow | SelfReport (deprecated), missing co-signer, `disputeWindowSlots = 0`, or invalid enum | Preflight throws since v0.12.7. For DisputeWindow: **`disputeWindowSlots >= 2_160`** (~15 min) |
+| 5 | `Allocate: account already in use` (custom 0x0) on `CreatePendingSettlement` — fee burned every retry | Caller hardcoded `settlementIndex = 0` or reused stale index after retry; PDA `[\"sap_pending\", escrow, idx]` already allocated | Always read `escrow.settlement_index` from chain via `escrowV2.nextSettlementIndex(agent, depositor, nonce)` (v0.12.8) OR use the `settlement_index` emitted by `SettlementPendingEvent` |
+| 6 | Funds never move; only `settlementPending` events on chain | `doSettle` returned the pending sig and silently skipped `finalizeSettlement` | Treat pending and finalize as **separate retry units** — log explicit `phase` markers; only `DisputeWindowNotElapsed` is retryable |
+| 7 | `Directory import .../dist/esm/core not supported` | Node ESM strict resolution doesn't accept `from "./core"` (no `/index.js`) | Use **static** `import` of the SDK, never `import()`, in pure-ESM Node. Fixed dist coming |
+| 8 | Random tx-layout regressions on `pnpm install` | Used `^0.12.0` and got a minor bump | Pin to **exact patch** (`"0.12.8"`). After bump: `pnpm rebuild && pm2 restart`, verify the new dist is loaded |
+
+### Canonical settle loop (copy-paste safe)
+
+```ts
+// 1. Read CURRENT settlement_index from chain (NEVER hardcode `0`).
+const idx = await sap.escrowV2.nextSettlementIndex(agentPda, depositor, nonce);
+
+// 2. Settle (CoSigned needs the Keypair as 7th arg).
+const sigSettle = await sap.escrowV2.settle(
+  depositor, nonce, callsToSettle, serviceHash,
+  [], FAST_SETTLE_OPTIONS, coSignerKeypair /* if security == 1 */,
+);
+
+// 3. DisputeWindow only — open + finalize as separate phases.
+if (escrow.settlementSecurity === 2) {
+  const sigPending = await sap.escrowV2.createPendingSettlement(
+    agentWallet, depositor, nonce, idx,
+    callsToSettle, amountLamports, serviceHash, merkleRoot,
+  );
+  await waitForSlot(currentSlot + escrow.disputeWindowSlots + 1);
+  const sigFinalize = await sap.escrowV2.finalizeSettlement(
+    agentWallet, depositor, nonce, idx,
+  );
+}
+```
+
+### Recommended settlement-security defaults
+
+| Mode | When to use | Required args | Recommended floor |
+|------|-------------|---------------|-------------------|
+| `0` SelfReport | **Never** (deprecated since v0.7.0) | — | — |
+| `1` CoSigned | Trusted-third-party arbiter | `coSigner: PublicKey` at create, `Keypair` at settle | — |
+| `2` DisputeWindow | Default for open marketplaces | `disputeWindowSlots: BN` | `>= 2_160` (~15 min @ 400ms/slot) |
+
+### Pinning + restart checklist
+
+```bash
+# in the merchant repo:
+pnpm up @oobe-protocol-labs/synapse-sap-sdk@0.12.8 --save-exact
+pnpm rebuild
+pm2 restart <service>
+# verify the NEW dist is loaded (the live process can hold an older one):
+pm2 logs <service> --lines 50 | grep "synapse-sap-sdk"
+```
+

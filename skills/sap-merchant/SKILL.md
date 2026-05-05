@@ -2402,6 +2402,41 @@ await client.escrowV2.settle(
 > satisfying both the IDL constraint and the runtime signature check
 > in a single call. SelfReport / DisputeWindow modes ignore the arg.
 
+> **v0.12.8 — `createPendingSettlement` requires the CURRENT `settlement_index`**
+>
+> The `pending_settlement` PDA is seeded on
+> `["sap_pending", escrow, settlement_index]`. The on-chain
+> `settle_calls_v2` instruction increments `escrow.settlement_index`
+> from N → N+1 and emits `SettlementPendingEvent { settlement_index: N }`.
+> The next `createPendingSettlement` MUST use that exact `N`.
+>
+> **Hardcoding `0`, reusing the previous index, or letting a retry loop
+> resubmit the same index ⇒ `Allocate: account already in use`
+> (custom 0x0)** — the tx fee is burned on every retry.
+>
+> ```ts
+> // ✅ correct — read it on-chain (v0.12.8+)
+> const idx = await sap.escrowV2.nextSettlementIndex(
+>   agentPda, depositorWallet, nonce,
+> );
+> const sigSettle = await sap.escrowV2.settle(/* ... */);
+> const sigPending = await sap.escrowV2.createPendingSettlement(
+>   agentWallet, depositorWallet, nonce,
+>   idx,                  // ← from chain, never reused
+>   callsToSettle, amountLamports, serviceHash,
+>   merkleRoot,
+> );
+>
+> // ✅ even better — subscribe to the event and use what the program emits
+> client.ws.onSettlementPendingEvent(({ settlement_index }) => {
+>   queue.push({ idx: settlement_index, /* ... */ });
+> });
+> ```
+>
+> Since v0.12.8 the SDK runs a `getAccountInfo(pendingPda)` preflight
+> and throws **before signing** if the PDA already exists, with a
+> message pointing at `nextSettlementIndex()`. No more silent fee burn.
+
 // DisputeWindow mode → creates PendingSettlement
 // (same API, but funds are locked until dispute window passes)
 ```
@@ -2495,8 +2530,12 @@ await client.receipt.inscribeReceiptBatch(
 
 // ── 2. Agent settles (creates PendingSettlement) ───────
 const serviceHash = hashToArray(sha256("search-query-batch"));
+// v0.12.8: read the current settlement_index from chain — NEVER hardcode it.
+const settlementIndex = await client.escrowV2.nextSettlementIndex(
+  agentPda, depositorWallet, /* nonce */ 0,
+);
 await client.escrowV2.createPendingSettlement(
-  agentWallet, depositorWallet, 0, 0,
+  agentWallet, depositorWallet, /* nonce */ 0, settlementIndex,
   new BN(50), new BN(5_000_000), serviceHash,
   merkleRoot, // receipt_merkle_root links settlement to receipts
 );
@@ -4584,3 +4623,215 @@ await new SynapseMcpServer(kit, { transport: 'stdio', name: 'my-merchant' }).sta
 
 ## Full reference
 See [sap-overview/SKILL.md](../sap-overview/SKILL.md) — Appendices A–E (provider catalog, plugin system, x402, Next.js, env vars, cheat-sheet).
+
+---
+
+## Common Pitfalls — Lessons learned in production (v0.12.5 → v0.12.8)
+
+Every item below is a real bug that bricked a live merchant loop. Read this section
+before writing any settlement code — every line saves either a burned tx fee or a
+stuck escrow.
+
+### 1. `Reached maximum depth for account resolution` — use `accountsPartial`
+
+**Symptom:** `settleBatch` (and any IX touching `settlement_receipt` + `escrow`)
+throws synchronously from the Anchor TS resolver — no tx is even sent.
+
+**Root cause:** circular PDA seeds. `escrow` is seeded on `escrow.depositor` and
+`settlement_receipt` is seeded on `escrow + arg(batch_root)`. The Anchor TS
+resolver loops trying to derive both.
+
+**Fix (v0.12.5+):** the SDK switched both `EscrowModule.settleBatch` and
+`X402Registry.settleBatch` to `.accountsPartial(...)`. If you build a custom
+builder for any IX with `settlement_receipt`, **always** use `.accountsPartial`,
+never `.accounts`.
+
+### 2. `Computational budget exceeded` on batches > 8 — let the SDK size CU
+
+**Symptom:** batches of 9+ settlements fail with `exceeded maximum number of
+instructions allowed (200000) at instruction #X`.
+
+**Root cause:** Solana's default CU cap is 200 000 — `setComputeUnitLimit` is
+**free** (it caps the max charge, doesn't add lamports). Forgetting to bump it
+on a large batch is purely self-inflicted.
+
+**Fix (v0.12.5+):** `settleBatch` auto-injects `setComputeUnitLimit` using
+`computeBatchSettleCu(n) = min(60_000 + n * 25_000, 1_200_000)`. Don't override
+it unless you know the batch contains very heavy SPL legs.
+
+### 3. `InvalidCoSigner` (error 6093) — wire the keypair, not just the pubkey
+
+**Symptom:** CoSigned escrows fail at `escrow_v2.rs:371` with `Error Code:
+InvalidCoSigner. Error Number: 6093`.
+
+**Root cause:** the SDK was passing the co-signer's `PublicKey` in
+`remaining_accounts` but never registering the `Keypair` in `.signers([...])`,
+so the runtime saw an unsigned account where it expected `is_signer=true`.
+
+**Fix (v0.12.6+):** pass the co-signer `Keypair` as the **7th positional arg**
+to `EscrowV2Module.settle`. SDK appends `pubkey` with `isSigner: true` AND
+adds the keypair to `.signers`. SelfReport / DisputeWindow ignore the arg.
+
+```ts
+await client.escrowV2.settle(
+  depositorWallet, nonce, callsToSettle, serviceHash,
+  splAccounts, opts,
+  coSignerKeypair,  // ← REQUIRED for security == 1
+);
+```
+
+### 4. `InvalidSettlementSecurity` on createEscrow — preflight your config
+
+**Symptom:** `createEscrowV2` simulates fine until you check the program error
+and discover the security config is invalid (zero-window, missing co-signer,
+deprecated SelfReport).
+
+**Fix (v0.12.7+):** the SDK now preflights the security args **before signing**:
+
+| Input | Verdict |
+|-------|---------|
+| `settlementSecurity = 0` (SelfReport) | ❌ thrown — deprecated since v0.7.0 |
+| `settlementSecurity = 1` + missing `coSigner` | ❌ thrown — `CoSignerRequired` |
+| `settlementSecurity = 2` + `disputeWindowSlots < 1` | ❌ thrown — zero-window abuse vector |
+| `settlementSecurity ∉ {0,1,2}` | ❌ thrown — enum invalid |
+
+**Recommendation:** for DisputeWindow, use **`disputeWindowSlots >= 2_160`**
+(~15 minutes at 400 ms/slot) so the depositor has a realistic chance to dispute
+before auto-release.
+
+### 5. `Allocate: account already in use` (custom 0x0) — read `settlement_index` from chain
+
+**Symptom:** `CreatePendingSettlement` simulation fails with:
+```
+Program 11111111111111111111111111111111 invoke [2]
+Allocate: account Address { address: <PDA>, base: None } already in use
+Program 11111111111111111111111111111111 failed: custom program error: 0x0
+```
+Every retry burns ~5 000 lamports of base fee. The settle queue stalls.
+
+**Root cause:** the orchestrator is passing a stale or hardcoded
+`settlementIndex` (very often `0`). The PDA at
+`["sap_pending", escrow, settlement_index]` already exists from a previous
+settlement and SystemProgram refuses to allocate over it.
+
+**Fix (v0.12.8+):** ALWAYS read the current index from chain right before
+building the IX:
+
+```ts
+// ✅ canonical pattern
+const idx = await sap.escrowV2.nextSettlementIndex(agentPda, depositorWallet, nonce);
+await sap.escrowV2.settle(/* ... */);
+await sap.escrowV2.createPendingSettlement(
+  agentWallet, depositorWallet, nonce,
+  idx,           // ← never `0`, never reused
+  callsToSettle, amountLamports, serviceHash,
+  merkleRoot,
+);
+```
+
+Or subscribe and use the index emitted by `SettlementPendingEvent`. The SDK
+now runs a `getAccountInfo(pendingPda)` preflight and throws BEFORE signing
+if the PDA already exists.
+
+### 6. `settle()` returns the pending sig, finalize never runs — log both phases
+
+**Symptom:** explorer shows only `settlementPending` events, funds never move,
+`escrow.calls_settled` stays at 0. Sentinel logs claim "settled OK" but the
+on-chain receipt PDA at `sap_recv` is never minted.
+
+**Root cause:** orchestrator's `doSettle` returns the signature of the *pending*
+phase and skips/silently-fails `finalizeSettlement`. The SDK exposes both as
+separate methods; the caller is responsible for chaining them after the dispute
+window expires.
+
+**Fix (caller side):** log explicit phase markers and treat them as separate
+retry units:
+
+```ts
+const sigPending = await sap.escrowV2.createPendingSettlement(/* ... */);
+log.info({ phase: "pending", sig: sigPending });
+
+await waitForSlot(escrow.disputeWindowSlots + 1);
+
+const sigFinalize = await sap.escrowV2.finalizeSettlement(
+  agentWallet, depositorWallet, nonce, idx,
+);
+log.info({ phase: "finalize", sig: sigFinalize });
+```
+
+If finalize errors with anything other than `DisputeWindowNotElapsed`, treat
+it as fatal — don't silently re-queue.
+
+### 7. `Directory import .../dist/esm/core not supported` — Node ESM strictness
+
+**Symptom:** `dynamic import('@oobe-protocol-labs/synapse-sap-sdk')` from a
+Next.js / pure-ESM Node 20+ runtime throws on the directory re-export.
+
+**Root cause:** `dist/esm/index.js` contains `export … from "./core"` (no
+`/index.js` suffix), which is illegal under Node ESM strict resolution.
+
+**Workaround until SDK ships fixed dist:** use **static** `import` (the
+bundler resolves it correctly) instead of `import()`. This is fixed in the
+downstream consumers (e.g. `sentinel/receipts.ts`) — do **not** use dynamic
+import for the SDK in pure-ESM Node.
+
+### 8. SDK pinning — never use `^` for SAP SDK
+
+Merchant servers MUST pin to an exact patch:
+
+```jsonc
+"@oobe-protocol-labs/synapse-sap-sdk": "0.12.8"   // ✅
+"@oobe-protocol-labs/synapse-sap-sdk": "^0.12.0"  // ❌ — minor bumps may change tx layout
+```
+
+After every bump: `pnpm rebuild && pm2 restart <service>` and **verify the
+dist is actually loaded** (the live process can hold an older dist in memory).
+
+---
+
+### Quick-reference: minimum settle loop (v0.12.8+)
+
+```ts
+// Run this for every escrow ready to settle:
+async function settleOne(
+  agentWallet: PublicKey,
+  depositorWallet: PublicKey,
+  nonce: number,
+  callsToSettle: BN,
+  serviceHash: number[],
+  merkleRoot: number[],
+  coSigner?: Keypair,                 // only if security == 1
+) {
+  const [agentPda] = deriveAgent(agentWallet);
+
+  // 1. read current index from chain (single source of truth)
+  const idx = await sap.escrowV2.nextSettlementIndex(
+    agentPda, depositorWallet, nonce,
+  );
+
+  // 2. settle phase
+  const sigSettle = await sap.escrowV2.settle(
+    depositorWallet, nonce, callsToSettle, serviceHash,
+    [], FAST_SETTLE_OPTIONS, coSigner,
+  );
+  log.info({ phase: "settle", sig: sigSettle, idx });
+
+  // 3. pending phase (DisputeWindow only — for SelfReport/CoSigned the
+  //    settle call already moved funds; skip 3 + 4)
+  if (escrow.settlementSecurity === 2) {
+    const sigPending = await sap.escrowV2.createPendingSettlement(
+      agentWallet, depositorWallet, nonce, idx,
+      callsToSettle, amountLamports, serviceHash, merkleRoot,
+    );
+    log.info({ phase: "pending", sig: sigPending, idx });
+
+    // 4. finalize after dispute window (separate retry unit)
+    await waitForSlot(currentSlot + escrow.disputeWindowSlots + 1);
+    const sigFinalize = await sap.escrowV2.finalizeSettlement(
+      agentWallet, depositorWallet, nonce, idx,
+    );
+    log.info({ phase: "finalize", sig: sigFinalize, idx });
+  }
+}
+```
+
