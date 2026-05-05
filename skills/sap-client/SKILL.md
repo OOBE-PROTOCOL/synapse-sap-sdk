@@ -1000,7 +1000,20 @@ await client.escrowV2.create(agentWallet, {
   settlementSecurity: SettlementSecurity.CoSigned, // or .DisputeWindow
   // NOTE: .SelfReport is deprecated in v0.7 and returns an error
 });
+```
 
+> **v0.12.7 — `escrowV2.create` preflights settlement security**
+>
+> The SDK throws **before signing** if any of these is misconfigured:
+> - `SelfReport` (deprecated)
+> - `CoSigned` without a `coSigner` PublicKey
+> - `DisputeWindow` with `disputeWindowSlots < 1` (zero-window abuse vector)
+> - `settlementSecurity` not in `{0, 1, 2}`
+>
+> For `DisputeWindow` use **`disputeWindowSlots >= 2_160`** (~15 min @
+> 400ms/slot) so the depositor has a realistic chance to dispute.
+
+```ts
 // Deposit more funds
 await client.escrowV2.deposit(agentWallet, new BN(50_000));
 
