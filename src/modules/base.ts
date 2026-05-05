@@ -12,6 +12,12 @@
 
 import { type AnchorProvider, type Program, BN } from "@coral-xyz/anchor";
 import type { PublicKey, TransactionSignature } from "@solana/web3.js";
+import {
+  decodeAnchorError,
+  SapPreflightError,
+  throwPredicted,
+  SAP_ERROR_BY_NAME,
+} from "../utils/anchor-errors";
 
 /**
  * Anchor `Program` instance typed for the Synapse Agent SAP IDL.
@@ -154,5 +160,88 @@ export abstract class BaseModule {
   protected bn(value: number | bigint | BN): BN {
     if (BN.isBN(value)) return value;
     return new BN(value.toString());
+  }
+
+  // ── v0.13.0 preflight helpers ─────────────────────────
+
+  /**
+   * @name requireAccountExists
+   * @description Fetch a required account; throw a {@link SapPreflightError}
+   *   with an actionable message if it does not exist.
+   * @typeParam T - Expected account type.
+   * @param accountName - Anchor account discriminator name.
+   * @param address - PDA to fetch.
+   * @param onMissing - `{ predicted, hint }` describing the on-chain rejection
+   *   that would otherwise occur.
+   * @protected
+   * @since v0.13.0
+   */
+  protected async requireAccountExists<T>(
+    accountName: string,
+    address: PublicKey,
+    onMissing: { predicted: keyof typeof SAP_ERROR_BY_NAME; hint?: string },
+  ): Promise<T> {
+    const acc = await this.fetchAccountNullable<T>(accountName, address);
+    if (acc == null) {
+      throwPredicted(onMissing.predicted, onMissing.hint ?? `${accountName} ${address.toBase58()} not found`);
+    }
+    return acc as T;
+  }
+
+  /**
+   * @name requireAccountAbsent
+   * @description Verify a PDA does not yet exist on-chain. Used before any
+   *   `init` instruction to catch `account already in use` early.
+   * @protected
+   * @since v0.13.0
+   */
+  protected async requireAccountAbsent(
+    accountName: string,
+    address: PublicKey,
+    hint: string,
+  ): Promise<void> {
+    const acc = await this.provider.connection.getAccountInfo(address);
+    if (acc !== null) {
+      throw new SapPreflightError(
+        `${accountName} ${address.toBase58()} already exists. ${hint}`,
+        0,
+        "AccountAlreadyInUse",
+        hint,
+      );
+    }
+  }
+
+  /**
+   * @name simulateOrThrow
+   * @description Run `simulate()` on a method builder. If the simulation
+   *   reports a SAP program error, throw it as a {@link SapPreflightError}
+   *   with the decoded name + friendly hint *before* the user pays fees.
+   *   Returns the simulation logs on success for inspection.
+   * @protected
+   * @since v0.13.0
+   */
+  protected async simulateOrThrow(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    builder: any,
+    label: string,
+  ): Promise<readonly string[]> {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      const sim = await builder.simulate();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const logs = (sim?.raw ?? sim?.logs ?? []) as readonly string[];
+      return logs;
+    } catch (err) {
+      const decoded = decodeAnchorError(err);
+      if (decoded) {
+        throw new SapPreflightError(
+          `[${label}] simulation failed: ${decoded.friendly}`,
+          decoded.code,
+          decoded.name,
+          decoded.logs?.slice(0, 6).join(" | "),
+        );
+      }
+      throw err;
+    }
   }
 }

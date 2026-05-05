@@ -100,3 +100,16 @@ export type {
   SettlementPayload,
   GetX402DirectOptions,
 } from "./x402-direct";
+
+// ── v0.13.0  Full SAP error table + preflight helpers ─
+export {
+  SAP_ERRORS,
+  SAP_ERROR_BY_NAME,
+  decodeAnchorError,
+  SapPreflightError,
+  throwPredicted,
+} from "./anchor-errors";
+export type {
+  SapErrorEntry,
+  DecodedAnchorError,
+} from "./anchor-errors";

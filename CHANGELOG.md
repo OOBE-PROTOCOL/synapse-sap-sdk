@@ -7,6 +7,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-05-05 — Defensive Pipelines: Full SAP error table + module-wide preflights
+
+> **Goal**: stop the "burn fees on a guaranteed-failing tx" pattern across the
+> entire SDK. Every fund-touching IX now fetches the relevant on-chain state
+> and throws a typed `SapPreflightError` carrying the predicted Anchor error
+> name *before* the transaction is signed.
+
+### Added — Shared infrastructure (`utils/anchor-errors.ts`)
+
+- **`SAP_ERRORS`** — full table of all 147 SAP program errors (codes
+  6000-6146), generated 1:1 from `programs/synapse-agent-sap/src/errors.rs`.
+  Each entry: `{ code, name, msg }`.
+- **`SAP_ERROR_BY_NAME`** — reverse lookup `errorName → code`.
+- **`decodeAnchorError(err)`** — handles every shape of Anchor / RPC /
+  simulation error in the wild: direct `code`, nested `error.errorCode.number`,
+  `Error Number: 6075` strings, and raw `custom program error: 0x...` hex.
+  Returns `{ code, name, msg, friendly, logs? }` or `null`.
+- **`FRIENDLY_OVERRIDES`** — actionable English messages for the 30+ errors
+  that callers actually hit in production (orphan settlements, stake floor,
+  payment-token allowlist, dispute window, schema requirement, etc.).
+- **`SapPreflightError`** — typed exception class with
+  `predictedCode` / `predictedName` / `hint` fields. Always check
+  `err instanceof SapPreflightError` before parsing strings.
+- **`throwPredicted(name, hint?)`** — internal helper used by every module
+  preflight to throw with the correct error code/friendly text.
+
+### Added — `BaseModule` helpers
+
+- **`requireAccountExists<T>(name, pda, { predicted, hint })`** — fetches the
+  PDA, throws `SapPreflightError` with the predicted on-chain rejection if
+  missing.
+- **`requireAccountAbsent(name, pda, hint)`** — used before every `init`
+  instruction to catch SystemProgram `Allocate: account already in use`
+  (custom 0x0) before signing. Eliminates the entire class of
+  "PDA collision because I reused an index/nonce" bugs across the SDK.
+- **`simulateOrThrow(builder, label)`** — wraps `builder.simulate()` and
+  decodes any SAP error into `SapPreflightError`. Available for callers
+  who want pre-signing simulation on custom builders.
+
+### Added — Module preflights
+
+- **`escrow.deposit`** — verifies escrow exists, SOL/SPL token shape matches
+  `splAccounts.length`, amount > 0.
+- **`escrow.withdraw`** — verifies amount ≤ `escrow.balance`, token shape
+  matches.
+- **`escrow.close`** — verifies `escrow.balance == 0` (predicts `EscrowNotEmpty`).
+- **`escrowV2.deposit`** — escrow exists, SOL/SPL token shape matches,
+  amount > 0.
+- **`escrowV2.withdraw`** — amount ≤ `(balance − pendingAmount)`. Catches the
+  silent failure when callers try to withdraw funds locked in PendingSettlement
+  PDAs.
+- **`escrowV2.close`** — verifies `balance == 0` AND `pendingAmount == 0`.
+  Predicts `EscrowNotClosed` and points at `diagnoseOrphanPending` for
+  recovery.
+- **`staking.initStake`** — `initialDeposit ≥ MIN_AGENT_STAKE_LAMPORTS`
+  (0.1 SOL) AND stake PDA must not already exist.
+- **`staking.deposit`** — stake exists, amount > 0.
+- **`staking.requestUnstake`** — stake exists, amount > 0, amount ≤
+  `(stakedAmount − MIN_AGENT_STAKE_LAMPORTS)` (enforces protocol floor),
+  no double-pending unstake.
+- **`staking.completeUnstake`** — stake exists, an unstake is pending, and
+  the cooldown has elapsed (`now ≥ unstakeAvailableAt`).
+- **`vault.addDelegate`** — `expiresAt > now`, `expiresAt ≤
+  now + MAX_DELEGATE_DURATION_SECS` (365 days), `permissions != 0`,
+  delegate PDA must not exist. Predicts `DelegateExpiryInvalid` /
+  `DelegateExpired` / `InvalidDelegate`.
+- **`tools.publish`** — non-empty / ≤32-byte tool name, both
+  `inputSchemaHash` AND `outputSchemaHash` are 32 non-zero bytes (enforces
+  SAP v0.2.0 schema-required hardening), tool PDA must not exist. Predicts
+  `EmptyToolName` / `ToolNameTooLong` / `InvalidSchemaHash`.
+- **`tools.publishByName`** — rejects empty `inputSchema` / `outputSchema`
+  strings *before* hashing them (otherwise `sha256("")` would slip past
+  the publish() schema-hash check).
+
+### Why this matters
+
+Before v0.13.0 a typo or stale value silently became:
+
+- a wasted ~5 000 lamport base fee per failed simulation, then
+- a confusing on-chain error code requiring a manual lookup in
+  `errors.rs`, then
+- in the worst cases (orphan PendingSettlement, dispute window) a PDA
+  permanently stuck on-chain.
+
+After v0.13.0:
+
+- typed `SapPreflightError` with the exact predicted error name, friendly
+  message, and an actionable hint pointing at the recovery path,
+- zero RPC call wasted (preflights only do `getAccountInfo` reads),
+- consistent shape across all modules — `try { … } catch (e) {
+  if (e.preflight) handle(e.predictedName); }`.
+
+### Migration notes
+
+- All existing call sites continue to work; preflights only ADD pre-signing
+  validation, no API surface change.
+- If you were swallowing errors with `try { … } catch {}`, you'll now see
+  `SapPreflightError` thrown earlier with a clear message — this is intended.
+- Full error table is exported: `import { SAP_ERRORS, decodeAnchorError } from
+  "@oobe-protocol-labs/synapse-sap-sdk/utils"`.
+
 ## [0.12.9] — 2026-05-05 — orphan PendingSettlement preflight + diagnose helper
 
 ### Added

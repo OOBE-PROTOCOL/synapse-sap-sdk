@@ -39,6 +39,7 @@ import {
 import type { SettleOptions } from "../utils/priority-fee";
 import { computeBatchRoot, hashToArray } from "../utils/hash";
 import { isAcceptedPaymentToken } from "../constants/payments";
+import { throwPredicted } from "../utils/anchor-errors";
 
 /**
  * @name EscrowModule
@@ -160,6 +161,24 @@ export class EscrowModule extends BaseModule {
     const [agentPda] = deriveAgent(agentWallet);
     const [escrowPda] = this.deriveEscrow(agentPda);
 
+    // v0.13.0 preflight — escrow must exist; SPL deposits must include the
+    // 4 expected remaining accounts; SOL deposits must NOT include them.
+    const escrow = await this.requireAccountExists<EscrowAccountData>(
+      "escrowAccount",
+      escrowPda,
+      { predicted: "NotAuthority", hint: "Escrow PDA not found — call createEscrow first" },
+    );
+    const isSpl = escrow.tokenMint != null;
+    if (isSpl && splAccounts.length < 4) {
+      throwPredicted("SplTokenRequired", "Pass [depositorAta, escrowAta, tokenMint, tokenProgram] in splAccounts");
+    }
+    if (!isSpl && splAccounts.length > 0) {
+      throwPredicted("InvalidTokenAccount", "SOL escrow does not accept splAccounts; pass an empty array");
+    }
+    if (BigInt(this.bn(amount).toString()) <= 0n) {
+      throwPredicted("InsufficientEscrowBalance", "Deposit amount must be > 0");
+    }
+
     return this.methods
       .depositEscrow(this.bn(amount))
       .accounts({
@@ -235,6 +254,30 @@ export class EscrowModule extends BaseModule {
     const [agentPda] = deriveAgent(agentWallet);
     const [escrowPda] = this.deriveEscrow(agentPda);
 
+    // v0.13.0 preflight — verify balance covers amount, token program shape
+    // matches, and depositor matches the on-chain depositor.
+    const escrow = await this.requireAccountExists<EscrowAccountData>(
+      "escrowAccount",
+      escrowPda,
+      { predicted: "NotAuthority", hint: "Escrow PDA not found" },
+    );
+    const wantBN = this.bn(amount);
+    const want = BigInt(wantBN.toString());
+    if (want <= 0n) throwPredicted("InsufficientEscrowBalance", "Withdraw amount must be > 0");
+    if (want > BigInt(escrow.balance.toString())) {
+      throwPredicted(
+        "InsufficientEscrowBalance",
+        `requested ${want}, escrow.balance ${escrow.balance.toString()}`,
+      );
+    }
+    const isSpl = escrow.tokenMint != null;
+    if (isSpl && splAccounts.length < 4) {
+      throwPredicted("SplTokenRequired", "Pass [depositorAta, escrowAta, tokenMint, tokenProgram]");
+    }
+    if (!isSpl && splAccounts.length > 0) {
+      throwPredicted("InvalidTokenAccount", "SOL escrow does not accept splAccounts");
+    }
+
     return this.methods
       .withdrawEscrow(this.bn(amount))
       .accounts({
@@ -256,6 +299,19 @@ export class EscrowModule extends BaseModule {
   async close(agentWallet: PublicKey): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(agentWallet);
     const [escrowPda] = this.deriveEscrow(agentPda);
+
+    // v0.13.0 preflight — close fails on-chain if balance != 0.
+    const escrow = await this.requireAccountExists<EscrowAccountData>(
+      "escrowAccount",
+      escrowPda,
+      { predicted: "NotAuthority", hint: "Escrow PDA already closed or never created" },
+    );
+    if (BigInt(escrow.balance.toString()) !== 0n) {
+      throwPredicted(
+        "EscrowNotEmpty",
+        `balance ${escrow.balance.toString()} > 0 — withdraw remaining funds first`,
+      );
+    }
 
     return this.methods
       .closeEscrow()

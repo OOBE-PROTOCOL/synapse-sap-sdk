@@ -598,6 +598,38 @@
               }
             ]
           }
+        },
+        {
+          "name": "agent_stake",
+          "docs": [
+            "v0.11 H-3: AgentStake is now a typed required account so the slash on",
+            "DepositorWins outcomes is guaranteed instead of silently skipped when",
+            "the caller forgets to pass it via remaining_accounts."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow.agent",
+                "account": "EscrowAccountV2"
+              }
+            ]
+          }
         }
       ],
       "args": []
@@ -2504,10 +2536,16 @@
         {
           "name": "wallet",
           "writable": true,
-          "signer": true
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
         },
         {
           "name": "agent",
+          "docs": [
+            "v0.11 M-2: typed agent account."
+          ],
           "pda": {
             "seeds": [
               {
@@ -3647,10 +3685,16 @@
         {
           "name": "wallet",
           "writable": true,
-          "signer": true
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
         },
         {
           "name": "agent",
+          "docs": [
+            "v0.11 M-2: typed agent account."
+          ],
           "pda": {
             "seeds": [
               {
@@ -4671,10 +4715,16 @@
         {
           "name": "wallet",
           "writable": true,
-          "signer": true
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
         },
         {
           "name": "agent",
+          "docs": [
+            "v0.11 M-2: typed agent account — stake cannot be opened for a non-existent agent."
+          ],
           "pda": {
             "seeds": [
               {
@@ -6476,10 +6526,16 @@
       "accounts": [
         {
           "name": "wallet",
-          "signer": true
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
         },
         {
           "name": "agent",
+          "docs": [
+            "v0.11 M-2: typed agent account."
+          ],
           "pda": {
             "seeds": [
               {
@@ -9257,6 +9313,19 @@
       ]
     },
     {
+      "name": "StakeClosedEvent",
+      "discriminator": [
+        212,
+        204,
+        207,
+        181,
+        185,
+        249,
+        134,
+        59
+      ]
+    },
+    {
       "name": "StakeDepositedEvent",
       "discriminator": [
         198,
@@ -9410,6 +9479,19 @@
         65,
         22,
         57
+      ]
+    },
+    {
+      "name": "UnstakeCancelledEvent",
+      "discriminator": [
+        57,
+        228,
+        7,
+        42,
+        227,
+        64,
+        93,
+        51
       ]
     },
     {
@@ -10211,6 +10293,21 @@
       "code": 6143,
       "name": "DuplicateServiceHash",
       "msg": "dup service hash"
+    },
+    {
+      "code": 6144,
+      "name": "StakeBelowCoverage",
+      "msg": "stake under coverage"
+    },
+    {
+      "code": 6145,
+      "name": "StakeNotClosable",
+      "msg": "stake not closable"
+    },
+    {
+      "code": 6146,
+      "name": "AgentStakeAccountMissing",
+      "msg": "agent stake account missing"
     }
   ],
   "types": [
@@ -13437,6 +13534,33 @@
       }
     },
     {
+      "name": "StakeClosedEvent",
+      "docs": [
+        "v0.11 L-3: emitted when an agent's stake account is closed and rent reclaimed."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "returned_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "StakeDepositedEvent",
       "docs": [
         "Agent staked collateral."
@@ -14188,6 +14312,34 @@
           {
             "name": "new_version",
             "type": "u16"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UnstakeCancelledEvent",
+      "docs": [
+        "v0.11 L-2: emitted when a `deposit_stake` clears a previously requested",
+        "unstake (top-up = implicit cancel of the pending withdrawal)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "cancelled_amount",
+            "type": "u64"
           },
           {
             "name": "timestamp",
