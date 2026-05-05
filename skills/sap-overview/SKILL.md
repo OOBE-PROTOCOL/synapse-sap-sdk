@@ -2456,12 +2456,19 @@ All `fetch*` methods return deserialized account data. `fetchNullable` variants 
 
 #### EscrowV2Module — `client.escrowV2` (v0.7.0)
 
+> **v0.13.0 — `settle()` auto-bundles `settleCallsV2 + createPendingSettlement`**
+> in one tx for DisputeWindow escrows. The full DisputeWindow caller flow
+> is now: `settle()` → wait `disputeWindowSlots` → `finalizeSettlement(idx)`.
+> Calling `createPendingSettlement` separately is unnecessary (and will be
+> rejected by the v0.13.0 collision preflight) unless you opt out with
+> `settle(..., { skipAutoPending: true })`.
+
 | Method | Params | Returns | Description |
 |--------|--------|---------|-------------|
 | `create(agentWallet, args, splAccounts?)` | `PublicKey, CreateEscrowV2Args, AccountMeta[]?` | `TransactionSignature` | Create V2 escrow |
 | `deposit(agentWallet, nonce, amount, splAccounts?)` | `PublicKey, BN, BN, AccountMeta[]?` | `TransactionSignature` | Top up escrow |
-| `settle(depositor, nonce, calls, serviceHash, splAccounts?, opts?)` | `PublicKey, BN, BN, number[], ...` | `TransactionSignature` | SelfReport settle (agent-side) |
-| `createPendingSettlement(agent, depositor, nonce, settlementIdx, calls, amount, serviceHash, receiptMerkleRoot?)` | `...PublicKey, ...BN, number[], number[]?` | `TransactionSignature` | Dispute-window settlement (v0.7: +receiptMerkleRoot) |
+| `settle(depositor, nonce, calls, serviceHash, splAccounts?, opts?, coSigner?)` | `PublicKey, BN, BN, number[], ...` | `TransactionSignature` | **v0.13.0**: CoSigned → 1 IX immediate transfer; DisputeWindow → auto-bundles `settleCallsV2 + createPendingSettlement` in same tx. `opts.skipAutoPending` for legacy 2-tx behavior. `opts.receiptMerkleRoot` to inscribe a receipt root. |
+| `createPendingSettlement(agent, depositor, nonce, settlementIdx, calls, amount, serviceHash, receiptMerkleRoot?)` | `...PublicKey, ...BN, number[], number[]?` | `TransactionSignature` | **v0.13.0**: only call directly when `settle()` was invoked with `skipAutoPending: true`. Otherwise the auto-bundle already created the PDA. |
 | `finalizeSettlement(agent, depositor, nonce, settlementIdx)` | `...PublicKey, ...BN` | `TransactionSignature` | Finalize after dispute window |
 | `fileDispute(agentWallet, nonce, settlementIdx, evidenceHash, disputeType?)` | `PublicKey, BN, BN, number[], number?` | `TransactionSignature` | Depositor files dispute (v0.7: +disputeType) |
 | ~~`resolveDispute(...)`~~ | — | — | **REMOVED in v0.7** — use `client.receipt.autoResolveDispute` |
@@ -6416,36 +6423,38 @@ has the long-form version; this is the executive summary every agent must know.
 | 2 | `Computational budget exceeded` on batches > 8 | Default 200k CU cap; `setComputeUnitLimit` is FREE | Let `settleBatch` auto-size with `computeBatchSettleCu(n)` (v0.12.5) — don't override unless heavy SPL legs |
 | 3 | `InvalidCoSigner` (error 6093) on CoSigned settle | SDK passed pubkey but never registered the keypair as signer | Pass co-signer **`Keypair`** as 7th arg to `escrowV2.settle(...)` (v0.12.6) |
 | 4 | `InvalidSettlementSecurity` on createEscrow | SelfReport (deprecated), missing co-signer, `disputeWindowSlots = 0`, or invalid enum | Preflight throws since v0.12.7. For DisputeWindow: **`disputeWindowSlots >= 2_160`** (~15 min) |
-| 5 | `Allocate: account already in use` (custom 0x0) on `CreatePendingSettlement` — fee burned every retry | Caller hardcoded `settlementIndex = 0` or reused stale index after retry; PDA `[\"sap_pending\", escrow, idx]` already allocated | Always read `escrow.settlement_index` from chain via `escrowV2.nextSettlementIndex(agent, depositor, nonce)` (v0.12.8) OR use the `settlement_index` emitted by `SettlementPendingEvent` |
+| 5 | `Allocate: account already in use` (custom 0x0) on `CreatePendingSettlement` — fee burned every retry | Caller called `createPendingSettlement` separately with stale/hardcoded `settlementIndex` | **v0.13.0**: stop calling `createPendingSettlement` manually — `escrowV2.settle()` auto-bundles it in the same tx using the live `settlement_index`. Pre-v0.13.0 fix: `escrowV2.nextSettlementIndex(...)` then pass to manual call. |
 | 6 | Funds never move; only `settlementPending` events on chain | `doSettle` returned the pending sig and silently skipped `finalizeSettlement` | Treat pending and finalize as **separate retry units** — log explicit `phase` markers; only `DisputeWindowNotElapsed` is retryable |
-| 6b | `ArithmeticOverflow` (6075) at finalize, retried forever for indices N→M | Orphan PendingSettlement PDAs created by callers that **skipped `settle_calls_v2`**; on-chain `pending_amount` never matched `pending.amount` | v0.12.9 finalize preflight + `escrowV2.diagnoseOrphanPending(...)` to walk the range and quarantine orphans. **Cannot be reclaimed without program upgrade** |
+| 6b | `ArithmeticOverflow` (6075) at finalize, retried forever for indices N→M | Orphan PendingSettlement PDAs created by callers that **skipped `settle_calls_v2`**; on-chain `pending_amount` never matched `pending.amount` | **v0.13.0** prevents new orphans (auto-bundle keeps the two IXs atomic). Pre-v0.13.0 orphans: `escrowV2.diagnoseOrphanPending(...)` to walk the range and quarantine. **Old orphans cannot be reclaimed without program upgrade** |
 | 7 | `Directory import .../dist/esm/core not supported` | Node ESM strict resolution doesn't accept `from "./core"` (no `/index.js`) | Use **static** `import` of the SDK, never `import()`, in pure-ESM Node. Fixed dist coming |
 | 8 | Random tx-layout regressions on `pnpm install` | Used `^0.12.0` and got a minor bump | Pin to **exact patch** (`"0.12.8"`). After bump: `pnpm rebuild && pm2 restart`, verify the new dist is loaded |
 
-### Canonical settle loop (copy-paste safe)
+### Canonical settle loop (v0.13.0+, copy-paste safe)
 
 ```ts
-// 1. Read CURRENT settlement_index from chain (NEVER hardcode `0`).
+// 1. Capture index BEFORE the auto-bundle bumps it (finalize needs it).
 const idx = await sap.escrowV2.nextSettlementIndex(agentPda, depositor, nonce);
 
-// 2. Settle (CoSigned needs the Keypair as 7th arg).
+// 2. settleCallsV2 + (auto-bundled) createPendingSettlement — ONE tx.
+//    For CoSigned: single IX, immediate transfer, no auto-bundle, no finalize.
+//    For DisputeWindow: two IXs atomically, then wait + finalize.
 const sigSettle = await sap.escrowV2.settle(
   depositor, nonce, callsToSettle, serviceHash,
   [], FAST_SETTLE_OPTIONS, coSignerKeypair /* if security == 1 */,
 );
 
-// 3. DisputeWindow only — open + finalize as separate phases.
-if (escrow.settlementSecurity === 2) {
-  const sigPending = await sap.escrowV2.createPendingSettlement(
-    agentWallet, depositor, nonce, idx,
-    callsToSettle, amountLamports, serviceHash, merkleRoot,
-  );
-  await waitForSlot(currentSlot + escrow.disputeWindowSlots + 1);
+// 3. DisputeWindow only — wait the window, then finalize.
+if (isDisputeWindow(escrow.settlementSecurity)) {
+  await waitForSlot(currentSlot + escrow.disputeWindowSlots.toNumber() + 1);
   const sigFinalize = await sap.escrowV2.finalizeSettlement(
     agentWallet, depositor, nonce, idx,
   );
 }
 ```
+
+> Pre-v0.13.0 callers had a 3-call loop (`settle` → `createPendingSettlement` →
+> `finalize`); the manual `createPendingSettlement` is now done inside `settle()`.
+> Opt-out for batched-receipt aggregation: `settle(..., { skipAutoPending: true })`.
 
 ### Recommended settlement-security defaults
 

@@ -40,6 +40,7 @@ import {
 import type { SettleOptions } from "../utils/priority-fee";
 import { isAcceptedPaymentToken, computeRequiredStakeLamports } from "../constants/payments";
 import { throwPredicted } from "../utils/anchor-errors";
+import { calculateSettleAmount } from "../utils/volume-curve";
 
 /**
  * @name EscrowV2Module
@@ -249,13 +250,64 @@ export class EscrowV2Module extends BaseModule {
       .rpc();
   }
 
+  /**
+   * Settle a batch of calls against a V2 escrow.
+   *
+   * **v0.13.0 — Auto-bundle DisputeWindow:** when the escrow's
+   * `settlementSecurity` is `DisputeWindow`, this method now bundles
+   * **`settleCallsV2` + `createPendingSettlement`** into the SAME
+   * transaction. This eliminates the foot-gun where a caller would call
+   * `createPendingSettlement` directly without a preceding `settleCallsV2`,
+   * leaving `escrow.pending_amount = 0` and causing `finalizeSettlement`
+   * to abort with `ArithmeticOverflow` (6075).
+   *
+   * Flow per security mode:
+   * - **CoSigned** — single IX (`settleCallsV2`) with co-signer in
+   *   remaining accounts; funds move immediately.
+   * - **DisputeWindow** — two IXs in one tx:
+   *   1. `settleCallsV2` — bumps `pending_amount` and `settlement_index`
+   *   2. `createPendingSettlement(idx)` — locks the dispute tracker PDA
+   *
+   *   After this tx confirms, wait `escrow.disputeWindowSlots` slots and
+   *   call {@link finalizeSettlement} with the index returned via
+   *   `SettlementPendingEvent` or readable from `escrow.settlement_index - 1`.
+   *
+   * Pass `opts.skipAutoPending = true` to opt out of the auto-bundle (e.g.
+   * if you want to drive `createPendingSettlement` separately for advanced
+   * flows like batched off-chain receipt aggregation).
+   *
+   * @param depositorWallet - Depositor of the escrow being settled.
+   * @param nonce - Escrow nonce (default 0 for the canonical escrow).
+   * @param callsToSettle - Number of calls to settle in this batch.
+   * @param serviceHash - 32-byte sha256 of the service payload.
+   * @param splAccounts - Optional remaining accounts (SPL transfer + co-signer).
+   * @param opts - Priority-fee + auto-pending options.
+   * @param coSigner - Required for CoSigned escrows.
+   * @returns The transaction signature.
+   * @since v0.7.0 — initial release
+   * @since v0.13.0 — auto-bundles `createPendingSettlement` for DisputeWindow
+   */
   async settle(
     depositorWallet: PublicKey,
     nonce: BN | number | bigint,
     callsToSettle: BN | number | bigint,
     serviceHash: number[],
     splAccounts: AccountMeta[] = [],
-    opts?: SettleOptions,
+    opts?: SettleOptions & {
+      /**
+       * v0.13.0 — Opt out of the DisputeWindow auto-bundle. When `true`,
+       * `settle()` only emits `settleCallsV2` and the caller is responsible
+       * for sending `createPendingSettlement` afterwards (legacy 2-tx flow).
+       * Default: `false` (auto-bundle is on).
+       */
+      skipAutoPending?: boolean;
+      /**
+       * v0.13.0 — `receiptMerkleRoot` to inscribe in the auto-bundled
+       * `createPendingSettlement`. Defaults to 32 zero bytes (no receipt
+       * batch). Ignored when `skipAutoPending = true`.
+       */
+      receiptMerkleRoot?: number[];
+    },
     coSigner?: Signer,
   ): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(this.walletPubkey);
@@ -277,6 +329,28 @@ export class EscrowV2Module extends BaseModule {
         ]
       : splAccounts;
 
+    // ── v0.13.0 preflight: fetch escrow once to drive both branches ──
+    // We need it to (a) detect DisputeWindow vs CoSigned, (b) read the
+    // current `settlement_index` to feed `createPendingSettlement`, and
+    // (c) compute `amount` via the volume curve so the bundled IX matches
+    // what `settle_calls_v2` will compute on-chain.
+    const escrowAcc = await this.fetchAccountNullable<EscrowAccountV2Data>(
+      "escrowAccountV2",
+      escrowPda,
+    );
+    if (!escrowAcc) {
+      throw new Error(
+        `escrowV2.settle: escrow PDA ${escrowPda.toBase58()} not found on-chain ` +
+          `(agent=${agentPda.toBase58()}, depositor=${depositorWallet.toBase58()}, nonce=${this.bn(nonce).toString()}). ` +
+          `Did the depositor call escrowV2.create() yet?`,
+      );
+    }
+
+    const isDisputeWindow =
+      typeof escrowAcc.settlementSecurity === "object" &&
+      escrowAcc.settlementSecurity !== null &&
+      "disputeWindow" in (escrowAcc.settlementSecurity as Record<string, unknown>);
+
     let builder = this.methods
       .settleCallsV2(this.bn(nonce), this.bn(callsToSettle), serviceHash)
       .accountsPartial({
@@ -295,6 +369,71 @@ export class EscrowV2Module extends BaseModule {
 
     if (preIxs.length > 0) {
       builder = builder.preInstructions(preIxs);
+    }
+
+    // ── v0.13.0: auto-bundle createPendingSettlement on DisputeWindow ──
+    // The on-chain `settle_calls_v2_handler` (DisputeWindow branch) only
+    // bumps `escrow.pending_amount` and `escrow.settlement_index` — it
+    // does NOT create the PendingSettlement PDA. Without the followup
+    // `createPendingSettlement` IX in the SAME tx, a buggy caller can
+    // (a) call `createPendingSettlement` later with a stale index, or
+    // (b) skip `settleCallsV2` entirely on a fresh escrow → orphan PDA
+    // whose `amount > escrow.pending_amount` → finalize aborts forever
+    // with `ArithmeticOverflow` (6075). Bundling is the only way to
+    // make that race impossible.
+    const skipAutoPending = opts?.skipAutoPending === true;
+    if (isDisputeWindow && !skipAutoPending) {
+      // PRE-increment settlement_index — settle_calls_v2 will bump it
+      // to (current + 1) AFTER our IX runs, but the PDA seed used by
+      // create_pending_settlement is the PRE-increment value (matches
+      // `SettlementPendingEvent.settlement_index`).
+      const settlementIndex = escrowAcc.settlementIndex;
+
+      // Mirror the on-chain volume-curve math so `pending.amount`
+      // matches what `escrow.pending_amount` was bumped by.
+      const totalCallsBefore = escrowAcc.totalCallsSettled.add(escrowAcc.pendingCalls);
+      const amount = calculateSettleAmount(
+        escrowAcc.pricePerCall,
+        escrowAcc.volumeCurve,
+        totalCallsBefore,
+        this.bn(callsToSettle),
+      );
+
+      const [pendingPda] = this.derivePendingSettlement(escrowPda, settlementIndex);
+
+      // Defensive: if a stale pending PDA exists at this index (orphan
+      // from an aborted prior run), refuse to send — otherwise the IX
+      // will fail with `Allocate: account already in use` (custom 0x0).
+      const existing = await this.provider.connection.getAccountInfo(pendingPda);
+      if (existing) {
+        throw new Error(
+          `escrowV2.settle (auto-bundle): pending PDA ${pendingPda.toBase58()} ` +
+            `already exists for settlementIndex=${settlementIndex.toString()}. ` +
+            `An earlier run created it but did not finalize. Either finalize ` +
+            `that index first or skip it permanently. (Pass skipAutoPending=true ` +
+            `to bypass this guard and emit only settleCallsV2.)`,
+        );
+      }
+
+      const receiptMerkleRoot = opts?.receiptMerkleRoot ?? new Array(32).fill(0);
+      const pendingIx = await this.methods
+        .createPendingSettlement(
+          settlementIndex,
+          this.bn(callsToSettle),
+          amount,
+          serviceHash,
+          receiptMerkleRoot,
+        )
+        .accounts({
+          wallet: this.walletPubkey,
+          agent: agentPda,
+          escrow: escrowPda,
+          pendingSettlement: pendingPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .instruction();
+
+      builder = builder.postInstructions([pendingIx]);
     }
 
     return builder.rpc(rpcOpts);
@@ -332,6 +471,24 @@ export class EscrowV2Module extends BaseModule {
     return BigInt(escrow.settlementIndex.toString());
   }
 
+  /**
+   * Create the PendingSettlement PDA for a DisputeWindow batch.
+   *
+   * **v0.13.0 NOTE:** in almost all cases you should call
+   * {@link settle} instead — it auto-bundles `settleCallsV2 +
+   * createPendingSettlement` in a single transaction so the two
+   * cannot drift out of sync. Use this method standalone ONLY when
+   * you intentionally pass `skipAutoPending: true` to `settle()`
+   * (e.g. batched receipt-merkle aggregation across multiple
+   * `settleCallsV2` runs).
+   *
+   * Calling this without a preceding `settleCallsV2` (which bumps
+   * `escrow.pending_amount`) creates an orphan PDA whose
+   * `pending.amount > escrow.pending_amount` — `finalizeSettlement`
+   * will then abort with `ArithmeticOverflow` (6075) forever.
+   *
+   * @since v0.7.0
+   */
   async createPendingSettlement(
     agentWallet: PublicKey,
     depositorWallet: PublicKey,

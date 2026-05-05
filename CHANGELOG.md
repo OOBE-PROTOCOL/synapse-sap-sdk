@@ -7,12 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.13.0] — 2026-05-05 — Defensive Pipelines: Full SAP error table + module-wide preflights
+## [0.13.0] — 2026-05-05 — Defensive Pipelines: Full SAP error table + module-wide preflights + auto-bundled DisputeWindow
 
 > **Goal**: stop the "burn fees on a guaranteed-failing tx" pattern across the
 > entire SDK. Every fund-touching IX now fetches the relevant on-chain state
 > and throws a typed `SapPreflightError` carrying the predicted Anchor error
 > name *before* the transaction is signed.
+>
+> **Plus**: the historical foot-gun where DisputeWindow callers would skip
+> `settleCallsV2` and call `createPendingSettlement` directly — leaving
+> `escrow.pending_amount = 0` and trapping `finalizeSettlement` in a
+> permanent `ArithmeticOverflow` loop — is now structurally impossible.
+> `escrowV2.settle()` bundles both IXs in the same transaction.
+
+### Added — Atomic DisputeWindow pipeline (`escrowV2.settle`)
+
+- **`escrowV2.settle()` now auto-bundles `settleCallsV2 + createPendingSettlement`**
+  in the SAME transaction whenever the escrow's `settlementSecurity` is
+  `DisputeWindow`. The SDK fetches the escrow once, picks the PRE-increment
+  `settlement_index`, mirrors the on-chain volume-curve math via the new
+  `calculateSettleAmount` helper, and posts both IXs atomically. After this
+  tx confirms, the caller only needs to wait `disputeWindowSlots` slots and
+  call `finalizeSettlement(idx)`.
+- **Why**: prior to v0.13.0 the 2-tx flow forced every caller to (a) call
+  `settleCallsV2` first, (b) capture the emitted `settlement_index`,
+  (c) call `createPendingSettlement(idx, calls, amount)` with a manually
+  computed `amount` matching the on-chain volume-curve math. Skipping (a),
+  reusing a stale `idx`, or miscomputing `amount` all produced orphan
+  PendingSettlement PDAs that finalize would reject forever with
+  `ArithmeticOverflow` (6075). Auto-bundling collapses (a)→(c) into one
+  signed transaction so the foot-gun is gone.
+- **Opt-out**: `settle(..., { skipAutoPending: true })` keeps the legacy
+  single-IX behaviour for advanced flows that batch receipt-merkle roots
+  across multiple settles.
+- **Opt-in receipt root**: `settle(..., { receiptMerkleRoot })` inscribes
+  a receipt-batch merkle root into the auto-bundled `createPendingSettlement`.
+- **`utils/calculateSettleAmount`** — public helper: client-side mirror of
+  the on-chain `calculate_settle_amount` (volume-curve walker). Handy for
+  fee previews and for callers that drive `createPendingSettlement` standalone.
 
 ### Added — Shared infrastructure (`utils/anchor-errors.ts`)
 
@@ -103,6 +135,15 @@ After v0.13.0:
 
 - All existing call sites continue to work; preflights only ADD pre-signing
   validation, no API surface change.
+- **DisputeWindow callers**: you can (and should) DELETE your manual
+  `createPendingSettlement` step. `escrowV2.settle()` now does both IXs
+  in one tx. Old code keeps working but now performs the `createPending`
+  step twice (once auto-bundled by `settle()`, once manually) — the manual
+  one will throw `pending PDA already exists` from the v0.13.0 collision
+  preflight, which is the SDK telling you to remove it.
+- To keep the legacy 2-tx flow (e.g. for batched receipt-merkle aggregation),
+  pass `settle(..., { skipAutoPending: true })` and continue calling
+  `createPendingSettlement` manually.
 - If you were swallowing errors with `try { … } catch {}`, you'll now see
   `SapPreflightError` thrown earlier with a clear message — this is intended.
 - Full error table is exported: `import { SAP_ERRORS, decodeAnchorError } from
