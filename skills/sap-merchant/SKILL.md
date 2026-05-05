@@ -4762,6 +4762,56 @@ log.info({ phase: "finalize", sig: sigFinalize });
 If finalize errors with anything other than `DisputeWindowNotElapsed`, treat
 it as fatal — don't silently re-queue.
 
+### 6b. `ArithmeticOverflow` (error 6075) at finalize — orphan PendingSettlement PDAs
+
+**Symptom:** `finalizeSettlement` fails with:
+```
+AnchorError thrown in programs/synapse-agent-sap/src/instructions/escrow_v2.rs:633.
+Error Code: ArithmeticOverflow. Error Number: 6075. Error Message: overflow.
+```
+Sentinel retries forever for sequential indices (e.g. 8 → 19), burning
+~5 000 lamports per retry. Funds never move; `escrow.pending_amount` stays
+at `0`; the orphan PDAs **cannot be closed** (`close_pending_settlement`
+requires `is_finalized=true`).
+
+**Root cause:** the on-chain `create_pending_settlement` IX accepts arbitrary
+`amount` / `calls_to_settle` from the caller and is **not linked** to the
+preceding `settle_calls_v2`. Any caller that calls `createPendingSettlement`
+without first calling `settle` (legacy probe loops) creates a PDA whose
+`amount` was never added to `escrow.pending_amount`. Finalize then runs
+`escrow.pending_amount.checked_sub(pending.amount)` → underflow → 6075.
+
+**Fix (v0.12.9+):** the SDK preflights both accounts before signing
+`finalizeSettlement`. If `pending.amount > escrow.pending_amount` OR
+`pending.amount > escrow.balance`, it throws a clear error telling you to
+**permanently skip that index**. Use the new diagnostic to walk the range
+and quarantine orphans on startup:
+
+```ts
+// Run once on startup (or whenever escrow.pending_amount === 0 but
+// the queue holds pending indices waiting for finalize).
+const top = await sap.escrowV2.nextSettlementIndex(agentPda, depositor, nonce);
+const skip: bigint[] = [];
+for (let idx = 0n; idx < top; idx++) {
+  const orphan = await sap.escrowV2.diagnoseOrphanPending(
+    agentWallet, depositor, nonce, idx,
+  );
+  if (orphan && orphan.reason !== "ok" && orphan.reason !== "already_finalized") {
+    log.warn({ idx, reason: orphan.reason }, "skip orphan pending");
+    skip.push(idx);
+  }
+}
+// Persist `skip` (file / db) and never enqueue these indices again.
+```
+
+> ⚠️ **Program-level limitation.** Orphan PDAs **cannot be reclaimed**
+> without a program upgrade. Each one locks ~0.0015 SOL of rent. The
+> structural fix requires either merging `create_pending_settlement` into
+> `settle_calls_v2`, adding a `force_close_orphan_pending_settlement`
+> admin IX, or constraining `create_pending_settlement.amount <=
+> escrow.pending_amount`. Until then the only correct sentinel-side
+> behavior is **skip + alert**.
+
 ### 7. `Directory import .../dist/esm/core not supported` — Node ESM strictness
 
 **Symptom:** `dynamic import('@oobe-protocol-labs/synapse-sap-sdk')` from a

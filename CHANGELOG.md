@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.9] — 2026-05-05 — orphan PendingSettlement preflight + diagnose helper
+
+### Added
+
+- **`EscrowV2Module.diagnoseOrphanPending(agent, depositor, nonce, idx)`** —
+  scans a single `settlement_index` and returns `null` if the PDA is
+  finalizable, or an object describing why finalize would fail (`missing`,
+  `amount_exceeds_pending`, `amount_exceeds_balance`, `already_finalized`,
+  `disputed`). Designed to feed a recovery / quarantine script that walks
+  `0..nextSettlementIndex` and logs every orphan to skip permanently.
+
+### Fixed
+
+- **`EscrowV2Module.finalizeSettlement` orphan preflight** — the on-chain
+  handler at `escrow_v2.rs:633` does
+  `escrow.pending_amount.checked_sub(pending_settlement.amount)` and
+  `escrow.balance.checked_sub(pending_settlement.amount)`. PendingSettlement
+  PDAs created by callers that **skipped `settle_calls_v2`** (legacy probe
+  loops) carry an `amount` that was never added to `escrow.pending_amount`,
+  so finalize aborts with **ArithmeticOverflow (error 6075)** and burns the
+  base fee on every retry. Such PDAs cannot be closed either
+  (`close_pending_settlement` requires `is_finalized=true`).
+
+  The SDK now fetches both the escrow and the pending PDA before signing
+  finalize. If `pending.amount > escrow.pending_amount` OR
+  `pending.amount > escrow.balance`, it throws a clear, actionable error
+  instructing the caller to permanently skip that index. This stops the
+  retry-loop fee burn observed in production sentinel logs (12+ orphan
+  indices retrying every 30s).
+
+### Notes — root cause is on-chain
+
+The underlying program-level bug (`create_pending_settlement` accepts
+arbitrary `amount`/`calls_to_settle` with no link to the preceding
+`settle_calls_v2`) requires a program upgrade to fully fix. Suggested
+on-chain remediations for a future release:
+
+1. **Merge `create_pending_settlement` into `settle_calls_v2`** — the
+   handler already has all required state; splitting it across two
+   instructions is the source of every orphan.
+2. **Add `force_close_orphan_pending_settlement`** — admin / depositor IX
+   that closes a PDA where `pending.amount > escrow.pending_amount`,
+   reclaiming the rent that is currently locked forever.
+3. **Constrain `create_pending_settlement` amount** — require
+   `pending.amount <= escrow.pending_amount` and decrement
+   `escrow.pending_amount` on creation instead of on finalize.
+
+Until one of those ships, this preflight is the only way to stop the
+bleeding without a program upgrade.
+
 ## [0.12.8] — 2026-05-05 — pending-settlement collision preflight + index helper
 
 ### Added
