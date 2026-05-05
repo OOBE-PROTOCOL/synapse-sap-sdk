@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.6] — 2026-05-05 — v2 settle co-signer support
+
+### Fixed
+
+- **`EscrowV2Module.settle` `InvalidCoSigner` (error 6093)** —
+  CoSigned escrows require the co-signer key to appear in
+  `remaining_accounts` with `is_signer = true` AND to actually sign
+  the transaction. The previous SDK signature only accepted
+  `splAccounts` and never wired the co-signer keypair into
+  `.signers([...])`, so on-chain validation at
+  `escrow_v2.rs:371` always failed for CoSigned settlements.
+
+### Changed
+
+- `EscrowV2Module.settle` now accepts an optional
+  `coSigner?: Signer` 7th argument. When provided, the SDK
+  automatically (a) appends the co-signer to `remaining_accounts`
+  with `isSigner: true`, and (b) registers the keypair via
+  `.signers([coSigner])`. Existing callers (no `coSigner`)
+  behave unchanged.
+- Switched `.accounts(...)` → `.accountsPartial(...)` to bypass
+  the Anchor TS resolver (same fix as v0.12.5 `settleBatch`).
+
 ## [0.12.5] — 2026-05-05 — settleBatch resolver fix + auto CU
 
 ### Fixed
