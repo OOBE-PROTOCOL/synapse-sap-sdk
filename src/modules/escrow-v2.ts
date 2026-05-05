@@ -39,6 +39,7 @@ import {
 } from "../utils/priority-fee";
 import type { SettleOptions } from "../utils/priority-fee";
 import { isAcceptedPaymentToken, computeRequiredStakeLamports } from "../constants/payments";
+import { throwPredicted } from "../utils/anchor-errors";
 
 /**
  * @name EscrowV2Module
@@ -220,6 +221,22 @@ export class EscrowV2Module extends BaseModule {
   ): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(agentWallet);
     const [escrowPda] = this.deriveEscrow(agentPda, undefined, nonce);
+
+    // v0.13.0 preflights — escrow exists, token shape matches, amount > 0
+    const escrow = await this.requireAccountExists<EscrowAccountV2Data>(
+      "escrowAccountV2",
+      escrowPda,
+      { predicted: "NotAuthority", hint: "Escrow V2 PDA not found — call createEscrow first" },
+    );
+    const want = BigInt(this.bn(amount).toString());
+    if (want <= 0n) throwPredicted("InsufficientEscrowBalance", "Deposit amount must be > 0");
+    const isSpl = escrow.tokenMint != null;
+    if (isSpl && splAccounts.length < 4) {
+      throwPredicted("SplTokenRequired", "Pass [depositorAta, escrowAta, tokenMint, tokenProgram]");
+    }
+    if (!isSpl && splAccounts.length > 0) {
+      throwPredicted("InvalidTokenAccount", "SOL escrow does not accept splAccounts");
+    }
 
     return this.methods
       .depositEscrowV2(this.bn(nonce), this.bn(amount))
@@ -574,6 +591,25 @@ export class EscrowV2Module extends BaseModule {
     const [agentPda] = deriveAgent(agentWallet);
     const [escrowPda] = this.deriveEscrow(agentPda, undefined, nonce);
 
+    // v0.13.0 preflight — amount must fit (balance - pendingAmount); the
+    // on-chain handler subtracts pending_amount from withdrawable funds.
+    const escrow = await this.requireAccountExists<EscrowAccountV2Data>(
+      "escrowAccountV2",
+      escrowPda,
+      { predicted: "NotAuthority", hint: "Escrow V2 PDA not found" },
+    );
+    const want = BigInt(this.bn(amount).toString());
+    if (want <= 0n) throwPredicted("InsufficientEscrowBalance", "Withdraw amount must be > 0");
+    const balance = BigInt(escrow.balance.toString());
+    const pending = BigInt(escrow.pendingAmount.toString());
+    const free = balance > pending ? balance - pending : 0n;
+    if (want > free) {
+      throwPredicted(
+        "InsufficientEscrowBalance",
+        `requested ${want}, withdrawable ${free} (balance ${balance} − pending ${pending})`,
+      );
+    }
+
     return this.methods
       .withdrawEscrowV2(this.bn(amount))
       .accounts({
@@ -589,6 +625,26 @@ export class EscrowV2Module extends BaseModule {
   ): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(agentWallet);
     const [escrowPda] = this.deriveEscrow(agentPda, undefined, nonce);
+
+    // v0.13.0 preflight — close fails if balance != 0 OR pending_amount != 0.
+    // Pending != 0 commonly indicates orphan PendingSettlement PDAs;
+    // run diagnoseOrphanPending() across the index range to identify them.
+    const escrow = await this.requireAccountExists<EscrowAccountV2Data>(
+      "escrowAccountV2",
+      escrowPda,
+      { predicted: "NotAuthority", hint: "Escrow V2 PDA already closed" },
+    );
+    const balance = BigInt(escrow.balance.toString());
+    const pending = BigInt(escrow.pendingAmount.toString());
+    if (balance !== 0n) {
+      throwPredicted("EscrowNotEmpty", `balance ${balance} > 0 — withdraw first`);
+    }
+    if (pending !== 0n) {
+      throwPredicted(
+        "EscrowNotClosed",
+        `pending_amount ${pending} > 0 — finalize all PendingSettlements first or quarantine orphans via diagnoseOrphanPending`,
+      );
+    }
 
     return this.methods
       .closeEscrowV2()

@@ -29,6 +29,8 @@ import type {
   InscribeMemoryArgs,
   CompactInscribeArgs,
 } from "../types";
+import { MAX_DELEGATE_DURATION_SECS } from "../constants/payments";
+import { throwPredicted } from "../utils/anchor-errors";
 
 /**
  * @name VaultModule
@@ -359,6 +361,29 @@ export class VaultModule extends BaseModule {
     const [agentPda] = deriveAgent(this.walletPubkey);
     const [vaultPda] = deriveVault(agentPda);
     const [delegatePda] = deriveVaultDelegate(vaultPda, delegatePubkey);
+
+    // v0.13.0 preflight — on-chain rejects expiry > now + MAX_DELEGATE_DURATION_SECS
+    // (365 days). Catch this client-side instead of burning the tx.
+    const exp = typeof expiresAt === "bigint" ? expiresAt : BigInt(expiresAt);
+    const nowSec = BigInt(Math.floor(Date.now() / 1000));
+    if (exp <= nowSec) {
+      throwPredicted("DelegateExpired", `expiresAt ${exp} is in the past (now ${nowSec})`);
+    }
+    const maxExp = nowSec + BigInt(MAX_DELEGATE_DURATION_SECS);
+    if (exp > maxExp) {
+      throwPredicted(
+        "DelegateExpiryInvalid",
+        `expiresAt ${exp} > now+MAX (${maxExp}); cap is ${MAX_DELEGATE_DURATION_SECS}s (365 days)`,
+      );
+    }
+    if (permissions === 0) {
+      throwPredicted("InvalidDelegate", "permissions bitmask cannot be 0");
+    }
+    await this.requireAccountAbsent(
+      "vaultDelegate",
+      delegatePda,
+      "Delegate already exists — revokeDelegate first or use a different delegate wallet",
+    );
 
     return this.methods
       .addVaultDelegate(permissions, this.bn(expiresAt))

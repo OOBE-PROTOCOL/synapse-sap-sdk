@@ -25,6 +25,7 @@ import {
   derivePendingSettlement as derivePendingPda,
   deriveDispute as deriveDisputePda,
   deriveReceiptBatch as deriveReceiptPda,
+  deriveStake,
 } from "../pda";
 import type { ReceiptBatchData } from "../types";
 
@@ -172,6 +173,9 @@ export class ReceiptModule extends BaseModule {
     const [pendingPda] = derivePendingPda(escrowPda, this.toNum(settlementIndex));
     const [disputePda] = deriveDisputePda(pendingPda);
     const [statsPda] = deriveAgentStats(agentPda);
+    // v0.11 H-3: AgentStake is now a typed required account so the slash on
+    // DepositorWins is guaranteed instead of silently skipped.
+    const [stakePda] = deriveStake(agentPda);
 
     return this.methods
       .autoResolveDispute()
@@ -183,6 +187,7 @@ export class ReceiptModule extends BaseModule {
         pendingSettlement: pendingPda,
         dispute: disputePda,
         agentStats: statsPda,
+        agentStake: stakePda,
       })
       .rpc();
   }

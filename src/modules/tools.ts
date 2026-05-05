@@ -27,6 +27,7 @@ import type {
   InscribeToolSchemaArgs,
 } from "../types";
 import { sha256, hashToArray } from "../utils";
+import { throwPredicted } from "../utils/anchor-errors";
 
 /**
  * @name ToolsModule
@@ -85,6 +86,34 @@ export class ToolsModule extends BaseModule {
     const [toolPda] = deriveTool(agentPda, new Uint8Array(args.toolNameHash));
     const [globalPda] = deriveGlobalRegistry();
 
+    // v0.13.0 preflights — enforce SAP v0.2.0 hardening rules
+    if (!args.toolName || args.toolName.length === 0) {
+      throwPredicted("EmptyToolName");
+    }
+    if (Buffer.byteLength(args.toolName, "utf8") > 32) {
+      throwPredicted("ToolNameTooLong", `${Buffer.byteLength(args.toolName, "utf8")} > 32 bytes`);
+    }
+    // v0.2.0 hardening: every tool MUST publish a non-empty input/output schema
+    // hash. Zero-hash tools are not callable by automated clients (LLMs/routers).
+    const isZeroHash = (h: number[]): boolean => h.length === 32 && h.every((b) => b === 0);
+    if (!args.inputSchemaHash || args.inputSchemaHash.length !== 32 || isZeroHash(args.inputSchemaHash)) {
+      throwPredicted(
+        "InvalidSchemaHash",
+        "inputSchemaHash is empty/zero — v0.2.0 requires every tool to declare a JSON-Schema. Use publishByName() or precompute sha256(schemaJson).",
+      );
+    }
+    if (!args.outputSchemaHash || args.outputSchemaHash.length !== 32 || isZeroHash(args.outputSchemaHash)) {
+      throwPredicted(
+        "InvalidSchemaHash",
+        "outputSchemaHash is empty/zero — v0.2.0 requires every tool to declare a JSON-Schema.",
+      );
+    }
+    await this.requireAccountAbsent(
+      "toolDescriptor",
+      toolPda,
+      "Tool already published with this name; use update() to change schema/version",
+    );
+
     return this.methods
       .publishTool(
         args.toolName,
@@ -138,6 +167,20 @@ export class ToolsModule extends BaseModule {
     requiredParams: number,
     isCompound: boolean,
   ): Promise<TransactionSignature> {
+    // v0.13.0 preflight — reject empty schemas BEFORE hashing (otherwise the
+    // hash of an empty string slips past the publish() schema-hash check).
+    if (!inputSchema || inputSchema.trim().length === 0) {
+      throwPredicted(
+        "InvalidSchemaHash",
+        "inputSchema string is empty — pass a valid JSON-Schema (v0.2.0 requirement)",
+      );
+    }
+    if (!outputSchema || outputSchema.trim().length === 0) {
+      throwPredicted(
+        "InvalidSchemaHash",
+        "outputSchema string is empty — pass a valid JSON-Schema (v0.2.0 requirement)",
+      );
+    }
     return this.publish({
       toolName,
       toolNameHash: hashToArray(sha256(toolName)),
