@@ -14,6 +14,7 @@ import {
   type PublicKey,
   type TransactionSignature,
   type AccountMeta,
+  type Signer,
 } from "@solana/web3.js";
 import { BN } from "@coral-xyz/anchor";
 import { BaseModule } from "./base";
@@ -37,7 +38,7 @@ import {
   buildRpcOptions,
 } from "../utils/priority-fee";
 import type { SettleOptions } from "../utils/priority-fee";
-import { isAcceptedPaymentToken } from "../constants/payments";
+import { isAcceptedPaymentToken, computeRequiredStakeLamports } from "../constants/payments";
 
 /**
  * @name EscrowV2Module
@@ -97,6 +98,54 @@ export class EscrowV2Module extends BaseModule {
     const [agentPda] = deriveAgent(agentWallet);
     const [escrowPda] = this.deriveEscrow(agentPda, undefined, args.escrowNonce);
     const [stakePda] = deriveStake(agentPda);
+    // v0.11 H-1 preflight: surface an actionable error if the agent's stake
+    // does not cover the slashable share of the new escrow. Saves a failed
+    // tx fee and gives the caller a clear top-up amount.
+    try {
+      const stakeAccount = await this.fetchAccountNullable<{ stakedAmount: BN }>("agentStake", stakePda);
+      if (stakeAccount) {
+        const escrowLamports = BigInt(this.bn(args.initialDeposit).toString());
+        const required = computeRequiredStakeLamports(escrowLamports);
+        const have = BigInt(stakeAccount.stakedAmount.toString());
+        if (have < required) {
+          throw new Error(
+            `createEscrowV2: agent stake ${have} lamports < required ${required} ` +
+            `lamports for escrow of ${escrowLamports} lamports. Top up via stakingModule.deposit.`,
+          );
+        }
+      }
+      // If no stake account exists at all, on-chain will reject with
+      // AccountNotInitialized — we let that bubble up unchanged.
+    } catch (err) {
+      // Preflight is advisory; rethrow only the explicit coverage error.
+      if (err instanceof Error && err.message.startsWith("createEscrowV2: agent stake")) {
+        throw err;
+      }
+    }
+    // v0.11 H-1 preflight: surface an actionable error if the agent's stake
+    // does not cover the slashable share of the new escrow. Saves a failed
+    // tx fee and gives the caller a clear top-up amount.
+    try {
+      const stakeAccount = await this.fetchAccountNullable<{ stakedAmount: BN }>("agentStake", stakePda);
+      if (stakeAccount) {
+        const escrowLamports = BigInt(this.bn(args.initialDeposit).toString());
+        const required = computeRequiredStakeLamports(escrowLamports);
+        const have = BigInt(stakeAccount.stakedAmount.toString());
+        if (have < required) {
+          throw new Error(
+            `createEscrowV2: agent stake ${have} lamports < required ${required} ` +
+            `lamports for escrow of ${escrowLamports} lamports. Top up via stakingModule.deposit.`,
+          );
+        }
+      }
+      // If no stake account exists at all, on-chain will reject with
+      // AccountNotInitialized — we let that bubble up unchanged.
+    } catch (err) {
+      // Preflight is advisory; rethrow only the explicit coverage error.
+      if (err instanceof Error && err.message.startsWith("createEscrowV2: agent stake")) {
+        throw err;
+      }
+    }
 
     return this.methods
       .createEscrowV2(
@@ -151,6 +200,7 @@ export class EscrowV2Module extends BaseModule {
     serviceHash: number[],
     splAccounts: AccountMeta[] = [],
     opts?: SettleOptions,
+    coSigner?: Signer,
   ): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(this.walletPubkey);
     const [escrowPda] = this.deriveEscrow(agentPda, depositorWallet, nonce);
@@ -160,9 +210,20 @@ export class EscrowV2Module extends BaseModule {
     const preIxs = buildPriorityFeeIxs(opts);
     const rpcOpts = buildRpcOptions(opts);
 
+    // CoSigned escrows require the co-signer to appear in
+    // remaining_accounts with `is_signer = true` AND to actually sign
+    // the transaction (Anchor on-chain checks `acc.is_signer`).
+    // We dedupe so callers can also pass it manually via splAccounts.
+    const remaining: AccountMeta[] = coSigner
+      ? [
+          ...splAccounts.filter((a) => !a.pubkey.equals(coSigner.publicKey)),
+          { pubkey: coSigner.publicKey, isSigner: true, isWritable: false },
+        ]
+      : splAccounts;
+
     let builder = this.methods
       .settleCallsV2(this.bn(nonce), this.bn(callsToSettle), serviceHash)
-      .accounts({
+      .accountsPartial({
         wallet: this.walletPubkey,
         agent: agentPda,
         agentStats: statsPda,
@@ -170,7 +231,11 @@ export class EscrowV2Module extends BaseModule {
         settlementReceipt: receiptPda,
         systemProgram: SystemProgram.programId,
       })
-      .remainingAccounts(splAccounts);
+      .remainingAccounts(remaining);
+
+    if (coSigner) {
+      builder = builder.signers([coSigner]);
+    }
 
     if (preIxs.length > 0) {
       builder = builder.preInstructions(preIxs);
