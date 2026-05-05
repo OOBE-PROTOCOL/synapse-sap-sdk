@@ -479,7 +479,7 @@ await client.escrow.deposit(agentWallet, new BN(50_000_000));
 // Agent settles calls
 await client.escrow.settle(depositorWallet, 10, serviceHash);
 
-// Batch settlement (up to 10 per TX)
+// Batch settlement (up to 10 per TX, SDK auto-sizes CU since v0.12.5)
 await client.escrow.settleBatch(depositorWallet, [
   { callsToSettle: new BN(5), serviceHash: hash1 },
   { callsToSettle: new BN(3), serviceHash: hash2 },

@@ -2982,12 +2982,25 @@ await client.escrowV2.create(agentWallet, {
   // ...
 });
 
-// 2. CoSigned — requires co-signer approval
+// 2. CoSigned — requires co-signer approval at create AND signature at settle
 await client.escrowV2.create(agentWallet, {
   // ...
   settlementSecurity: { coSigned: {} },
   coSigner: coSignerPubkey,
 });
+
+// → Settling a CoSigned escrow (v0.12.6+):
+//   The co-signer Keypair MUST be passed as the 7th arg to settle().
+//   Without it the program rejects with InvalidCoSigner (error 6093).
+await client.escrowV2.settle(
+  depositorWallet,
+  nonce,
+  callsToSettle,
+  serviceHash,
+  [],                  // splAccounts
+  FAST_SETTLE_OPTIONS, // opts
+  coSignerKeypair,     // Signer — SDK auto-wires remaining_accounts + signers
+);
 
 // 3. Arbitrated — dispute window + arbiter
 await client.escrowV2.create(agentWallet, {
@@ -3089,6 +3102,15 @@ import {
 |--------|-----|----------|----------------|----------|
 | `FAST_SETTLE_OPTIONS` | 5000 µL | 100,000 | Yes | Single settlement |
 | `FAST_BATCH_SETTLE_OPTIONS` | 5000 µL | 300,000 | Yes | Batch settlement |
+
+> **v0.12.5 — batch CU is auto-sized.** `client.x402.settleBatch` and
+> `client.escrow.settleBatch` now call `computeBatchSettleCu(n)` internally
+> (`60_000 + n * 25_000`, capped 1.2M CU) and inject `setComputeUnitLimit`
+> automatically when `opts.computeUnits` is missing. You can drop
+> `FAST_BATCH_SETTLE_OPTIONS` if you only needed it for the CU ceiling —
+> keep it only when you also want the 5 000 µL priority tip and
+> `skipPreflight`. Setting the CU limit is free (it caps the max charge,
+> it does not add lamports).
 
 #### Usage
 

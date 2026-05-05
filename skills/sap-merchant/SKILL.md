@@ -2227,6 +2227,21 @@ const receipts = await client.x402.settleBatch(
 );
 ```
 
+> **v0.12.5 — batch CU is auto-sized**
+>
+> `client.x402.settleBatch` and `client.escrow.settleBatch` now call
+> `computeBatchSettleCu(n)` internally and inject `setComputeUnitLimit`
+> automatically when `opts.computeUnits` is not specified. You no longer
+> need `FAST_BATCH_SETTLE_OPTIONS` just to bump the CU ceiling — you only
+> need it for the **priority fee tip** (5 000 µL) and `skipPreflight`.
+> A bare `settleBatch(...)` call now sizes itself correctly for any N
+> from 1 to 10. Setting the CU limit is free (it caps the maximum, it
+> does not add lamports).
+>
+> Both `settleBatch` paths also use `.accountsPartial(...)` to bypass
+> the Anchor TS PDA resolver and prevent
+> `Reached maximum depth for account resolution`.
+
 Or pass custom values:
 
 ```ts
@@ -2357,6 +2372,35 @@ await client.escrowV2.settle(
   new BN(5),          // calls to settle
   serviceHash,
 );
+```
+
+> **v0.12.6 — CoSigned escrows REQUIRE the `coSigner` arg**
+>
+> If the escrow was created with `settlementSecurity: 1` (CoSigned),
+> `EscrowV2Module.settle` MUST receive the co-signer `Keypair` as the
+> 7th argument, otherwise the on-chain check at
+> `escrow_v2.rs:371` rejects with **`InvalidCoSigner` (error 6093)**.
+>
+> ```ts
+> import { Keypair } from "@solana/web3.js";
+>
+> const coSignerKp = Keypair.fromSecretKey(/* ... */);
+>
+> await client.escrowV2.settle(
+>   depositorWallet,
+>   0,                  // nonce
+>   new BN(5),          // callsToSettle
+>   serviceHash,
+>   [],                 // splAccounts (empty for SOL)
+>   undefined,          // opts (or FAST_SETTLE_OPTIONS)
+>   coSignerKp,         // ← NEW: 7th arg, Signer
+> );
+> ```
+>
+> The SDK appends `coSigner.publicKey` to `remaining_accounts` with
+> `isSigner=true` AND registers the keypair via `.signers([coSigner])`,
+> satisfying both the IDL constraint and the runtime signature check
+> in a single call. SelfReport / DisputeWindow modes ignore the arg.
 
 // DisputeWindow mode → creates PendingSettlement
 // (same API, but funds are locked until dispute window passes)
