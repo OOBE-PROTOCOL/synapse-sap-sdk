@@ -1,210 +1,86 @@
 {
   "name": "@oobe-protocol-labs/synapse-sap-sdk",
   "version": "0.13.0",
-  "description": "TypeScript SDK for the Synapse Agent Protocol (SAP v2) on Solana Mainnet/Devnet",
-  "license": "MIT",
+  "description": "TypeScript SDK for Synapse SAP Protocol — x402 agentic escrow, dispute, staking, subscription & vault layers on Solana",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
-  "types": "dist/types/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/esm/index.js",
-      "require": "./dist/cjs/index.js",
-      "types": "./dist/types/index.d.ts"
-    },
-    "./agent": {
-      "import": "./dist/esm/modules/agent.js",
-      "require": "./dist/cjs/modules/agent.js",
-      "types": "./dist/types/modules/agent.d.ts"
-    },
-    "./feedback": {
-      "import": "./dist/esm/modules/feedback.js",
-      "require": "./dist/cjs/modules/feedback.js",
-      "types": "./dist/types/modules/feedback.d.ts"
-    },
-    "./indexing": {
-      "import": "./dist/esm/modules/indexing.js",
-      "require": "./dist/cjs/modules/indexing.js",
-      "types": "./dist/types/modules/indexing.d.ts"
-    },
-    "./tools": {
-      "import": "./dist/esm/modules/tools.js",
-      "require": "./dist/cjs/modules/tools.js",
-      "types": "./dist/types/modules/tools.d.ts"
-    },
-    "./vault": {
-      "import": "./dist/esm/modules/vault.js",
-      "require": "./dist/cjs/modules/vault.js",
-      "types": "./dist/types/modules/vault.d.ts"
-    },
-    "./escrow": {
-      "import": "./dist/esm/modules/escrow.js",
-      "require": "./dist/cjs/modules/escrow.js",
-      "types": "./dist/types/modules/escrow.d.ts"
-    },
-    "./attestation": {
-      "import": "./dist/esm/modules/attestation.js",
-      "require": "./dist/cjs/modules/attestation.js",
-      "types": "./dist/types/modules/attestation.d.ts"
-    },
-    "./ledger": {
-      "import": "./dist/esm/modules/ledger.js",
-      "require": "./dist/cjs/modules/ledger.js",
-      "types": "./dist/types/modules/ledger.d.ts"
-    },
-    "./pda": {
-      "import": "./dist/esm/pda/index.js",
-      "require": "./dist/cjs/pda/index.js",
-      "types": "./dist/types/pda/index.d.ts"
-    },
-    "./types": {
-      "import": "./dist/esm/types/index.js",
-      "require": "./dist/cjs/types/index.js",
-      "types": "./dist/types/types/index.d.ts"
-    },
-    "./plugin": {
-      "import": "./dist/esm/plugin/index.js",
-      "require": "./dist/cjs/plugin/index.js",
-      "types": "./dist/types/plugin/index.d.ts"
-    },
-    "./plugin/schemas": {
-      "import": "./dist/esm/plugin/schemas.js",
-      "require": "./dist/cjs/plugin/schemas.js",
-      "types": "./dist/types/plugin/schemas.d.ts"
-    },
-    "./registries": {
-      "import": "./dist/esm/registries/index.js",
-      "require": "./dist/cjs/registries/index.js",
-      "types": "./dist/types/registries/index.d.ts"
-    },
-    "./registries/discovery": {
-      "import": "./dist/esm/registries/discovery.js",
-      "require": "./dist/cjs/registries/discovery.js",
-      "types": "./dist/types/registries/discovery.d.ts"
-    },
-    "./registries/x402": {
-      "import": "./dist/esm/registries/x402.js",
-      "require": "./dist/cjs/registries/x402.js",
-      "types": "./dist/types/registries/x402.d.ts"
-    },
-    "./registries/session": {
-      "import": "./dist/esm/registries/session.js",
-      "require": "./dist/cjs/registries/session.js",
-      "types": "./dist/types/registries/session.d.ts"
-    },
-    "./registries/builder": {
-      "import": "./dist/esm/registries/builder.js",
-      "require": "./dist/cjs/registries/builder.js",
-      "types": "./dist/types/registries/builder.d.ts"
-    },
-    "./registries/metaplex-bridge": {
-      "import": "./dist/esm/registries/metaplex-bridge.js",
-      "require": "./dist/cjs/registries/metaplex-bridge.js",
-      "types": "./dist/types/registries/metaplex-bridge.d.ts"
-    },
-    "./registries/fairscale": {
-      "import": "./dist/esm/registries/fairscale.js",
-      "require": "./dist/cjs/registries/fairscale.js",
-      "types": "./dist/types/registries/fairscale.d.ts"
-    },
-    "./idl": {
-      "import": "./dist/esm/idl/index.js",
-      "require": "./dist/cjs/idl/index.js",
-      "types": "./dist/types/idl/index.d.ts"
-    },
-    "./constants": {
-      "import": "./dist/esm/constants/index.js",
-      "require": "./dist/cjs/constants/index.js",
-      "types": "./dist/types/constants/index.d.ts"
-    },
-    "./core": {
-      "import": "./dist/esm/core/index.js",
-      "require": "./dist/cjs/core/index.js",
-      "types": "./dist/types/core/index.d.ts"
-    },
-    "./errors": {
-      "import": "./dist/esm/errors/index.js",
-      "require": "./dist/cjs/errors/index.js",
-      "types": "./dist/types/errors/index.d.ts"
-    },
-    "./utils": {
-      "import": "./dist/esm/utils/index.js",
-      "require": "./dist/cjs/utils/index.js",
-      "types": "./dist/types/utils/index.d.ts"
-    },
-    "./events": {
-      "import": "./dist/esm/events/index.js",
-      "require": "./dist/cjs/events/index.js",
-      "types": "./dist/types/events/index.d.ts"
-    },
-    "./postgres": {
-      "import": "./dist/esm/postgres/index.js",
-      "require": "./dist/cjs/postgres/index.js",
-      "types": "./dist/types/postgres/index.d.ts"
-    },
-    "./parser": {
-      "import": "./dist/esm/parser/index.js",
-      "require": "./dist/cjs/parser/index.js",
-      "types": "./dist/types/parser/index.d.ts"
-    }
-  },
+  "types": "dist/esm/index.d.ts",
   "files": [
     "dist",
-    "src",
-    "src/idl",
-    "src/postgres",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
-  "scripts": {
-    "build": "yarn build:cjs && yarn build:esm && yarn build:types",
-    "build:cjs": "tsc -p tsconfig.cjs.json",
-    "build:esm": "tsc -p tsconfig.esm.json",
-    "build:types": "tsc -p tsconfig.json --emitDeclarationOnly",
-    "clean": "rm -rf dist",
-    "sync-idl": "cp ../target/idl/synapse_agent_sap.json src/idl/synapse_agent_sap.json && echo 'IDL synced'",
-    "prepublishOnly": "yarn clean && yarn build",
-    "typecheck": "tsc --noEmit"
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    },
+    "./types": {
+      "types": "./dist/esm/types.d.ts",
+      "import": "./dist/esm/types.js",
+      "require": "./dist/cjs/types.js"
+    },
+    "./pdas": {
+      "types": "./dist/esm/pdas/index.d.ts",
+      "import": "./dist/esm/pdas/index.js",
+      "require": "./dist/cjs/pdas/index.js"
+    },
+    "./instructions": {
+      "types": "./dist/esm/instructions/index.d.ts",
+      "import": "./dist/esm/instructions/index.js",
+      "require": "./dist/cjs/instructions/index.js"
+    },
+    "./accounts": {
+      "types": "./dist/esm/accounts/index.d.ts",
+      "import": "./dist/esm/accounts/index.js",
+      "require": "./dist/cjs/accounts/index.js"
+    },
+    "./events": {
+      "types": "./dist/esm/events/index.d.ts",
+      "import": "./dist/esm/events/index.js",
+      "require": "./dist/cjs/events/index.js"
+    },
+    "./utils": {
+      "types": "./dist/esm/utils/index.d.ts",
+      "import": "./dist/esm/utils/index.js",
+      "require": "./dist/cjs/utils/index.js"
+    }
   },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.cjs.json",
+    "clean": "rm -rf dist",
+    "test": "vitest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "keywords": [
+    "solana",
+    "anchor",
+    "escrow",
+    "agentic",
+    "x402",
+    "payments",
+    "dispute",
+    "staking",
+    "synapse",
+    "sap"
+  ],
+  "license": "Apache-2.0",
   "dependencies": {
-    "@coral-xyz/anchor": ">=0.30.0",
-    "@solana/web3.js": ">=1.90.0"
+    "@coral-xyz/anchor": "^0.30.1",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.98.4",
+    "bn.js": "^5.2.3",
+    "bs58": "^5.0.0"
   },
   "devDependencies": {
-    "@metaplex-foundation/mpl-core": "^1.10.0",
-    "@metaplex-foundation/umi": "^1.5.0",
-    "@metaplex-foundation/umi-bundle-defaults": "^1.5.1",
-    "typescript": "^5.7.3",
-    "zod": "^4.3.6"
-  },
-  "peerDependencies": {
-    "@coral-xyz/anchor": ">=0.30.0",
-    "@metaplex-foundation/mpl-core": ">=1.9.0",
-    "@metaplex-foundation/umi": ">=0.9.0",
-    "@metaplex-foundation/umi-bundle-defaults": ">=0.9.0",
-    "@solana/web3.js": ">=1.90.0",
-    "@triton-one/yellowstone-grpc": ">=1.0.0",
-    "pg": ">=8.0.0",
-    "zod": ">=3.20.0"
-  },
-  "peerDependenciesMeta": {
-    "zod": {
-      "optional": true
-    },
-    "pg": {
-      "optional": true
-    },
-    "@triton-one/yellowstone-grpc": {
-      "optional": true
-    },
-    "@metaplex-foundation/mpl-core": {
-      "optional": true
-    },
-    "@metaplex-foundation/umi": {
-      "optional": true
-    },
-    "@metaplex-foundation/umi-bundle-defaults": {
-      "optional": true
-    }
+    "@types/node": "^20.19.39",
+    "eslint": "^8.57.0",
+    "prettier": "^3.3.0",
+    "typescript": "^5.9.3",
+    "vitest": "^1.6.0"
   },
   "engines": {
     "node": ">=18"

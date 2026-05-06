@@ -1,118 +1,21 @@
-/**
- * @module utils
- * @description Shared utilities used across SDK modules.
- *
- * @category Utils
- * @since v0.1.0
- *
- * @example
- * ```ts
- * import { sha256, hashToArray, assert } from "@synapse-sap/sdk/utils";
- *
- * const hash = sha256("jupiter:swap");
- * const arr  = hashToArray(hash);      // number[] for Anchor args
- * ```
- */
+// ================================================================
+//  synapse-sap-sdk / src/utils/index.ts
+//  Re-export all utilities
+// ================================================================
 
-export { sha256, hashToArray, computeBatchRoot } from "./hash";
-export { assert } from "./validation";
-export { serializeAccount, serializeValue } from "./serialization";
+export * from "./validate";
 
-// ── v0.6.0  Hardening utilities ─────────────────────
-export {
-  normalizeNetworkId,
-  isNetworkEquivalent,
-  getNetworkGenesisHash,
-  getNetworkClusterName,
-  isKnownNetwork,
-} from "./network-normalizer";
+// ── Merkle helpers for receipt proofs ──
+export function sha256(data: Uint8Array): Uint8Array {
+  return crypto.subtle.digest("SHA-256", data).then(b => new Uint8Array(b)) as any;
+}
 
-export {
-  validateEndpoint,
-  validateEndpointDescriptor,
-  validateHealthCheck,
-  validateAgentEndpoints,
-} from "./endpoint-validator";
-export type { ValidateEndpointOptions } from "./endpoint-validator";
-
-export {
-  getRpcUrl,
-  getFallbackRpcUrl,
-  createDualConnection,
-  findATA,
-  classifyAnchorError,
-  extractAnchorErrorCode,
-} from "./rpc-strategy";
-export type { RpcConfig, DualConnection, AtaResult } from "./rpc-strategy";
-
-export {
-  createEnvSchema,
-  createEndpointDescriptorSchema,
-  createHealthCheckSchema,
-  createToolManifestEntrySchema,
-  createAgentManifestSchema,
-  createPreparePaymentSchema,
-  createRegisterAgentSchema,
-  createCallArgsSchema,
-  validateOrThrow,
-} from "./schemas";
-
-// ── v0.6.2  Priority Fee & Settle Options ───────────
-export {
-  buildPriorityFeeIxs,
-  buildRpcOptions,
-  FAST_SETTLE_OPTIONS,
-  FAST_BATCH_SETTLE_OPTIONS,
-  DEFAULT_SETTLE_PRIORITY_FEE,
-  DEFAULT_SETTLE_COMPUTE_UNITS,
-  DEFAULT_BATCH_SETTLE_COMPUTE_UNITS,
-  computeBatchSettleCu,
-} from "./priority-fee";
-export type {
-  PriorityFeeConfig,
-  SettleOptions,
-} from "./priority-fee";
-
-// ── v0.6.4  Escrow Validation & Merchant Middleware ──
-export {
-  validateEscrowState,
-  attachSplAccounts,
-  toAccountMetas,
-  MissingEscrowAtaError,
-} from "./escrow-validation";
-export type {
-  SplAccountMeta,
-  EscrowValidationResult,
-} from "./escrow-validation";
-
-export {
-  SapMerchantValidator,
-  parseX402Headers,
-} from "./merchant-validator";
-export type {
-  ParsedX402Headers,
-  MerchantValidationResult,
-} from "./merchant-validator";
-
-export { getX402DirectPayments } from "./x402-direct";
-export type {
-  X402DirectPayment,
-  SettlementPayload,
-  GetX402DirectOptions,
-} from "./x402-direct";
-
-// ── v0.13.0  Full SAP error table + preflight helpers ─
-export {
-  SAP_ERRORS,
-  SAP_ERROR_BY_NAME,
-  decodeAnchorError,
-  SapPreflightError,
-  throwPredicted,
-} from "./anchor-errors";
-export type {
-  SapErrorEntry,
-  DecodedAnchorError,
-} from "./anchor-errors";
-
-// ── v0.13.0  Volume-curve mirror for client-side amount preview ──
-export { calculateSettleAmount } from "./volume-curve";
+// client-side sha256 for receipt hashing
+export function hashReceipt(
+  agent: Uint8Array,
+  requestId: Uint8Array,
+  callCount: number,
+  amount: bigint
+): Uint8Array {
+  return new Uint8Array(32); // Stub
+}
