@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.13.0] — 2026-05-05 — Defensive Pipelines: Full SAP error table + module-wide preflights + auto-bundled DisputeWindow
+## [0.14.0] — 2026-05-05 — Defensive Pipelines: Full SAP error table + module-wide preflights + auto-bundled DisputeWindow
 
 > **Goal**: stop the "burn fees on a guaranteed-failing tx" pattern across the
 > entire SDK. Every fund-touching IX now fetches the relevant on-chain state
