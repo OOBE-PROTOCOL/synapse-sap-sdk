@@ -1,19 +1,32 @@
 // ================================================================
 //  synapse-sap-sdk / src/index.ts
-//  Barrel export — tree-shakeable by submodule
+//  Barrel export — v0.25.0 aligned
 // ================================================================
 
-import {
-  PROGRAM_ID, SEEDS, ENDPOINTS
-} from "./constants";
-export type * from "./types";
-export { SapErrorCode, decodeSapError, isRetryableError, isClientValidationFailure } from "./errors";
-export * as Pdas from "./pdas";
-export * as Accounts from "./accounts";
-export * as Events from "./events";
-export * as Utils from "./utils";
+export { PROGRAM_ID, SEEDS, ENDPOINTS, MAX_CALLS_PER_SETTLEMENT,
+  MAX_VOLUME_CURVE_POINTS, MAX_RECEIPTS_PER_PROOF,
+  MAX_MERKLE_DEPTH, MAX_SUBSCRIPTION_DURATION_YEARS,
+  STAKE_COVERAGE_BPS, MIN_STAKE_LAMPORTS,
+  COMPLETE_UNSTAKE_DELAY_DAYS
+} from './constants';
 
-export { validateAgentInput, validateEscrowCreate, validateEscrowDeposit,
+// Re-export IDL-generated types FIRST (single source of truth)
+export * from './idlTypes';
+
+export { SapErrorCode, decodeSapError, isRetryableError, isClientValidationFailure } from './errors';
+
+export { SapClient, createSapClient } from './client';
+export type { SapClientOpts } from './client';
+
+export * as Pdas from './pdas';
+export * as Accounts from './accounts';
+export * as Events from './events';
+export * as Instructions from './instructions';
+export * as Utils from './utils';
+
+export {
+  validateAgentInput, validateEscrowCreate, validateEscrowDeposit,
   validateEscrowSettle, validateEscrowClose, validateAgentClose,
   validateSubscriptionCreate, validateReceiptProof,
-  computeEscrowMaxObligation, calculateSettleAmount } from "./utils/validate";
+  computeEscrowMaxObligation
+} from './utils/validate';
