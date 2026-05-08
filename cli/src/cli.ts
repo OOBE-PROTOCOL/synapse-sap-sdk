@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * @module cli
- * @description synapse-sap CLI — v0.14.0 Edition
+ * @description synapse-sap CLI — v0.15.0 Edition
  *
  * Complete toolbox for the Synapse Agent Protocol (SAP v2):
  *   - Agent lifecycle management
@@ -11,8 +11,8 @@
  *   - Memory systems (vault, session, inscribe)
  *   - Environment & config management
  *
- * @since v0.14.0
- * @requires @oobe-protocol-labs/synapse-sap-sdk@^0.14.0
+ * @since v0.15.0
+ * @requires @oobe-protocol-labs/synapse-sap-sdk@^0.15.0
  */
 
 import { Command } from "commander";
@@ -34,8 +34,8 @@ const program = new Command();
 
 program
   .name("synapse-sap")
-  .description("synapse-sap CLI — v0.14.0 Edition\nComplete toolbox for the Synapse Agent Protocol (SAP v2) on Solana")
-  .version("0.14.0")
+  .description("synapse-sap CLI — v0.15.0 Edition\nComplete toolbox for the Synapse Agent Protocol (SAP v2) on Solana")
+  .version("0.15.0")
   .addHelpText("after", `
 Quick Start:
   $ synapse-sap agent register --name "My Agent"

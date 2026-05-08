@@ -57,9 +57,9 @@ import { deriveAgent, deriveAgentStats, deriveVault } from "../pda";
 import type {
   AgentAccountData,
   AgentStatsData,
-  Capability,
   VaultDelegateData,
 } from "../types";
+import type { Capability } from "../types/common";
 
 // ═══════════════════════════════════════════════════════════════════
 //  Typed peer-dep handles (lazy-loaded)
@@ -381,7 +381,7 @@ async function loadMplCore(): Promise<MplCoreRuntime> {
     cachedRuntime = { mplCore, umiBundle, umiCore };
     return cachedRuntime;
   } catch (cause) {
-    throw new Error(PEER_DEP_INSTALL_HINT, { cause: cause as Error });
+    throw Object.assign(new Error(PEER_DEP_INSTALL_HINT), { cause });
   }
 }
 

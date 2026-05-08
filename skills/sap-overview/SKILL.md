@@ -1,11 +1,11 @@
 ---
 name: sap-overview
 description: |
-  Master reference for the Synapse SAP SDK v0.14.0 on Solana.
+  Master reference for the Synapse SAP SDK v0.15.0 on Solana.
   Covers: 13 instruction modules, 6 registries, typed account parsers,
   PDA derivations, constants, errors, events, and utilities.
   Use for any code generation or agentic orchestration against
-  @oobe-protocol-labs/synapse-sap-sdk@0.14.0.
+  @oobe-protocol-labs/synapse-sap-sdk@0.15.0.
 triggers:
   - synapse sap sdk
   - sap v0.14
@@ -13,10 +13,10 @@ triggers:
   - oobe protocol sdk
 ---
 
-# SAP SDK v0.14.0 — Agent Skill Reference
+# SAP SDK v0.15.0 — Agent Skill Reference
 
 > **Package**: `@oobe-protocol-labs/synapse-sap-sdk`  
-> **Version**: `0.14.0`  
+> **Version**: `0.15.0`  
 > **Program ID**: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`  
 > **IDL**: `v0.25.0` aligned  
 > **Runtime**: Node.js ≥ 18, TypeScript ≥ 5.0  
@@ -190,7 +190,7 @@ await client.staking.initStake({ signer, wallet, agent, stake, initialDeposit })
 await client.staking.depositStake({ signer, wallet, agent, stake, amount });
 await client.staking.requestUnstake({ signer, wallet, agent, stake, amount });
 await client.staking.completeUnstake({ signer, wallet, agent, stake });
-// Ledger ops (also under StakingModule in v0.14.0):
+// Ledger ops (also under StakingModule in v0.15.0):
 await client.staking.initLedger({ signer, wallet, agent, vault, session, ledger });
 await client.staking.writeLedger({ signer, wallet, session, vault, agent, ledger, data, contentHash });
 await client.staking.sealLedger({ signer, wallet, session, vault, agent, ledger, page });

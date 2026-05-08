@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] — 2026-05-08 — TypeScript Config Hardening + Capability Import Fixes
+
+### Fixed
+- **`tsconfig.json`**: switched to `"module": "preserve"` with `"moduleResolution": "bundler"` for universal Node/Bundler/Web compatibility.
+- **`tsconfig.esm.json` / `tsconfig.cjs.json`**: dedicated emit configs for dual-format builds (ESM + CJS).
+- **`builder.ts` / `metaplex-bridge.ts`**: resolved `Capability` symbol collision between `types.ts` (bitflags enum) and `types/common.ts` (object interface). Now imports the correct interface from `../types/common`.
+- **`merchant-validator.ts`**: pointed `SapValidationError` import to `../errors/index` (2-arg constructor) fixing TS2554 "Expected 1 arguments, but got 2".
+- **CLI `package.json`**: aligned SDK dependency to `^0.15.0`.
+
+### Changed
+- Bumped SDK version from `0.14.0` → `0.15.0` across all packages, skills, CLI, and docs.
+
+---
+
 ## [0.14.0] — 2026-05-05 — Defensive Pipelines: Full SAP error table + module-wide preflights + auto-bundled DisputeWindow
 
 > **Goal**: stop the "burn fees on a guaranteed-failing tx" pattern across the

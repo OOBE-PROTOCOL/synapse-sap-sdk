@@ -84,7 +84,6 @@ export class MissingEscrowAtaError extends SapError {
       `Missing ${side} ATA: ${ataAddress}. ` +
         `Settlement mode is Escrow/SPL but the Associated Token Account does not exist. ` +
         `The ${side} must create the ATA before escrow operations.`,
-      "SAP_MISSING_ESCROW_ATA",
     );
     this.name = "MissingEscrowAtaError";
     this.ataAddress = ataAddress;

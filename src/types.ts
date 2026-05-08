@@ -20,24 +20,19 @@ export interface VolumeCurvePoint {
 
 /** EscrowAccountV2 — matches on-chain struct after v0.13 hardening */
 export interface EscrowAccountV2 {
-  // Discriminator + account metadata
   agent: PublicKey;
   depositor: PublicKey;
-  // Token
   tokenMint: PublicKey | null;
   decimals: number;
-  // Balances
   balance: BN;
   totalDeposited: BN;
   totalSettled: BN;
   totalCallsSettled: BN;
   pendingAmount: BN;
   pendingCalls: BN;
-  // Security (v0.13)
-  maxObligation: BN;           // H-2: cap on total balance
-  disputeBondTotal: BN;        // C-3: tracked dispute bonds
-  pendingSettlementCount: number; // C-5: open pending count
-  // Config
+  maxObligation: BN;
+  disputeBondTotal: BN;
+  pendingSettlementCount: number;
   pricePerCall: BN;
   basePrice: BN;
   maxCalls: BN;
@@ -105,11 +100,10 @@ export interface AgentStats {
   wallet: PublicKey;
   totalCallsServed: BN;
   lifetimeRevenue: BN;
-  averageRating: number;  // u32 / 100
+  averageRating: number;
   reviewCount: number;
   disputeCount: number;
   disputesLost: number;
-  // v0.12 H-1
   activeEscrows: number;
   updatedAt: BN;
 }
@@ -118,7 +112,7 @@ export interface AgentStake {
   wallet: PublicKey;
   stakedAmount: BN;
   slashedAmount: BN;
-  unstakeAmount: BN;       // H-11: pending unstake
+  unstakeAmount: BN;
   unstakeRequestedAt: BN;
   unstakeAvailableAt: BN;
   totalDisputesLost: number;
@@ -172,7 +166,6 @@ export interface Subscription {
   startedAt: BN;
   cancelledAt: BN;
   createdAt: BN;
-  // v0.13: SPL support placeholder
   tokenMint: PublicKey | null;
   tokenDecimals: number;
 }
@@ -241,8 +234,71 @@ export interface CapabilityIndex {
 export interface ProgramConfig {
   admin: PublicKey;
   treasury: PublicKey;
-  feeBasisPoints: number;     // u16
+  feeBasisPoints: number;
   paused: boolean;
   minStake: BN;
-  version: number;           // u8
+  version: number;
 }
+
+// ================================================================
+//  Re-exports from types/ sub-modules ( barrel )  
+// ================================================================
+
+export type { RegisterAgentArgs } from "./types/instructions";
+export type { UpdateAgentArgs } from "./types/instructions";
+export type { GiveFeedbackArgs } from "./types/instructions";
+export type { UpdateFeedbackArgs } from "./types/instructions";
+export type { PublishToolArgs } from "./types/instructions";
+export type { UpdateToolArgs } from "./types/instructions";
+export type { InscribeToolSchemaArgs } from "./types/instructions";
+export type { InscribeMemoryArgs } from "./types/instructions";
+export type { CompactInscribeArgs } from "./types/instructions";
+export type { CreateEscrowArgs } from "./types/instructions";
+export type { CreateAttestationArgs } from "./types/instructions";
+export type { CreateEscrowV2Args } from "./types/instructions";
+export type { CreateSubscriptionArgs } from "./types/instructions";
+export type { DelegatePermissionBit } from "./types/instructions";
+export type { SchemaTypeValue } from "./types/instructions";
+export type { CompressionTypeValue } from "./types/instructions";
+
+export type { VolumeCurveBreakpoint } from "./types/common";
+export type { PricingTier } from "./types/common";
+export type { PluginRef } from "./types/common";
+export type { Settlement } from "./types/common";
+
+export type { EndpointDescriptor } from "./types/endpoint";
+export type { HealthCheckDescriptor } from "./types/endpoint";
+export type { ToolManifestEntry } from "./types/endpoint";
+export type { AgentManifest } from "./types/endpoint";
+export type { EndpointValidationResult } from "./types/endpoint";
+
+export type {
+  AgentAccountData,
+  AgentStatsData,
+  FeedbackAccountData,
+  CapabilityIndexData,
+  ProtocolIndexData,
+  ToolCategoryIndexData,
+  GlobalRegistryData,
+  MemoryVaultData,
+  SessionLedgerData,
+  EpochPageData,
+  VaultDelegateData,
+  SessionCheckpointData,
+  ToolDescriptorData,
+  EscrowAccountData,
+  EscrowAccountV2Data,
+  PendingSettlementData,
+  DisputeRecordData,
+  ReceiptBatchData,
+  AgentStakeData,
+  SubscriptionData,
+  CounterShardData,
+  IndexPageData,
+  MemoryLedgerData,
+  LedgerPageData,
+  AgentAttestationData,
+} from "./types/accounts";
+
+export type { TokenTypeKind, SettlementModeKind } from "./types/enums";
+export { TokenType, SettlementMode } from "./types/enums";

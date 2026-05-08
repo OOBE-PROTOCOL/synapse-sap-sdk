@@ -1,3 +1,13 @@
+/** Generic SDK error */
+export class SapError extends Error {
+  constructor(message: string) { super(message); this.name = "SapError"; }
+}
+
+/** Validation-specific SDK error */
+export class SapValidationError extends Error {
+  constructor(message: string) { super(message); this.name = "SapValidationError"; }
+}
+
 // ================================================================
 //  synapse-sap-sdk / src/errors.ts
 //  On-chain error codes ↔ human-readable messages + recovery actions
