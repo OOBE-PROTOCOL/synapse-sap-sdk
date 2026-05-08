@@ -66,12 +66,15 @@ Documentation:
     configureLogger({ json: opts.json, silent: opts.silent });
   });
 
+import { registerSkillsCommands } from "./commands/skills";
+
 // ── Register all command groups ──────────────────────
 registerAgentCommands(program);
 registerEscrowCommands(program);
 registerX402Commands(program);
 registerMerchantCommands(program);
 registerMemoryCommands(program);
+registerSkillsCommands(program);
 
 // ── Parse & execute ──────────────────────────────────
 program.parse(process.argv);
