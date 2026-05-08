@@ -1,9 +1,48 @@
 // ================================================================
 //  synapse-sap-sdk / src/constants.ts
-//  v0.13 Protocol Constants — Anchored to on-chain parameters
+//  Protocol Constants — compatibility barrel
 // ================================================================
 
-export const PROGRAM_ID = "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ" as const;
+import { PublicKey } from "@solana/web3.js";
+
+export const PROGRAM_ID = "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ";
+export const SAP_PROGRAM_ID: PublicKey = new PublicKey(PROGRAM_ID);
+export const MAINNET_SAP_PROGRAM_ID: PublicKey = new PublicKey(PROGRAM_ID);
+export const DEVNET_SAP_PROGRAM_ID:  PublicKey = new PublicKey(PROGRAM_ID);
+export const LOCALNET_SAP_PROGRAM_ID: PublicKey = new PublicKey(PROGRAM_ID);
+
+export {
+  SAP_PROGRAM_ADDRESS,
+} from "./constants/programs";
+export { SEEDS } from "./constants/seeds";
+export type { SeedKey } from "./constants/seeds";
+export {
+  LIMITS,
+  AGENT_VERSION,
+  VAULT_PROTOCOL_VERSION,
+  TOOL_CATEGORY_VALUES,
+  HTTP_METHOD_VALUES,
+} from "./constants/limits";
+export { SapNetwork } from "./constants/network";
+export type { SapNetworkId } from "./constants/network";
+export {
+  SAP_PROGRAM,
+  SAP_UPGRADE_AUTHORITY,
+  GLOBAL_REGISTRY_ADDRESS,
+  GLOBAL_REGISTRY_BUMP,
+  IDL_ACCOUNT_ADDRESS,
+  PROGRAM_METADATA_PROGRAM,
+  TOOL_CATEGORY_ADDRESSES,
+  TOOL_CATEGORY_ADDRESS_LIST,
+} from "./constants/addresses";
+export {
+  USDC_MINT_MAINNET,
+  USDC_MINT_DEVNET,
+  MIN_AGENT_STAKE_LAMPORTS,
+  MAX_DELEGATE_DURATION_SECS,
+  isAcceptedUsdcMint,
+  isAcceptedPaymentToken,
+} from "./constants/payments";
 
 export const DISCRIMINATOR_SIZE = 8;
 export const PUBKEY_SIZE       = 32;
@@ -14,47 +53,18 @@ export const U64_SIZE          = 8;
 export const U128_SIZE         = 16;
 export const I64_SIZE          = 8;
 export const BOOL_SIZE         = 1;
-export const OPTION_SIZE       = 1 + 32; // Option<Pubkey>
+export const OPTION_SIZE       = 1 + 32;
 
-/** On-chain security limits (v0.13 hardened) */
 export const MAX_CALLS_PER_SETTLEMENT = 10_000;
 export const MAX_VOLUME_CURVE_POINTS  = 10;
 export const MAX_RECEIPTS_PER_PROOF   = 128;
 export const MAX_MERKLE_DEPTH         = 16;
 export const MAX_SUBSCRIPTION_DURATION_YEARS = 10;
-
-export const STAKE_COVERAGE_BPS = 5_000;           // 50%
-export const MIN_STAKE_LAMPORTS = 1_000_000_000;   // 1 SOL
+export const STAKE_COVERAGE_BPS = 5_000;
+export const MIN_STAKE_LAMPORTS = 1_000_000_000;
 export const COMPLETE_UNSTAKE_DELAY_DAYS = 14;
 
-/** Escrow PDA seeds (must match program) */
-export const SEEDS = {
-  AGENT:           "sap_agent",
-  AGENT_STATS:     "sap_stats",
-  AGENT_STAKE:     "sap_stake",
-  ESCROW_V2:       "sap_escrow_v2",
-  PENDING_SETTLE:  "sap_pending",
-  DISPUTE:         "sap_dispute",
-  SUBSCRIPTION:    "sap_subscription",
-  VAULT:           "sap_vault",
-  SESSION:         "sap_session",
-  EPOCH_PAGE:      "sap_epoch",
-  VAULT_DELEGATE:  "sap_delegate",
-  CAPABILITY_IDX:  "sap_cap_idx",
-  PROTOCOL_IDX:    "sap_proto_idx",
-  TOOL_CAT_IDX:    "sap_tool_cat",
-  TOOL:            "sap_tool",
-  RECEIPT_BATCH:   "sap_receipt",
-  REFERRAL:        "sap_referral",
-  AFFILIATE:       "sap_affiliate",
-  RAKE_VAULT:      "sap_rake_vault",
-  GLOBAL:          "sap_global",
-} as const;
-
-/** Default commitment for all RPC calls */
 export const DEFAULT_COMMITMENT = "confirmed" as const;
-
-/** Network endpoints */
 export const ENDPOINTS = {
   MAINNET: "https://api.mainnet-beta.solana.com",
   DEVNET:  "https://api.devnet.solana.com",

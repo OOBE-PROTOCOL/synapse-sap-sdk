@@ -4,48 +4,61 @@
 // ================================================================
 
 import { PublicKey, TransactionSignature } from "@solana/web3.js";
+import { Program } from "@coral-xyz/anchor";
+
+export type SapEventName =
+  | "EscrowCreated"
+  | "SettlementFiled"
+  | "SettlementFinalized"
+  | "DisputeFiled"
+  | "DisputeResolved"
+  | "StakeEvent"
+  | "SubscriptionEvent";
 
 export interface ParsedEvent {
-  name: string;
-  data: Record<string, any>;
+  name: SapEventName;
+  data: Record<string, unknown>;
   signature: TransactionSignature;
   slot: number;
 }
 
-const EVENT_DISCRIMS: Record<string, Uint8Array> = {
-  EscrowCreated: new Uint8Array([0]),
-  SettlementFiled: new Uint8Array([0]),
-  SettlementFinalized: new Uint8Array([0]),
-  DisputeFiled: new Uint8Array([0]),
-  DisputeResolved: new Uint8Array([0]),
-  StakeEvent: new Uint8Array([0]),
-  SubscriptionEvent: new Uint8Array([0]),
-};
+export class EventParser {
+  constructor(private program: Program) {}
 
-/** Parse program logs for emitted events */
-export function parseEventsFromLogs(
-  logs: string[],
-  signature: string
-): ParsedEvent[] {
-  const events: ParsedEvent[] = [];
-  for (const log of logs) {
-    if (!log.includes("Program log:")) continue;
-    const payload = log.replace(/^Program log:\s*/, "");
-    // Anchor event format: "Event <name> <base64encoded>"
-    for (const [name, _discrim] of Object.entries(EVENT_DISCRIMS)) {
-      if (payload.startsWith(`Event ${name} `)) {
-        const b64 = payload.slice(`Event ${name} `.length);
-        // TODO: full Borsh deserialization for each event schema
-        events.push({ name, data: { raw: b64 }, signature, slot: 0 });
+  parseLogs(logs: string[]): ParsedEvent[] {
+    const events: ParsedEvent[] = [];
+    for (const log of logs) {
+      if (!log.includes("Program log:")) continue;
+      const payload = log.replace(/^Program log:\s*/, "");
+      for (const name of [
+        "EscrowCreated",
+        "SettlementFiled",
+        "SettlementFinalized",
+        "DisputeFiled",
+        "DisputeResolved",
+        "StakeEvent",
+        "SubscriptionEvent",
+      ] as SapEventName[]) {
+        if (payload.startsWith(`Event ${name} `)) {
+          const b64 = payload.slice(`Event ${name} `.length);
+          events.push({ name, data: { raw: b64 }, signature: "", slot: 0 });
+        }
       }
     }
+    return events;
   }
-  return events;
 }
 
-/** Fetch + parse events for a given transaction */
+export function parseEventsFromLogs(
+  logs: string[],
+  signature: TransactionSignature
+): ParsedEvent[] {
+  const parser = new EventParser({} as Program);
+  return parser.parseLogs(logs).map((e) => ({ ...e, signature }));
+}
+
 export async function fetchTransactionEvents(
-  connection: any, // Connection
+  connection: any,
   signature: TransactionSignature
 ): Promise<ParsedEvent[]> {
   const tx = await connection.getTransaction(signature, { commitment: "confirmed" });

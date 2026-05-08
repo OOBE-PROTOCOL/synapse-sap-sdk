@@ -28,7 +28,7 @@ import {
 import type {
   EscrowValidationResult,
 } from "./escrow-validation";
-import { SapValidationError } from "../errors";
+import { SapValidationError } from "../errors/index";
 import type { EscrowAccountData } from "../types";
 
 // ═══════════════════════════════════════════════════════════════════

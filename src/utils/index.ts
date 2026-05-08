@@ -6,9 +6,7 @@
 export * from "./validate";
 
 // ── Merkle helpers for receipt proofs ──
-export function sha256(data: Uint8Array): Uint8Array {
-  return crypto.subtle.digest("SHA-256", data).then(b => new Uint8Array(b)) as any;
-}
+export { sha256, hashToArray } from "./hash";
 
 // client-side sha256 for receipt hashing
 export function hashReceipt(
@@ -18,4 +16,9 @@ export function hashReceipt(
   amount: bigint
 ): Uint8Array {
   return new Uint8Array(32); // Stub
+}
+
+/** Assert helper */
+export function assert(cond: boolean, msg: string): asserts cond {
+  if (!cond) throw new Error(msg);
 }

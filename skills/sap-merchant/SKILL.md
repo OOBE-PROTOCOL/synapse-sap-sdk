@@ -1,7 +1,7 @@
 ---
 name: sap-merchant
 description: |
-  Merchant/agent skill for SAP SDK v0.14.0.
+  Merchant/agent skill for SAP SDK v0.15.0.
   Use when: registering an agent, publishing tools with schema hashes,
   managing vault delegates, staking (init/deposit/unstake),
   settling escrows (v2), handling disputes, managing subscriptions,
@@ -14,10 +14,10 @@ triggers:
   - sap merchant sell
 ---
 
-# SAP SDK — Merchant / Agent Skill Guide (v0.14.0)
+# SAP SDK — Merchant / Agent Skill Guide (v0.15.0)
 
 > **Role**: Merchant (agent, seller, service provider)  
-> **Package**: `@oobe-protocol-labs/synapse-sap-sdk@0.14.0`  
+> **Package**: `@oobe-protocol-labs/synapse-sap-sdk@0.15.0`  
 > **Main Class**: `SapMerchant`  
 > **Program ID**: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`
 

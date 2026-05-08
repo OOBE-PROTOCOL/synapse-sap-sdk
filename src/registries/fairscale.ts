@@ -66,7 +66,7 @@ export class FairScaleError extends SapError {
   readonly upstreamCode?: string;
 
   constructor(message: string, status: number, upstreamCode?: string) {
-    super(message, "FAIRSCALE_ERROR");
+    super(message);
     this.name = "FairScaleError";
     this.status = status;
     this.upstreamCode = upstreamCode;

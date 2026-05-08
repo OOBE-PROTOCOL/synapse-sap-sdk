@@ -1,7 +1,7 @@
 ---
 name: sap-metaplex
 description: |
-  Metaplex Core bridge for SAP SDK v0.14.0.
+  Metaplex Core bridge for SAP SDK v0.15.0.
   Use when: minting agent identity NFTs, attaching AgentIdentity plugin,
   linking SAP agents to MPL Core assets, triple-check link verification,
   atomic register flows (mint + attach + SAP register).
@@ -13,10 +13,10 @@ triggers:
   - sap bridge
 ---
 
-# SAP × Metaplex Core — Bridge Skill Guide (v0.14.0)
+# SAP × Metaplex Core — Bridge Skill Guide (v0.15.0)
 
 > **Module**: `client.metaplex` (MetaplexBridge)  
-> **SAP SDK**: `@oobe-protocol-labs/synapse-sap-sdk@0.14.0`  
+> **SAP SDK**: `@oobe-protocol-labs/synapse-sap-sdk@0.15.0`  
 > **MPL Core**: `@metaplex-foundation/mpl-core >= 1.9.0`  
 > **EIP-8004**: Trustless Agents  
 
@@ -209,5 +209,5 @@ export async function GET(
 5. **`hashString` from pdas is a placeholder** — The real SHA-256 must be
    computed in the bridge code, not the placeholder in `pdas/index.ts`.
 
-6. **Version drift** — This bridge guide targets SDK v0.14.0. If using a
+6. **Version drift** — This bridge guide targets SDK v0.15.0. If using a
    different version, verify `MetaplexBridge` exports in `src/registries/metaplex-bridge.ts`.

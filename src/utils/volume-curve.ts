@@ -95,7 +95,7 @@ export function calculateSettleAmount(
   let remaining = calls.clone();
   let cursor = totalCallsBefore.clone();
 
-  while (remaining.gtn(0)) {
+  while (remaining.gt(new BN(0))) {
     let currentPrice = basePrice;
     let nextThreshold: BN | null = null;
 

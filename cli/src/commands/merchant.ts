@@ -1,6 +1,6 @@
 /**
  * @module cli/commands/merchant
- * @description Merchant/agent operations — v0.14.0 aligned.
+ * @description Merchant/agent operations — v0.15.0 aligned.
  * Uses: client.agent.registerAgent, client.staking.initStake, client.vault.addVaultDelegate
  */
 import { Command } from "commander";

@@ -56,12 +56,12 @@ import {
 import { sha256, hashToArray, assert } from "../utils";
 import { LIMITS, TOOL_CATEGORY_VALUES, HTTP_METHOD_VALUES } from "../constants";
 import type {
-  Capability,
   PricingTier,
   TokenTypeKind,
   SettlementModeKind,
   VolumeCurveBreakpoint,
 } from "../types";
+import type { Capability } from "../types/common";
 import { TokenType, SettlementMode } from "../types";
 
 // ═══════════════════════════════════════════════════════════════════

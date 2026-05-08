@@ -33,9 +33,13 @@
  */
 export const SEEDS = {
   AGENT: "sap_agent",
+  AGENT_STATS: "sap_stats",
+  AGENT_STAKE: "sap_stake",
   FEEDBACK: "sap_feedback",
   CAPABILITY_INDEX: "sap_cap_idx",
+  CAPABILITY_IDX: "sap_cap_idx",
   PROTOCOL_INDEX: "sap_proto_idx",
+  PROTOCOL_IDX: "sap_proto_idx",
   GLOBAL: "sap_global",
   PLUGIN: "sap_plugin",
   MEMORY: "sap_memory",
@@ -43,33 +47,29 @@ export const SEEDS = {
   VAULT: "sap_vault",
   SESSION: "sap_session",
   EPOCH: "sap_epoch",
+  EPOCH_PAGE: "sap_epoch",
   DELEGATE: "sap_delegate",
+  VAULT_DELEGATE: "sap_delegate",
   TOOL: "sap_tool",
   CHECKPOINT: "sap_checkpoint",
   ESCROW: "sap_escrow",
   ESCROW_V2: "sap_escrow_v2",
   STATS: "sap_stats",
   TOOL_CATEGORY: "sap_tool_cat",
+  TOOL_CAT_IDX: "sap_tool_cat",
   ATTESTATION: "sap_attest",
   LEDGER: "sap_ledger",
   LEDGER_PAGE: "sap_page",
   BUFFER: "sap_buffer",
   DIGEST: "sap_digest",
   PENDING: "sap_pending",
+  PENDING_SETTLE: "sap_pending",
   DISPUTE: "sap_dispute",
   STAKE: "sap_stake",
-  SUBSCRIPTION: "sap_sub",
+  SUBSCRIPTION: "sap_subscription",
   SHARD: "sap_shard",
   INDEX_PAGE: "sap_idx_page",
-  /**
-   * @since v0.10.0 — Anti-replay receipt PDA bound to (escrow, service_hash) or (escrow, batch_root).
-   * Created via `init` on every settle_calls / settle_batch / settle_calls_v2; replays fail.
-   */
   SETTLEMENT_RECEIPT: "sap_recv",
-  /**
-   * @deprecated v0.10.0 — Was reserved for receipt batch merkle root (never used on-chain).
-   * Use {@link SEEDS.SETTLEMENT_RECEIPT} (`sap_recv`) instead. Will be removed in v0.11.0.
-   */
   RECEIPT: "sap_receipt",
 } as const;
 
