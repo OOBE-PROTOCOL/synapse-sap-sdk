@@ -1,12 +1,18 @@
 /**
  * @module cli/config
- * @description CLI configuration management.
+ * @description CLI configuration management — v0.14.0 aligned.
  *
  * Handles loading config from:
  *   1. Command-line flags (highest priority)
  *   2. Config file (~/.config/synapse-sap/config.json)
  *   3. Environment variables
  *   4. Sensible defaults
+ *
+ * SAP SDK v0.14.0 specific:
+ *   - apiKey for RPC authentication
+ *   - jupiterApiKey for DeFi operations
+ *   - rpcHeaders for gated RPCs
+ *   - Default programId: SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ
  */
 
 import * as fs from "fs";
@@ -20,10 +26,13 @@ import * as os from "os";
 export interface CliConfig {
   rpc: string;
   fallbackRpc?: string;
-  programId?: string;
+  programId: string;
   cluster: "mainnet-beta" | "devnet" | "localnet";
   walletPath?: string;
   privateKey?: string;
+  apiKey?: string;
+  jupiterApiKey?: string;
+  rpcHeaders?: Record<string, string>;
   json: boolean;
   silent: boolean;
   tmpDir: string;
@@ -45,6 +54,8 @@ const CLUSTER_RPCS: Record<string, string> = {
   devnet: "https://api.devnet.solana.com",
   localnet: "http://localhost:8899",
 };
+
+const DEFAULT_PROGRAM_ID = "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ";
 
 // ═══════════════════════════════════════════════════════════════════
 //  Config Loader
@@ -77,6 +88,15 @@ export function loadConfig(overrides: Partial<CliConfig> = {}): CliConfig {
   if (env.SOLANA_CLUSTER) envConfig.cluster = env.SOLANA_CLUSTER as CliConfig["cluster"];
   if (env.WALLET_KEYPAIR_PATH) envConfig.walletPath = env.WALLET_KEYPAIR_PATH;
   if (env.WALLET_PRIVATE_KEY) envConfig.privateKey = env.WALLET_PRIVATE_KEY;
+  if (env.OOBE_API_KEY) envConfig.apiKey = env.OOBE_API_KEY;
+  if (env.JUPITER_API_KEY) envConfig.jupiterApiKey = env.JUPITER_API_KEY;
+  if (env.RPC_HEADERS) {
+    try {
+      envConfig.rpcHeaders = JSON.parse(env.RPC_HEADERS);
+    } catch {
+      // ignore invalid JSON
+    }
+  }
 
   // 3. Merge: overrides > env > file > defaults
   const cluster = overrides.cluster ?? envConfig.cluster ?? fileConfig.cluster ?? "devnet";
@@ -84,10 +104,13 @@ export function loadConfig(overrides: Partial<CliConfig> = {}): CliConfig {
   return {
     rpc: overrides.rpc ?? envConfig.rpc ?? fileConfig.rpc ?? CLUSTER_RPCS[cluster]!,
     fallbackRpc: overrides.fallbackRpc ?? envConfig.fallbackRpc ?? fileConfig.fallbackRpc,
-    programId: overrides.programId ?? envConfig.programId ?? fileConfig.programId,
+    programId: overrides.programId ?? envConfig.programId ?? fileConfig.programId ?? DEFAULT_PROGRAM_ID,
     cluster,
     walletPath: overrides.walletPath ?? envConfig.walletPath ?? fileConfig.walletPath,
     privateKey: overrides.privateKey ?? envConfig.privateKey ?? fileConfig.privateKey,
+    apiKey: overrides.apiKey ?? envConfig.apiKey ?? fileConfig.apiKey,
+    jupiterApiKey: overrides.jupiterApiKey ?? envConfig.jupiterApiKey ?? fileConfig.jupiterApiKey,
+    rpcHeaders: overrides.rpcHeaders ?? envConfig.rpcHeaders ?? fileConfig.rpcHeaders,
     json: overrides.json ?? fileConfig.json ?? false,
     silent: overrides.silent ?? fileConfig.silent ?? false,
     tmpDir: overrides.tmpDir ?? fileConfig.tmpDir ?? DEFAULT_TMP_DIR,
@@ -122,4 +145,4 @@ export function getConfigDir(): string {
   return DEFAULT_CONFIG_DIR;
 }
 
-export { DEFAULT_TMP_DIR, DEFAULT_LOG_DIR };
+export { DEFAULT_TMP_DIR, DEFAULT_LOG_DIR, DEFAULT_PROGRAM_ID };
