@@ -88,6 +88,20 @@ Uses `client.vault.initVault()`, `client.session.openSession()`, `client.vault.i
 | `memory delegate remove <pubkey>` | Revoke delegate |
 | `memory reputation give <agent>` | Give feedback (`--score`, `--tag`) |
 
+### `skills` — Skill Management
+
+Download and manage Hermes Agent skill files from the SDK GitHub releases.
+
+| Command | Description |
+|---------|-------------|
+| `skills install` | Install all SAP skills (or single: `skills install sap-client`) |
+| `skills list` | List installed skills |
+| `skills update` | Update all skills to latest release |
+| `skills remove <skill>` | Remove a skill |
+| `skills path` | Show skills installation directory |
+
+Default skills: `sap-overview`, `sap-client`, `sap-merchant`, `sap-memory`, `sap-metaplex`.
+
 ### `merchant` — Merchant Ops
 
 Uses `client.agent.registerAgent()`, `client.vault.addVaultDelegate()`.
