@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.1] — 2026-05-09 — IDL Path Fix
+
+### Fixed
+- **`client.ts`**: corrected IDL require path from `"./idl.json"` to `"./idl/synapse_agent_sap.json"` to match actual distributed file location, fixing "Module not found" errors in ESM builds.
+
 ## [0.15.0] — 2026-05-08 — TypeScript Config Hardening + Capability Import Fixes
 
 ### Fixed
