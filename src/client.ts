@@ -16,7 +16,7 @@ import {
 } from "./instructions";
 
 // @ts-ignore — JSON resolution handled by bundler
-const idlJson = require("./idl.json");
+const idlJson = require("./idl/synapse_agent_sap.json");
 
 export interface SapClientOpts {
   connection?: Connection;

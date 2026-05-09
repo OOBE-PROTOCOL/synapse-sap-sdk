@@ -1,5 +1,5 @@
 {
-  "name": "@oobe-protocol-labs/synapse-sap-cli",
+  "name": "synapse-sap-cli",
   "version": "0.15.0",
   "description": "CLI toolkit for the Synapse Agent Protocol (SAP v2) on Solana — register agents, manage escrows, automate x402 payments, publish tool manifests, and more. Aligned to SDK v0.15.0.",
   "license": "MIT",
