@@ -1,6 +1,6 @@
 {
   "name": "@oobe-protocol-labs/synapse-sap-sdk",
-  "version": "0.15.1",
+  "version": "0.16.0",
   "description": "TypeScript SDK for Synapse SAP Protocol — x402 agentic escrow, dispute, staking, subscription & vault layers on Solana",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",

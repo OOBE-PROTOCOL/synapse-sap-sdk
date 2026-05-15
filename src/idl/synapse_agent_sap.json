@@ -2,7 +2,7 @@
   "address": "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ",
   "metadata": {
     "name": "synapse_agent_sap",
-    "version": "0.2.0",
+    "version": "0.25.0",
     "spec": "0.1.0",
     "description": "Created with Anchor"
   },
@@ -439,6 +439,206 @@
       ]
     },
     {
+      "name": "append_buffer",
+      "docs": [
+        "Append data to buffer page. ≤750B per call, uses realloc."
+      ],
+      "discriminator": [
+        168,
+        36,
+        127,
+        59,
+        138,
+        135,
+        234,
+        0
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          },
+          "relations": [
+            "session"
+          ]
+        },
+        {
+          "name": "session"
+        },
+        {
+          "name": "buffer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "session"
+              },
+              {
+                "kind": "arg",
+                "path": "page_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "page_index",
+          "type": "u32"
+        },
+        {
+          "name": "data",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "append_memory_chunk",
+      "docs": [
+        "Append onchain chunk to memory entry. Max 900B."
+      ],
+      "discriminator": [
+        165,
+        107,
+        165,
+        229,
+        120,
+        250,
+        89,
+        67
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "memory_entry",
+          "writable": true
+        },
+        {
+          "name": "memory_chunk",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "chunk_index",
+          "type": "u8"
+        },
+        {
+          "name": "data",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
       "name": "auto_resolve_dispute",
       "docs": [
         "Permissionless auto-resolution after proof deadline."
@@ -861,6 +1061,34 @@
           }
         },
         {
+          "name": "pricing_menu",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  112,
+                  114,
+                  105,
+                  99,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
           "name": "global_registry",
           "writable": true,
           "pda": {
@@ -972,6 +1200,125 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "close_buffer",
+      "docs": [
+        "Close a buffer page, reclaim ALL accumulated rent."
+      ],
+      "discriminator": [
+        46,
+        114,
+        179,
+        58,
+        57,
+        45,
+        194,
+        172
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          },
+          "relations": [
+            "session"
+          ]
+        },
+        {
+          "name": "session"
+        },
+        {
+          "name": "buffer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "session"
+              },
+              {
+                "kind": "arg",
+                "path": "page_index"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "page_index",
+          "type": "u32"
+        }
+      ]
     },
     {
       "name": "close_capability_index",
@@ -1213,6 +1560,116 @@
       ]
     },
     {
+      "name": "close_digest",
+      "docs": [
+        "Close a digest PDA, reclaim all rent."
+      ],
+      "discriminator": [
+        168,
+        76,
+        145,
+        230,
+        141,
+        231,
+        180,
+        170
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "session"
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          },
+          "relations": [
+            "session"
+          ]
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "digest",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  100,
+                  105,
+                  103,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "session"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "close_dispute",
       "docs": [
         "Close finalized dispute PDA. Depositor reclaims rent."
@@ -1387,65 +1844,6 @@
       ]
     },
     {
-      "name": "close_escrow",
-      "docs": [
-        "Close empty escrow PDA. Withdraw first."
-      ],
-      "discriminator": [
-        139,
-        171,
-        94,
-        146,
-        191,
-        91,
-        144,
-        50
-      ],
-      "accounts": [
-        {
-          "name": "depositor",
-          "writable": true,
-          "signer": true,
-          "relations": [
-            "escrow"
-          ]
-        },
-        {
-          "name": "escrow",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "escrow.agent",
-                "account": "EscrowAccount"
-              },
-              {
-                "kind": "account",
-                "path": "depositor"
-              }
-            ]
-          }
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "close_escrow_v2",
       "docs": [
         "Close empty V2 escrow. No pending settlements allowed."
@@ -1504,6 +1902,33 @@
               {
                 "kind": "account",
                 "path": "escrow.escrow_nonce",
+                "account": "EscrowAccountV2"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent_stats",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow.agent",
                 "account": "EscrowAccountV2"
               }
             ]
@@ -1762,6 +2187,121 @@
       "args": []
     },
     {
+      "name": "close_memory_chunk",
+      "docs": [
+        "Close a memory chunk PDA (rent returned to wallet)."
+      ],
+      "discriminator": [
+        94,
+        182,
+        119,
+        190,
+        134,
+        13,
+        9,
+        80
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "memory_entry"
+        },
+        {
+          "name": "memory_chunk",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_memory_entry",
+      "docs": [
+        "Close a memory entry PDA (rent returned to wallet)."
+      ],
+      "discriminator": [
+        173,
+        191,
+        88,
+        60,
+        0,
+        29,
+        57,
+        185
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "memory_entry",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "close_pending_settlement",
       "docs": [
         "Close finalized pending settlement PDA. Reclaim rent."
@@ -1815,6 +2355,63 @@
               }
             ]
           }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_plugin",
+      "docs": [
+        "Close plugin PDA. Removes from agent.active_plugins."
+      ],
+      "discriminator": [
+        71,
+        76,
+        91,
+        241,
+        155,
+        207,
+        69,
+        0
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "plugin_slot",
+          "writable": true
         }
       ],
       "args": []
@@ -2705,40 +3302,31 @@
       ]
     },
     {
-      "name": "create_escrow",
+      "name": "create_buffer",
       "docs": [
-        "Create escrow. Locks price_per_call + optional max_calls. token_mint: None=SOL."
+        "Create buffer page PDA. ≈0.001 SOL rent, reclaimable."
       ],
       "discriminator": [
-        253,
-        215,
-        165,
-        116,
-        36,
-        108,
-        68,
-        80
+        175,
+        76,
+        101,
+        74,
+        224,
+        249,
+        104,
+        170
       ],
       "accounts": [
         {
-          "name": "depositor",
+          "name": "wallet",
           "writable": true,
-          "signer": true
-        },
-        {
-          "name": "agent",
-          "docs": [
-            "Agent to prepay for — anyone can create escrow"
+          "signer": true,
+          "relations": [
+            "agent"
           ]
         },
         {
-          "name": "agent_stake",
-          "docs": [
-            "v0.10 hardening: agent MUST hold at least `AgentStake::MIN_STAKE`",
-            "in collateral before any new escrow can be opened.  This guarantees",
-            "every accepted client has a slashable bond to claim against in case",
-            "of dispute."
-          ],
+          "name": "agent",
           "pda": {
             "seeds": [
               {
@@ -2748,11 +3336,36 @@
                   97,
                   112,
                   95,
-                  115,
-                  116,
                   97,
-                  107,
-                  101
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
                 ]
               },
               {
@@ -2760,10 +3373,16 @@
                 "path": "agent"
               }
             ]
-          }
+          },
+          "relations": [
+            "session"
+          ]
         },
         {
-          "name": "escrow",
+          "name": "session"
+        },
+        {
+          "name": "buffer",
           "writable": true,
           "pda": {
             "seeds": [
@@ -2774,21 +3393,21 @@
                   97,
                   112,
                   95,
+                  98,
+                  117,
+                  102,
+                  102,
                   101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
+                  114
                 ]
               },
               {
                 "kind": "account",
-                "path": "agent"
+                "path": "session"
               },
               {
-                "kind": "account",
-                "path": "depositor"
+                "kind": "arg",
+                "path": "page_index"
               }
             ]
           }
@@ -2800,40 +3419,8 @@
       ],
       "args": [
         {
-          "name": "price_per_call",
-          "type": "u64"
-        },
-        {
-          "name": "max_calls",
-          "type": "u64"
-        },
-        {
-          "name": "initial_deposit",
-          "type": "u64"
-        },
-        {
-          "name": "expires_at",
-          "type": "i64"
-        },
-        {
-          "name": "volume_curve",
-          "type": {
-            "vec": {
-              "defined": {
-                "name": "VolumeCurveBreakpoint"
-              }
-            }
-          }
-        },
-        {
-          "name": "token_mint",
-          "type": {
-            "option": "pubkey"
-          }
-        },
-        {
-          "name": "token_decimals",
-          "type": "u8"
+          "name": "page_index",
+          "type": "u32"
         }
       ]
     },
@@ -2881,6 +3468,59 @@
                   97,
                   107,
                   101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent_stats",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pricing_menu",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  112,
+                  114,
+                  105,
+                  99,
+                  105,
+                  110,
+                  103
                 ]
               },
               {
@@ -3518,74 +4158,6 @@
         }
       ],
       "args": []
-    },
-    {
-      "name": "deposit_escrow",
-      "docs": [
-        "Deposit additional SOL into an existing escrow."
-      ],
-      "discriminator": [
-        226,
-        112,
-        158,
-        176,
-        178,
-        118,
-        153,
-        128
-      ],
-      "accounts": [
-        {
-          "name": "depositor",
-          "writable": true,
-          "signer": true,
-          "relations": [
-            "escrow"
-          ]
-        },
-        {
-          "name": "escrow",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "escrow.agent",
-                "account": "EscrowAccount"
-              },
-              {
-                "kind": "account",
-                "path": "depositor"
-              }
-            ]
-          }
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "amount",
-          "type": "u64"
-        }
-      ]
     },
     {
       "name": "deposit_escrow_v2",
@@ -4334,6 +4906,120 @@
           }
         }
       ]
+    },
+    {
+      "name": "init_digest",
+      "docs": [
+        "Init MemoryDigest PDA. Fixed ~0.002 SOL, never grows."
+      ],
+      "discriminator": [
+        42,
+        229,
+        170,
+        125,
+        97,
+        157,
+        10,
+        10
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          },
+          "relations": [
+            "session"
+          ]
+        },
+        {
+          "name": "session"
+        },
+        {
+          "name": "digest",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  100,
+                  105,
+                  103,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "session"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "init_index_page",
@@ -5510,6 +6196,129 @@
       ]
     },
     {
+      "name": "inscribe_to_digest",
+      "docs": [
+        "Inscribe data to TX log + update PDA proof. Primary write. Zero rent."
+      ],
+      "discriminator": [
+        51,
+        91,
+        115,
+        170,
+        4,
+        85,
+        82,
+        106
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          },
+          "relations": [
+            "session"
+          ]
+        },
+        {
+          "name": "session"
+        },
+        {
+          "name": "digest",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  100,
+                  105,
+                  103,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "session"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "data",
+          "type": "bytes"
+        },
+        {
+          "name": "content_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "inscribe_tool_schema",
       "docs": [
         "Inscribe JSON schema to TX log. schema_type: 0=input, 1=output, 2=desc."
@@ -5710,6 +6519,129 @@
               32
             ]
           }
+        }
+      ]
+    },
+    {
+      "name": "post_digest",
+      "docs": [
+        "Post digest proof (hash only). Zero additional rent."
+      ],
+      "discriminator": [
+        175,
+        113,
+        239,
+        5,
+        36,
+        95,
+        17,
+        97
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "session"
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          },
+          "relations": [
+            "session"
+          ]
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "digest",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  100,
+                  105,
+                  103,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "session"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "content_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "data_size",
+          "type": "u32"
         }
       ]
     },
@@ -6125,6 +7057,34 @@
           }
         },
         {
+          "name": "pricing_menu",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  112,
+                  114,
+                  105,
+                  99,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
           "name": "global_registry",
           "writable": true,
           "pda": {
@@ -6204,6 +7164,72 @@
           "type": {
             "option": "string"
           }
+        }
+      ]
+    },
+    {
+      "name": "register_plugin",
+      "docs": [
+        "Register plugin slot. type: 0=Memory..5=Custom."
+      ],
+      "discriminator": [
+        146,
+        14,
+        244,
+        131,
+        70,
+        141,
+        32,
+        0
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "plugin_slot",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "plugin_type",
+          "type": "u8"
         }
       ]
     },
@@ -7070,339 +8096,6 @@
       "args": []
     },
     {
-      "name": "settle_batch",
-      "docs": [
-        "Batch settle up to 10 settlements in one TX. Volume curve spans batch.",
-        "v0.10: requires `batch_root = sha256(s_0 || s_1 || ... || s_{N-1})`",
-        "to seed the anti-replay receipt PDA."
-      ],
-      "discriminator": [
-        22,
-        2,
-        21,
-        223,
-        225,
-        122,
-        163,
-        214
-      ],
-      "accounts": [
-        {
-          "name": "wallet",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "agent",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  97,
-                  103,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet"
-              }
-            ]
-          }
-        },
-        {
-          "name": "agent_stats",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  115
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "agent"
-              }
-            ]
-          }
-        },
-        {
-          "name": "escrow",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "agent"
-              },
-              {
-                "kind": "account",
-                "path": "escrow.depositor",
-                "account": "EscrowAccount"
-              }
-            ]
-          }
-        },
-        {
-          "name": "settlement_receipt",
-          "docs": [
-            "v0.10 anti-replay: PDA bound to the batch_root (sha256 of all",
-            "service_hashes in order).  Replaying the same batch fails the",
-            "`init` constraint."
-          ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  114,
-                  101,
-                  99,
-                  118
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "escrow"
-              },
-              {
-                "kind": "arg",
-                "path": "batch_root"
-              }
-            ]
-          }
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "settlements",
-          "type": {
-            "vec": {
-              "defined": {
-                "name": "Settlement"
-              }
-            }
-          }
-        },
-        {
-          "name": "batch_root",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "settle_calls",
-      "docs": [
-        "Agent settles calls — claims funds from escrow. service_hash = proof of work."
-      ],
-      "discriminator": [
-        100,
-        156,
-        197,
-        134,
-        219,
-        245,
-        3,
-        170
-      ],
-      "accounts": [
-        {
-          "name": "wallet",
-          "docs": [
-            "Agent owner — signs settlement + receives payment"
-          ],
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "agent",
-          "docs": [
-            "PDA derivation for escrow + stats."
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  97,
-                  103,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet"
-              }
-            ]
-          }
-        },
-        {
-          "name": "agent_stats",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  115
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "agent"
-              }
-            ]
-          }
-        },
-        {
-          "name": "escrow",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "agent"
-              },
-              {
-                "kind": "account",
-                "path": "escrow.depositor",
-                "account": "EscrowAccount"
-              }
-            ]
-          }
-        },
-        {
-          "name": "settlement_receipt",
-          "docs": [
-            "v0.10 anti-replay: an `init` of this PDA fails if the same",
-            "`service_hash` was already used to settle this escrow.",
-            "Receipt PDAs are intentionally NOT closeable to preserve the",
-            "uniqueness invariant for the lifetime of the escrow."
-          ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  114,
-                  101,
-                  99,
-                  118
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "escrow"
-              },
-              {
-                "kind": "arg",
-                "path": "service_hash"
-              }
-            ]
-          }
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "calls_to_settle",
-          "type": "u64"
-        },
-        {
-          "name": "service_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
-      ]
-    },
-    {
       "name": "settle_calls_v2",
       "docs": [
         "Agent settles calls via V2 escrow. Mode-dispatched."
@@ -7573,6 +8266,117 @@
               32
             ]
           }
+        }
+      ]
+    },
+    {
+      "name": "store_memory",
+      "docs": [
+        "Store a memory entry (metadata + optional IPFS pointer)."
+      ],
+      "discriminator": [
+        168,
+        103,
+        88,
+        240,
+        93,
+        185,
+        30,
+        235
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "memory_entry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  109,
+                  101,
+                  109,
+                  111,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              },
+              {
+                "kind": "arg",
+                "path": "entry_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "entry_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "content_type",
+          "type": "string"
+        },
+        {
+          "name": "ipfs_cid",
+          "type": {
+            "option": "string"
+          }
+        },
+        {
+          "name": "total_size",
+          "type": "u32"
         }
       ]
     },
@@ -7917,6 +8721,34 @@
           }
         },
         {
+          "name": "pricing_menu",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  112,
+                  114,
+                  105,
+                  99,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
@@ -7983,6 +8815,129 @@
           "type": {
             "option": "string"
           }
+        }
+      ]
+    },
+    {
+      "name": "update_digest_storage",
+      "docs": [
+        "Update optional offchain storage pointer (IPFS CID, Arweave TX, etc.)."
+      ],
+      "discriminator": [
+        71,
+        7,
+        245,
+        130,
+        255,
+        14,
+        149,
+        40
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "session"
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          },
+          "relations": [
+            "session"
+          ]
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "digest",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  100,
+                  105,
+                  103,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "session"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "storage_ref",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "storage_type",
+          "type": "u8"
         }
       ]
     },
@@ -8188,70 +9143,6 @@
           "type": {
             "option": "u8"
           }
-        }
-      ]
-    },
-    {
-      "name": "withdraw_escrow",
-      "docs": [
-        "Client withdraws from escrow. Withdraws min(amount, balance)."
-      ],
-      "discriminator": [
-        81,
-        84,
-        226,
-        128,
-        245,
-        47,
-        96,
-        104
-      ],
-      "accounts": [
-        {
-          "name": "depositor",
-          "writable": true,
-          "signer": true,
-          "relations": [
-            "escrow"
-          ]
-        },
-        {
-          "name": "escrow",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "escrow.agent",
-                "account": "EscrowAccount"
-              },
-              {
-                "kind": "account",
-                "path": "depositor"
-              }
-            ]
-          }
-        }
-      ],
-      "args": [
-        {
-          "name": "amount",
-          "type": "u64"
         }
       ]
     },
@@ -8479,6 +9370,19 @@
       ]
     },
     {
+      "name": "AgentPricingMenu",
+      "discriminator": [
+        181,
+        203,
+        249,
+        3,
+        52,
+        2,
+        117,
+        144
+      ]
+    },
+    {
       "name": "AgentStake",
       "discriminator": [
         47,
@@ -8557,19 +9461,6 @@
       ]
     },
     {
-      "name": "EscrowAccount",
-      "discriminator": [
-        36,
-        69,
-        48,
-        18,
-        128,
-        225,
-        125,
-        135
-      ]
-    },
-    {
       "name": "EscrowAccountV2",
       "discriminator": [
         183,
@@ -8635,6 +9526,58 @@
       ]
     },
     {
+      "name": "MemoryBuffer",
+      "discriminator": [
+        58,
+        228,
+        180,
+        234,
+        11,
+        227,
+        220,
+        144
+      ]
+    },
+    {
+      "name": "MemoryChunk",
+      "discriminator": [
+        15,
+        107,
+        188,
+        123,
+        125,
+        236,
+        239,
+        95
+      ]
+    },
+    {
+      "name": "MemoryDigest",
+      "discriminator": [
+        198,
+        235,
+        118,
+        212,
+        98,
+        33,
+        36,
+        1
+      ]
+    },
+    {
+      "name": "MemoryEntry",
+      "discriminator": [
+        15,
+        44,
+        32,
+        71,
+        71,
+        155,
+        94,
+        86
+      ]
+    },
+    {
       "name": "MemoryLedger",
       "discriminator": [
         221,
@@ -8671,6 +9614,19 @@
         184,
         79,
         23
+      ]
+    },
+    {
+      "name": "PluginSlot",
+      "discriminator": [
+        112,
+        220,
+        38,
+        230,
+        210,
+        32,
+        69,
+        151
       ]
     },
     {
@@ -8845,6 +9801,32 @@
       ]
     },
     {
+      "name": "BufferAppendedEvent",
+      "discriminator": [
+        156,
+        162,
+        205,
+        194,
+        186,
+        77,
+        132,
+        123
+      ]
+    },
+    {
+      "name": "BufferCreatedEvent",
+      "discriminator": [
+        247,
+        199,
+        20,
+        143,
+        98,
+        102,
+        41,
+        79
+      ]
+    },
+    {
       "name": "CallsReportedEvent",
       "discriminator": [
         6,
@@ -8933,6 +9915,32 @@
         235,
         161,
         202
+      ]
+    },
+    {
+      "name": "DigestInscribedEvent",
+      "discriminator": [
+        233,
+        117,
+        252,
+        177,
+        192,
+        174,
+        153,
+        3
+      ]
+    },
+    {
+      "name": "DigestPostedEvent",
+      "discriminator": [
+        231,
+        137,
+        131,
+        51,
+        62,
+        183,
+        86,
+        27
       ]
     },
     {
@@ -9157,6 +10165,19 @@
       ]
     },
     {
+      "name": "MemoryStoredEvent",
+      "discriminator": [
+        154,
+        225,
+        51,
+        106,
+        181,
+        46,
+        15,
+        197
+      ]
+    },
+    {
       "name": "PaymentSettledEvent",
       "discriminator": [
         55,
@@ -9167,6 +10188,19 @@
         8,
         9,
         240
+      ]
+    },
+    {
+      "name": "PluginRegisteredEvent",
+      "discriminator": [
+        201,
+        231,
+        95,
+        83,
+        74,
+        230,
+        47,
+        122
       ]
     },
     {
@@ -9349,6 +10383,19 @@
         59,
         181,
         251
+      ]
+    },
+    {
+      "name": "StorageRefUpdatedEvent",
+      "discriminator": [
+        141,
+        82,
+        16,
+        183,
+        6,
+        140,
+        37,
+        224
       ]
     },
     {
@@ -10031,283 +11078,378 @@
     },
     {
       "code": 6091,
+      "name": "InvalidPaymentToken",
+      "msg": "payment token not accepted (USDC only)"
+    },
+    {
+      "code": 6092,
       "name": "InvalidSettlementSecurity",
       "msg": "bad security"
     },
     {
-      "code": 6092,
+      "code": 6093,
       "name": "CoSignerRequired",
       "msg": "cosigner"
     },
     {
-      "code": 6093,
+      "code": 6094,
       "name": "InvalidCoSigner",
       "msg": "bad cosigner"
     },
     {
-      "code": 6094,
+      "code": 6095,
       "name": "InvalidArbiter",
       "msg": "bad arbiter"
     },
     {
-      "code": 6095,
+      "code": 6096,
       "name": "ArbiterRequired",
       "msg": "arbiter=0"
     },
     {
-      "code": 6096,
+      "code": 6097,
       "name": "EscrowNonceReused",
       "msg": "nonce reused"
     },
     {
-      "code": 6097,
+      "code": 6098,
       "name": "SettlementNotPending",
       "msg": "not pending"
     },
     {
-      "code": 6098,
+      "code": 6099,
       "name": "SettlementAlreadyFinalized",
       "msg": "already final"
     },
     {
-      "code": 6099,
+      "code": 6100,
       "name": "DisputeWindowNotExpired",
       "msg": "too early"
     },
     {
-      "code": 6100,
+      "code": 6101,
       "name": "DisputeWindowExpired",
       "msg": "window closed"
     },
     {
-      "code": 6101,
+      "code": 6102,
       "name": "NotDepositor",
       "msg": "not depositor"
     },
     {
-      "code": 6102,
+      "code": 6103,
       "name": "DisputeAlreadyFiled",
       "msg": "dup dispute"
     },
     {
-      "code": 6103,
+      "code": 6104,
       "name": "DisputeStillOpen",
       "msg": "dispute open"
     },
     {
-      "code": 6104,
+      "code": 6105,
       "name": "NotArbiter",
       "msg": "not arbiter"
     },
     {
-      "code": 6105,
+      "code": 6106,
       "name": "InvalidDisputeOutcome",
       "msg": "bad outcome"
     },
     {
-      "code": 6106,
+      "code": 6107,
       "name": "StakeBelowMinimum",
       "msg": "stake<min"
     },
     {
-      "code": 6107,
+      "code": 6108,
       "name": "NoStakeAccount",
       "msg": "no stake"
     },
     {
-      "code": 6108,
+      "code": 6109,
       "name": "UnstakeAlreadyPending",
       "msg": "unstake pending"
     },
     {
-      "code": 6109,
+      "code": 6110,
       "name": "UnstakeCooldownNotMet",
       "msg": "cooldown"
     },
     {
-      "code": 6110,
+      "code": 6111,
       "name": "NoUnstakePending",
       "msg": "no unstake"
     },
     {
-      "code": 6111,
+      "code": 6112,
       "name": "SlashExceedsStake",
       "msg": "slash>stake"
     },
     {
-      "code": 6112,
+      "code": 6113,
       "name": "SubscriptionAlreadyActive",
       "msg": "sub active"
     },
     {
-      "code": 6113,
+      "code": 6114,
       "name": "SubscriptionCancelled",
       "msg": "sub cancelled"
     },
     {
-      "code": 6114,
+      "code": 6115,
       "name": "NoIntervalDue",
       "msg": "no due"
     },
     {
-      "code": 6115,
+      "code": 6116,
       "name": "SubscriptionInsufficientBalance",
       "msg": "sub low bal"
     },
     {
-      "code": 6116,
+      "code": 6117,
       "name": "InvalidBillingInterval",
       "msg": "bad interval"
     },
     {
-      "code": 6117,
+      "code": 6118,
       "name": "InvalidShardIndex",
       "msg": "bad shard"
     },
     {
-      "code": 6118,
+      "code": 6119,
       "name": "IndexPageFull",
       "msg": "page full"
     },
     {
-      "code": 6119,
+      "code": 6120,
       "name": "InvalidPageIndex",
       "msg": "bad page"
     },
     {
-      "code": 6120,
+      "code": 6121,
       "name": "IndexPageNotEmpty",
       "msg": "page≠empty"
     },
     {
-      "code": 6121,
+      "code": 6122,
       "name": "AlreadyMigrated",
       "msg": "already v2"
     },
     {
-      "code": 6122,
+      "code": 6123,
       "name": "MigrationV1Only",
       "msg": "v1 only"
     },
     {
-      "code": 6123,
+      "code": 6124,
       "name": "SettlementDisputed",
       "msg": "disputed"
     },
     {
-      "code": 6124,
+      "code": 6125,
       "name": "InvalidAgentWallet",
       "msg": "bad agent wallet"
     },
     {
-      "code": 6125,
+      "code": 6126,
       "name": "StakeAgentMismatch",
       "msg": "stake agent mismatch"
     },
     {
-      "code": 6126,
+      "code": 6127,
       "name": "NotAuthority",
       "msg": "not authority"
     },
     {
-      "code": 6127,
+      "code": 6128,
       "name": "UnstakeBelowRent",
       "msg": "unstake below rent"
     },
     {
-      "code": 6128,
+      "code": 6129,
       "name": "InsufficientStake",
       "msg": "insufficient stake"
     },
     {
-      "code": 6129,
+      "code": 6130,
       "name": "SelfReportDeprecated",
       "msg": "SelfReport deprecated"
     },
     {
-      "code": 6130,
+      "code": 6131,
       "name": "ArbiterDeprecated",
       "msg": "arbiter deprecated"
     },
     {
-      "code": 6131,
+      "code": 6132,
       "name": "InvalidBatchIndex",
       "msg": "bad batch idx"
     },
     {
-      "code": 6132,
+      "code": 6133,
       "name": "InvalidPeriod",
       "msg": "bad period"
     },
     {
-      "code": 6133,
+      "code": 6134,
       "name": "InvalidDisputeType",
       "msg": "bad dispute type"
     },
     {
-      "code": 6134,
+      "code": 6135,
       "name": "ProofDeadlineExpired",
       "msg": "proof expired"
     },
     {
-      "code": 6135,
+      "code": 6136,
       "name": "ProofDeadlineNotExpired",
       "msg": "proof not expired"
     },
     {
-      "code": 6136,
+      "code": 6137,
       "name": "InvalidReceiptProof",
       "msg": "bad receipt proof"
     },
     {
-      "code": 6137,
+      "code": 6138,
       "name": "SettlementReplay",
       "msg": "settlement replay"
     },
     {
-      "code": 6138,
+      "code": 6139,
       "name": "PaymentTokenNotAllowed",
       "msg": "token not allowed"
     },
     {
-      "code": 6139,
+      "code": 6140,
       "name": "AgentStakeRequired",
       "msg": "agent stake required"
     },
     {
-      "code": 6140,
+      "code": 6141,
       "name": "DelegateExpiryInvalid",
       "msg": "delegate expiry invalid"
     },
     {
-      "code": 6141,
+      "code": 6142,
       "name": "EscrowNotClosed",
       "msg": "escrow not closed"
     },
     {
-      "code": 6142,
+      "code": 6143,
       "name": "VolumeCurveNotDescending",
       "msg": "curve not descending"
     },
     {
-      "code": 6143,
+      "code": 6144,
       "name": "DuplicateServiceHash",
       "msg": "dup service hash"
     },
     {
-      "code": 6144,
+      "code": 6145,
       "name": "StakeBelowCoverage",
       "msg": "stake under coverage"
     },
     {
-      "code": 6145,
+      "code": 6146,
       "name": "StakeNotClosable",
       "msg": "stake not closable"
     },
     {
-      "code": 6146,
+      "code": 6147,
       "name": "AgentStakeAccountMissing",
       "msg": "agent stake account missing"
+    },
+    {
+      "code": 6148,
+      "name": "PricingTierNotFound",
+      "msg": "requested price_per_call does not match any tier in the agent pricing menu"
+    },
+    {
+      "code": 6149,
+      "name": "AgentStatsMigrationRequired",
+      "msg": "agent stats must be upgraded before this operation (active_escrows field missing)"
+    },
+    {
+      "code": 6150,
+      "name": "InvalidPricingMenu",
+      "msg": "pricing menu is invalid or empty (at least one tier required)"
+    },
+    {
+      "code": 6151,
+      "name": "MaxCallsPerSettlementExceeded",
+      "msg": "calls per settlement exceeds maximum allowed (max 10000)"
+    },
+    {
+      "code": 6152,
+      "name": "InvalidVolumeCurvePrice",
+      "msg": "volume curve breakpoint price must be > 0"
+    },
+    {
+      "code": 6153,
+      "name": "EscrowCoverageExceeded",
+      "msg": "escrow deposit would exceed the agent's staked coverage limit"
+    },
+    {
+      "code": 6154,
+      "name": "CoSignerIsAgentWallet",
+      "msg": "co-signer cannot be the agent wallet itself"
+    },
+    {
+      "code": 6155,
+      "name": "EscrowAlreadyExpired",
+      "msg": "escrow has already expired"
+    },
+    {
+      "code": 6156,
+      "name": "PendingSettlementExists",
+      "msg": "escrow has an unresolved pending settlement"
+    },
+    {
+      "code": 6157,
+      "name": "TokenAccountOwnerMismatch",
+      "msg": "token account owner mismatch"
+    },
+    {
+      "code": 6158,
+      "name": "MaxReceiptProofExceeded",
+      "msg": "receipt proof exceeds maximum allowed count"
+    },
+    {
+      "code": 6159,
+      "name": "MaxMerkleDepthExceeded",
+      "msg": "merkle proof depth exceeds maximum allowed"
+    },
+    {
+      "code": 6160,
+      "name": "PendingAmountMismatch",
+      "msg": "pending settlement amount does not match escrow pending amount"
+    },
+    {
+      "code": 6161,
+      "name": "StakeSlashLocksUnstake",
+      "msg": "stake slash would lock unstake request"
+    },
+    {
+      "code": 6162,
+      "name": "InvalidPricePerCall",
+      "msg": "price per call must be > 0"
+    },
+    {
+      "code": 6163,
+      "name": "SubscriptionIntervalOverflow",
+      "msg": "subscription intervals overflow"
+    },
+    {
+      "code": 6164,
+      "name": "AgentStatsVersionMismatch",
+      "msg": "agent stats version mismatch — migration required"
+    },
+    {
+      "code": 6165,
+      "name": "EscrowVersionMismatch",
+      "msg": "escrow version mismatch — migration required"
     }
   ],
   "types": [
@@ -10513,6 +11655,40 @@
       }
     },
     {
+      "name": "AgentPricingMenu",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "tiers",
+            "docs": [
+              "Copy of AgentAccount pricing at creation time.",
+              "Max 10 tiers — enough for typical SaaS ladder."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "PricingTier"
+                }
+              }
+            }
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "AgentStake",
       "type": {
         "kind": "struct",
@@ -10592,6 +11768,15 @@
           {
             "name": "is_active",
             "type": "bool"
+          },
+          {
+            "name": "active_escrows",
+            "docs": [
+              "v0.12 H-1 hardening: counter of open escrows for this agent.",
+              "Incremented on create_escrow, decremented on close_escrow.",
+              "close_agent refuses to execute unless this is zero."
+            ],
+            "type": "u32"
           },
           {
             "name": "updated_at",
@@ -10734,6 +11919,76 @@
           },
           {
             "name": "Monthly"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BufferAppendedEvent",
+      "docs": [
+        "Data appended to buffer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "session",
+            "type": "pubkey"
+          },
+          {
+            "name": "buffer",
+            "type": "pubkey"
+          },
+          {
+            "name": "page_index",
+            "type": "u32"
+          },
+          {
+            "name": "chunk_size",
+            "type": "u16"
+          },
+          {
+            "name": "total_size",
+            "type": "u16"
+          },
+          {
+            "name": "num_entries",
+            "type": "u16"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BufferCreatedEvent",
+      "docs": [
+        "Buffer page created."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "session",
+            "type": "pubkey"
+          },
+          {
+            "name": "buffer",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "page_index",
+            "type": "u32"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }
@@ -11078,6 +12333,109 @@
           {
             "name": "delegate",
             "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DigestInscribedEvent",
+      "docs": [
+        "Data inscribed to TX log via digest. Permanent, zero rent.",
+        "Verify: sha256(data) == content_hash. Replay merkle chain → match root."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "session",
+            "type": "pubkey"
+          },
+          {
+            "name": "digest",
+            "type": "pubkey"
+          },
+          {
+            "name": "entry_index",
+            "type": "u32"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "data_len",
+            "type": "u32"
+          },
+          {
+            "name": "merkle_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DigestPostedEvent",
+      "docs": [
+        "Digest proof posted (hash only, no data)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "session",
+            "type": "pubkey"
+          },
+          {
+            "name": "digest",
+            "type": "pubkey"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "data_size",
+            "type": "u32"
+          },
+          {
+            "name": "entry_index",
+            "type": "u32"
+          },
+          {
+            "name": "merkle_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
             "name": "timestamp",
@@ -11489,95 +12847,6 @@
       }
     },
     {
-      "name": "EscrowAccount",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "bump",
-            "type": "u8"
-          },
-          {
-            "name": "agent",
-            "type": "pubkey"
-          },
-          {
-            "name": "depositor",
-            "type": "pubkey"
-          },
-          {
-            "name": "agent_wallet",
-            "type": "pubkey"
-          },
-          {
-            "name": "balance",
-            "type": "u64"
-          },
-          {
-            "name": "total_deposited",
-            "type": "u64"
-          },
-          {
-            "name": "total_settled",
-            "type": "u64"
-          },
-          {
-            "name": "total_calls_settled",
-            "type": "u64"
-          },
-          {
-            "name": "price_per_call",
-            "type": "u64"
-          },
-          {
-            "name": "max_calls",
-            "type": "u64"
-          },
-          {
-            "name": "created_at",
-            "type": "i64"
-          },
-          {
-            "name": "last_settled_at",
-            "type": "i64"
-          },
-          {
-            "name": "expires_at",
-            "type": "i64"
-          },
-          {
-            "name": "volume_curve",
-            "docs": [
-              "Tiered pricing curve (max 5 breakpoints). Spans tier boundaries."
-            ],
-            "type": {
-              "vec": {
-                "defined": {
-                  "name": "VolumeCurveBreakpoint"
-                }
-              }
-            }
-          },
-          {
-            "name": "token_mint",
-            "docs": [
-              "None = SOL, Some = SPL token."
-            ],
-            "type": {
-              "option": "pubkey"
-            }
-          },
-          {
-            "name": "token_decimals",
-            "docs": [
-              "Token decimals (9=SOL, 6=USDC). Informational."
-            ],
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
       "name": "EscrowAccountV2",
       "type": {
         "kind": "struct",
@@ -11703,6 +12972,27 @@
           },
           {
             "name": "receipt_batch_count",
+            "type": "u32"
+          },
+          {
+            "name": "dispute_bond_total",
+            "docs": [
+              "Cumulative dispute bonds held in escrow (orphan protection)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "max_obligation",
+            "docs": [
+              "Maximum balance allowed (set at creation time based on stake coverage)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "pending_settlement_count",
+            "docs": [
+              "Number of non-finalized PendingSettlement PDAs for this escrow."
+            ],
             "type": "u32"
           }
         ]
@@ -12305,6 +13595,192 @@
       }
     },
     {
+      "name": "MemoryBuffer",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "session",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "page_index",
+            "type": "u32"
+          },
+          {
+            "name": "num_entries",
+            "type": "u16"
+          },
+          {
+            "name": "total_size",
+            "type": "u16"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MemoryChunk",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "memory_entry",
+            "type": "pubkey"
+          },
+          {
+            "name": "chunk_index",
+            "type": "u8"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MemoryDigest",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "session",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "num_entries",
+            "type": "u32"
+          },
+          {
+            "name": "merkle_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "latest_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "total_data_size",
+            "type": "u64"
+          },
+          {
+            "name": "storage_ref",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "storage_type",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MemoryEntry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "entry_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "content_type",
+            "type": "string"
+          },
+          {
+            "name": "ipfs_cid",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "total_chunks",
+            "type": "u8"
+          },
+          {
+            "name": "total_size",
+            "type": "u32"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "MemoryInscribedEvent",
       "docs": [
         "AES-256-GCM ciphertext inscription. Permanent TX log, zero rent.",
@@ -12436,6 +13912,35 @@
           {
             "name": "ring",
             "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MemoryStoredEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "entry_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "content_type",
+            "type": "string"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }
@@ -12650,6 +14155,72 @@
           {
             "name": "pda",
             "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PluginRegisteredEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "plugin_type",
+            "type": "u8"
+          },
+          {
+            "name": "plugin_pda",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PluginSlot",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "plugin_type",
+            "type": {
+              "defined": {
+                "name": "PluginType"
+              }
+            }
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          },
+          {
+            "name": "initialized_at",
+            "type": "i64"
+          },
+          {
+            "name": "last_updated",
+            "type": "i64"
+          },
+          {
+            "name": "data_account",
+            "type": {
+              "option": "pubkey"
+            }
           }
         ]
       }
@@ -13313,36 +14884,6 @@
       }
     },
     {
-      "name": "Settlement",
-      "docs": [
-        "Individual settlement entry for batch."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "calls_to_settle",
-            "docs": [
-              "Calls to bill"
-            ],
-            "type": "u64"
-          },
-          {
-            "name": "service_hash",
-            "docs": [
-              "sha256 proof of service"
-            ],
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
       "name": "SettlementFinalizedEvent",
       "docs": [
         "Pending settlement finalized (auto-released after dispute window)."
@@ -13618,6 +15159,42 @@
           {
             "name": "compensated_to",
             "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StorageRefUpdatedEvent",
+      "docs": [
+        "Offchain storage pointer updated."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "session",
+            "type": "pubkey"
+          },
+          {
+            "name": "digest",
+            "type": "pubkey"
+          },
+          {
+            "name": "storage_ref",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "storage_type",
+            "type": "u8"
           },
           {
             "name": "timestamp",
