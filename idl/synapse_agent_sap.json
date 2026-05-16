@@ -7057,34 +7057,6 @@
           }
         },
         {
-          "name": "pricing_menu",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  112,
-                  114,
-                  105,
-                  99,
-                  105,
-                  110,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "agent"
-              }
-            ]
-          }
-        },
-        {
           "name": "global_registry",
           "writable": true,
           "pda": {
@@ -7108,8 +7080,7 @@
           }
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
