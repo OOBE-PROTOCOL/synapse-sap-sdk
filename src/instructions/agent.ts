@@ -57,15 +57,14 @@ export class AgentModule {
       .instruction();
   }
 
-  /** register_agent (6 accounts, 8 args) */
-  async registerAgent(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; agentStats: PublicKey; pricingMenu: PublicKey; globalRegistry: PublicKey; name: string; description: string; capabilities: Capability[]; pricing: PricingTier[]; protocols: string[]; agentId: (string | null); agentUri: (string | null); x402Endpoint: (string | null); remainingAccounts?: any[] }): Promise<TransactionInstruction> {
+  /** register_agent (5 accounts, 8 args) */
+  async registerAgent(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; agentStats: PublicKey; globalRegistry: PublicKey; name: string; description: string; capabilities: Capability[]; pricing: PricingTier[]; protocols: string[]; agentId: (string | null); agentUri: (string | null); x402Endpoint: (string | null); remainingAccounts?: any[] }): Promise<TransactionInstruction> {
     return this.program
       .methods.registerAgent(ctx.name, ctx.description, ctx.capabilities, ctx.pricing, ctx.protocols, ctx.agentId, ctx.agentUri, ctx.x402Endpoint)
       .accounts({
         wallet: ctx.wallet,
         agent: ctx.agent,
         agentStats: ctx.agentStats,
-        pricingMenu: ctx.pricingMenu,
         globalRegistry: ctx.globalRegistry,
         systemProgram: SystemProgram.programId,
       })
