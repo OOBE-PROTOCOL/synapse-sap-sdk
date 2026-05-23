@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] — 2026-05-23 — Revenue Fees + Treasury Integration
+
+### Added
+- **Revenue Fee Collection**: 4 fee streams auto-collected to treasury wallet `J7PyZAGKvprCz4SQ5DKBLAHstJxgVqZcz6kguUoWpP7P`
+  - `register_agent`: 0.1 SOL registration fee
+  - `close_agent`: 0.05 SOL closure fee
+  - `settle_calls_v2`: 0.5% (50 bps) settlement fee
+  - `add_to_index_page`: 1 SOL featured listing fee
+- **Treasury Integration**: Fees transferred via `remaining_accounts[0]` validation in program
+- **Feature Flag Control**: `legacy-memory` feature disabled by default for production builds
+- **Build Optimization**: Clean build support with `anchor clean && anchor build`
+
+### Changed
+- **Instruction Count**: 85 instructions (legacy memory instructions gated behind feature flag)
+- **Build Size**: Optimized to 1.2MB binary
+- **IDL Size**: 268KB with full instruction metadata
+- **Treasury Pattern**: Program receives treasury via `remaining_accounts`, SDK auto-includes constant
+
+### Security
+- **Fee Validation**: Treasury wallet validated in all fee-collecting instructions
+- **Lamport Math**: Exact fee calculation with overflow protection
+- **Separation of Concerns**: Program (flexible) + SDK (convenient) treasury handling
+
+### Technical Details
+- **Binary**: `target/deploy/synapse_agent_sap.so` — 1.2MB
+- **IDL**: `target/idl/synapse_agent_sap.json` — 268KB, version 0.18.0
+- **Program ID**: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`
+- **Devnet Upgrade**: Signature `3W2zg6zFj1CNK1Do6HN1pW3eTwnomGLk3hhk8smXpVF2Go8T9EvW8FKHz4eEqNRcxqAHdSCzxj3uMgWPrK7gveLC`
+
+### Deprecated
+- Legacy memory instructions (`create_buffer`, `init_digest`, `store_memory`, `register_plugin`) now require `legacy-memory` feature flag
+
 ## [0.15.1] — 2026-05-09 — IDL Path Fix
 
 ### Fixed
