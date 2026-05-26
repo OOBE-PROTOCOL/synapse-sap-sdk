@@ -17,10 +17,10 @@ export function getAgentPDA(wallet: PublicKey): [PublicKey, number] {
   );
 }
 
-/** Derive AgentStats PDA from wallet pubkey */
-export function getAgentStatsPDA(wallet: PublicKey): [PublicKey, number] {
+/** Derive AgentStats PDA from agent PDA (not wallet) */
+export function getAgentStatsPDA(agent: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from(SEEDS.AGENT_STATS), wallet.toBuffer()],
+    [Buffer.from(SEEDS.AGENT_STATS), agent.toBuffer()],
     PROGRAM_PUBLIC_KEY
   );
 }

@@ -7,6 +7,111 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.18.1] — 2026-05-25 — Bugfix Release (SDK sync, ESM builds)
+
+### Fixed
+- **SDK Dependency** — Updated to `@oobe-protocol-labs/synapse-sap-sdk@0.18.1` with critical bug fixes:
+  - `getAgentStatsPDA()` now correctly derives from agent PDA (not wallet)
+  - `sendTransaction()` fixed for `VersionedTransaction` compatibility
+  - ESM builds now work without `createRequire` workaround
+- **ESM Compatibility** — Removed `createRequire` workaround in banner.ts (now handled by SDK)
+
+### Changed
+- Version bump: 0.18.0-rc.0 → 0.18.1
+- SDK dependency: `^0.18.0` → `^0.18.1`
+
+### Migration Notes
+- No breaking changes in CLI itself
+- SDK fixes are transparent to CLI users
+- All existing commands work without modification
+
+## [0.18.0-rc.0] — 2026-05-23 — CLI PRO: Revenue Edition
+
+### 🎉 Major Release — Professional CLI with Revenue Features
+
+First production-ready CLI with complete revenue model integration, professional UI components, and advanced analytics.
+
+### Added
+
+#### Revenue Features
+- **Treasury Integration** — Auto-collection of protocol fees to `J7PyZAGKvprCz4SQ5DKBLAHstJxgVqZcz6kguUoWpP7P`
+- **Fee Transparency** — All fee amounts displayed in help text and command output
+- **Revenue Analytics** — New `analytics` command group for treasury tracking
+  - `synapse-sap analytics revenue` — Revenue breakdown by fee type
+  - `synapse-sap analytics treasury --watch` — Real-time treasury monitoring
+
+#### Professional UI Components
+- **ASCII Banner** — Custom "SAP-CLIENT" banner with violet (#9333EA) and aqua (#06B6D4) colors
+- **Animated Banners** — Rainbow, ocean, fire, matrix, sunset color schemes
+- **Loading Animations** — Typewriter effects, progress bars, spinners
+- **Status Messages** — Color-coded success, error, warning, info, tip messages
+- **Fee Display Tables** — Formatted revenue breakdown tables
+- **Transaction Animations** — Multi-stage transaction confirmation feedback
+
+#### Command Groups (11 groups, 50+ subcommands)
+
+- **`analytics`** (NEW) — `revenue`, `treasury`
+  Real-time revenue tracking and treasury wallet monitoring
+  
+- **`agent`** — Enhanced with revenue fees
+  - `register` — Now displays 0.1 SOL fee
+  - `close` — Now displays 0.05 SOL fee
+  - All commands show treasury wallet
+
+- **`escrow`** — Enhanced with settlement fees
+  - `settle` — Now displays 0.5% fee
+  - Fee calculation in output
+
+- **`merchant`** — Enhanced with revenue features
+  - `register` — Fee display
+  - `settle` — Fee calculation
+  - Treasury integration
+
+- **`indexing`** — Featured listings
+  - `feature` — 1 SOL fee display
+
+- **`memory`** — On-chain memory systems
+- **`skills`** — AI agent skills orchestration
+- **`plugin`** — SynapseAgentKit plugins (110 tools)
+- **`doctor`** — Enhanced diagnostics
+- **`env`** — Environment management
+- **`config`** — Configuration management
+- **`x402`** — Payment flows
+
+#### SDK Integration
+- **@oobe-protocol-labs/synapse-sap-sdk ^0.18.0** — Revenue edition
+- **TREASURY_WALLET constant** — Auto-included in all fee-collecting methods
+- **Auto treasury inclusion** — No code changes required for developers
+
+### Changed
+
+- **Version bump** — 0.6.0 → 0.18.0 (aligned with SDK)
+- **SDK dependency** — ^0.6.0 → ^0.18.0
+- **Help text** — Enhanced with revenue fees and treasury info
+- **Command output** — Now includes fee amounts and treasury wallet
+- **UI/UX** — Professional color scheme and animations
+
+### Technical Details
+
+- **Package size**: 44.8 kB (compressed) / 221.3 kB (uncompressed)
+- **Total files**: 64
+- **Published**: npm (prerelease tag)
+- **Build**: TypeScript strict mode, ESM + CJS dual format
+
+### Migration Notes
+
+- **No breaking changes** — All existing commands continue to work
+- **Fee transparency** — Fees are now displayed in output (auto-collected)
+- **Treasury wallet** — Visible in all relevant commands
+- **Analytics** — New command group for revenue tracking
+
+### Known Issues
+
+- Analytics revenue breakdown uses simplified estimation (will be enhanced with Geyser streaming in next release)
+- Treasury watch mode requires manual Ctrl+C to stop
+
+---
+
 ## [0.6.0] — 2026-03-28
 
 ### 🎉 Initial Public Release

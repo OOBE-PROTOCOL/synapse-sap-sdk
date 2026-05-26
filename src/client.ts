@@ -106,7 +106,10 @@ export class SapClient {
     tx: VersionedTransaction, signers: Signer[],
     opts?: { commitment?: Commitment; maxRetries?: number }
   ): Promise<string> {
-    return await this.connection.sendTransaction(tx as any, signers, {
+    // Sign transaction first
+    tx.sign(signers);
+    // Then send without signers (web3 expects serialized tx)
+    return await this.connection.sendTransaction(tx, {
       preflightCommitment: opts?.commitment ?? "confirmed",
       maxRetries: opts?.maxRetries ?? 3,
     });
