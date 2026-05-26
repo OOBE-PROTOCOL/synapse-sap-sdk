@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.18.1] — 2026-05-26 — Critical Bugfixes
+## [0.18.1] — 2026-05-26 — Critical Bugfixes + IDL Sync
 
 ### Fixed
 - **`getAgentStatsPDA()` signature**: Changed parameter from `wallet: PublicKey` to `agent: PublicKey` to match on-chain seed derivation `["sap_stats", agent]`. This was causing PDA derivation mismatches when the SDK derived stats PDA from wallet instead of agent PDA.
@@ -18,16 +18,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Fix**: Now signs transaction first (`tx.sign(signers)`), then sends without signers parameter
   - **Workaround removed**: No need to manually call `sendRawTransaction(tx.serialize())` anymore
 
+- **IDL Sync v0.18.0**: Replaced `src/idl.json` with canonical IDL from `target/idl/synapse_agent_sap.json` (v0.18.0 mainnet). This fixes the `registerAgent` account count mismatch:
+  - **Before**: IDL v0.25.0 with 6 accounts (incorrect, includes `pricing_menu`)
+  - **After**: IDL v0.18.0 with 5 accounts (correct: `wallet`, `agent`, `agent_stats`, `global_registry`, `system_program`)
+  - **Impact**: `registerAgent` now works against mainnet program without errors
+  - **Thanks to**: Covenant team for identifying the account mismatch
+
 - **ESM directory imports**: Added explicit `.js` extensions in package.json exports to support native Node ESM without `ERR_UNSUPPORTED_DIR_IMPORT` errors.
   - **Workaround removed**: No need to use `createRequire()` for CJS fallback anymore
 
 ### Changed
 - **Version bump**: 0.18.0 → 0.18.1 (patch release, backward-compatible except getAgentStatsPDA signature)
+- **IDL version**: v0.25.0 → v0.18.0 (synced with mainnet deployment)
 
 ### Technical Details
 - **Breaking Change**: `getAgentStatsPDA()` signature change is technically breaking, but fixes incorrect behavior
 - **All other changes**: Fully backward-compatible, no migration needed
 - **Build**: Dual-format (ESM + CJS) with explicit `.js` extensions
+- **IDL**: `src/idl.json` now mirrors `target/idl/synapse_agent_sap.json` (v0.18.0, 85 instructions)
 
 ## [0.18.0] — 2026-05-23 — Revenue Fees + Treasury Integration
 
