@@ -7,24 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.18.1] — 2026-05-25 — Bugfix Release (SDK sync, ESM builds)
-
-### Fixed
-- **SDK Dependency** — Updated to `@oobe-protocol-labs/synapse-sap-sdk@0.18.1` with critical bug fixes:
-  - `getAgentStatsPDA()` now correctly derives from agent PDA (not wallet)
-  - `sendTransaction()` fixed for `VersionedTransaction` compatibility
-  - ESM builds now work without `createRequire` workaround
-- **ESM Compatibility** — Removed `createRequire` workaround in banner.ts (now handled by SDK)
-
-### Changed
-- Version bump: 0.18.0-rc.0 → 0.18.1
-- SDK dependency: `^0.18.0` → `^0.18.1`
-
-### Migration Notes
-- No breaking changes in CLI itself
-- SDK fixes are transparent to CLI users
-- All existing commands work without modification
-
 ## [0.18.0-rc.0] — 2026-05-23 — CLI PRO: Revenue Edition
 
 ### 🎉 Major Release — Professional CLI with Revenue Features
