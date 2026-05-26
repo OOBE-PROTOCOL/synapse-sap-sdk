@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] — 2026-05-26 — IDL Sync v0.18.0 + Critical Bugfixes
+
+**CRITICAL RELEASE** — Syncs SDK with mainnet program v0.18.0, fixes PDA derivation, transaction signing, and ESM imports.
+
+### Fixed
+- **IDL Sync v0.18.0**: Replaced `src/idl.json` (v0.25.0, 6 accounts) with canonical `target/idl/synapse_agent_sap.json` (v0.18.0, 5 accounts). This resolves the `registerAgent` account mismatch:
+  - **Before**: `wallet`, `agent`, `agent_stats`, `pricing_menu`, `global_registry`, `system_program` ❌
+  - **After**: `wallet`, `agent`, `agent_stats`, `global_registry`, `system_program` ✅
+  - **Impact**: `registerAgent` now works against mainnet program without errors
+  - **IDL version**: v0.25.0 → v0.18.0 (85 instructions, 268KB)
+
+- **`getAgentStatsPDA()` signature**: Changed parameter from `wallet: PublicKey` to `agent: PublicKey` to match on-chain seed derivation `["sap_stats", agent]`.
+  - **Migration**: Update all calls from `getAgentStatsPDA(wallet)` to `getAgentStatsPDA(getAgentPDA(wallet)[0])`
+  - **Thanks to**: Covenant team for reporting and reproduction steps
+
+- **`sendTransaction()` for VersionedTransaction**: Fixed incorrect handling of signers parameter.
+  - **Fix**: Now signs transaction first (`tx.sign(signers)`), then sends without signers parameter
+  - **Workaround removed**: No need to manually call `sendRawTransaction(tx.serialize())` anymore
+
+- **ESM directory imports**: Added explicit `.js` extensions in package.json exports to support native Node ESM.
+  - **Workaround removed**: No need to use `createRequire()` for CJS fallback anymore
+
+### Changed
+- **Version bump**: 0.18.1 → 0.19.0 (minor release, includes IDL sync + bugfixes)
+- **IDL version**: v0.25.0 → v0.18.0 (synced with mainnet deployment)
+- **Build size**: Optimized TypeScript output
+
+### Technical Details
+- **Breaking Change**: `getAgentStatsPDA()` signature change is technically breaking, but fixes incorrect behavior
+- **IDL Sync**: `src/idl.json` now mirrors `target/idl/synapse_agent_sap.json` (v0.18.0 mainnet)
+- **All other changes**: Fully backward-compatible, no migration needed
+- **Build**: Dual-format (ESM + CJS) with explicit `.js` extensions
+
+### Thanks
+- **Covenant team** for detailed bug reports and reproduction steps
+
 ## [0.18.1] — 2026-05-26 — Critical Bugfixes + IDL Sync
 
 ### Fixed
