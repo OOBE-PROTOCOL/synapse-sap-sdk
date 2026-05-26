@@ -1,0 +1,62 @@
+/**
+ * Treasury Wallet Configuration
+ * 
+ * Protocol treasury wallet for revenue fee collection.
+ * This wallet receives all protocol fees from:
+ * - Agent registration (0.1 SOL)
+ * - Agent close (0.05 SOL)
+ * - Escrow settlement (0.5%)
+ * - Featured listings (1 SOL)
+ * 
+ * @category Constants
+ * @since v0.18.0
+ */
+
+import { PublicKey } from "@solana/web3.js";
+
+/**
+ * Treasury wallet public key
+ * 
+ * This is the canonical treasury wallet that receives all protocol fees.
+ * Fees are optional - if treasury account is not passed, no fees are collected.
+ * 
+ * @example
+ * ```ts
+ * import { TREASURY_WALLET } from "@synapse-sap/sdk/constants";
+ * console.log("Treasury:", TREASURY_WALLET.toString());
+ * ```
+ */
+export const TREASURY_WALLET = new PublicKey("J7PyZAGKvprCz4SQ5DKBLAHstJxgVqZcz6kguUoWpP7P");
+
+/**
+ * Get treasury wallet for current network
+ * 
+ * @returns Treasury wallet PublicKey
+ * 
+ * @example
+ * ```ts
+ * import { getTreasuryWallet } from "@synapse-sap/sdk/constants";
+ * const treasury = getTreasuryWallet();
+ * ```
+ */
+export function getTreasuryWallet(): PublicKey {
+  return TREASURY_WALLET;
+}
+
+/**
+ * Check if provided pubkey is the treasury wallet
+ * 
+ * @param pubkey - PublicKey to check
+ * @returns true if matches treasury wallet
+ * 
+ * @example
+ * ```ts
+ * import { isTreasuryWallet } from "@synapse-sap/sdk/constants";
+ * if (isTreasuryWallet(somePubkey)) {
+ *   console.log("This is the treasury wallet!");
+ * }
+ * ```
+ */
+export function isTreasuryWallet(pubkey: PublicKey): boolean {
+  return pubkey.equals(TREASURY_WALLET);
+}

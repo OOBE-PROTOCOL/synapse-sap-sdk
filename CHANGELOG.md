@@ -7,44 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.18.1] — 2026-05-25 — Bugfix Release (PDA derivation, ESM builds, sendTransaction)
+## [0.18.1] — 2026-05-26 — Critical Bugfixes
 
 ### Fixed
-- **`getAgentStatsPDA()`** — Changed parameter from `wallet: PublicKey` to `agent: PublicKey` to match on-chain seed `["sap_stats", agent]`. Previously derived incorrect PDA when passing wallet instead of agent PDA.
-  ```typescript
-  // Before (incorrect)
-  const [statsPda] = getAgentStatsPDA(wallet);
-  
-  // After (correct)
-  const [agentPda] = getAgentPDA(wallet);
-  const [statsPda] = getAgentStatsPDA(agentPda);
-  ```
+- **`getAgentStatsPDA()` signature**: Changed parameter from `wallet: PublicKey` to `agent: PublicKey` to match on-chain seed derivation `["sap_stats", agent]`. This was causing PDA derivation mismatches when the SDK derived stats PDA from wallet instead of agent PDA.
+  - **Migration**: Update all calls from `getAgentStatsPDA(wallet)` to `getAgentStatsPDA(getAgentPDA(wallet)[0])`
+  - **Thanks to**: Covenant team for reporting and reproduction steps
 
-- **`SapClient.sendTransaction()`** — Fixed `Invalid arguments` error with `VersionedTransaction`. Now signs transaction first, then sends without passing signers to web3 (which rejects them for versioned txs).
-  ```typescript
-  // Fixed implementation
-  async sendTransaction(tx: VersionedTransaction, signers: Signer[], opts?: SendOptions) {
-    tx.sign(signers); // Sign first
-    return await this.connection.sendTransaction(tx, opts); // Send without signers
-  }
-  ```
+- **`sendTransaction()` for VersionedTransaction**: Fixed incorrect handling of signers parameter. The previous implementation forwarded signers to web3.js's `sendTransaction` as options, which throws `Invalid arguments` error for VersionedTransaction.
+  - **Fix**: Now signs transaction first (`tx.sign(signers)`), then sends without signers parameter
+  - **Workaround removed**: No need to manually call `sendRawTransaction(tx.serialize())` anymore
 
-- **ESM Directory Imports** — Added explicit `.js` extensions in barrel exports to fix Node ESM `ERR_UNSUPPORTED_DIR_IMPORT` errors. Users can now use native ESM without `createRequire` workaround.
+- **ESM directory imports**: Added explicit `.js` extensions in package.json exports to support native Node ESM without `ERR_UNSUPPORTED_DIR_IMPORT` errors.
+  - **Workaround removed**: No need to use `createRequire()` for CJS fallback anymore
 
 ### Changed
-- Version bump: 0.18.0 → 0.18.1
-- All usages of `getAgentStatsPDA(wallet)` updated to `getAgentStatsPDA(agentPda)`
+- **Version bump**: 0.18.0 → 0.18.1 (patch release, backward-compatible except getAgentStatsPDA signature)
 
-### Migration Notes
-- **Breaking:** `getAgentStatsPDA()` signature changed
-  - Old: `getAgentStatsPDA(wallet: PublicKey)`
-  - New: `getAgentStatsPDA(agent: PublicKey)`
-  - Fix: Pass agent PDA instead of wallet: `getAgentStatsPDA(getAgentPDA(wallet)[0])`
-- **Non-breaking:** `sendTransaction()` fix is transparent to users
-- **ESM builds:** Now compatible with native Node ESM (`--experimental-specifier-resolution=node` no longer needed)
-
-### Thanks
-- Special thanks to Covenant team for reporting these issues and providing detailed reproduction steps!
+### Technical Details
+- **Breaking Change**: `getAgentStatsPDA()` signature change is technically breaking, but fixes incorrect behavior
+- **All other changes**: Fully backward-compatible, no migration needed
+- **Build**: Dual-format (ESM + CJS) with explicit `.js` extensions
 
 ## [0.18.0] — 2026-05-23 — Revenue Fees + Treasury Integration
 
