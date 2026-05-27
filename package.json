@@ -1,7 +1,7 @@
 {
   "name": "@oobe-protocol-labs/synapse-sap-sdk",
-  "version": "0.19.0",
-  "description": "Synapse Agent Protocol (SAP) SDK for Solana — v0.19.0 IDL sync + critical bugfixes",
+  "version": "0.19.1",
+  "description": "Synapse Agent Protocol (SAP) SDK for Solana — v0.19.1 critical hotfix",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
