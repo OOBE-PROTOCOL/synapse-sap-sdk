@@ -14,10 +14,7 @@ import {
   EscrowModule, GlobalModule, IndexingModule, MiscModule,
   SessionModule, StakingModule, SubscriptionModule, ToolsModule, VaultModule,
 } from "./instructions";
-
-// Use require.resolve() for Next.js static export compatibility
-const idlPath = require.resolve("./idl/synapse_agent_sap.json");
-const idlJson = require(idlPath);
+import idlJson from "./idl/synapse_agent_sap.json";
 
 export interface SapClientOpts {
   connection?: Connection;
