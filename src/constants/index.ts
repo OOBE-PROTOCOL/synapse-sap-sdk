@@ -30,6 +30,9 @@ export {
   SAP_PROGRAM_ID,
 } from "./programs";
 
+// ── Legacy Program ID (backward compatibility) ─────────
+export { PROGRAM_ID, ENDPOINTS } from "../constants";
+
 // ── PDA Seeds ────────────────────────────────────────
 export { SEEDS } from "./seeds";
 export type { SeedKey } from "./seeds";
@@ -42,6 +45,9 @@ export {
   TOOL_CATEGORY_VALUES,
   HTTP_METHOD_VALUES,
 } from "./limits";
+
+// ── Legacy Limits (backward compatibility) ─────────
+export { MAX_VOLUME_CURVE_POINTS } from "../constants";
 
 // ── Legacy Constants (backward compatibility) ─────────
 export {

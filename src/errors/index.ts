@@ -344,3 +344,7 @@ export class SapPermissionError extends SapError {
     this.name = "SapPermissionError";
   }
 }
+
+
+// ── Legacy Error Code Enum (backward compatibility) ────
+export { SapErrorCode } from '../errors';
