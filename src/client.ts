@@ -15,8 +15,9 @@ import {
   SessionModule, StakingModule, SubscriptionModule, ToolsModule, VaultModule,
 } from "./instructions";
 
-// @ts-ignore — JSON resolution handled by bundler
-const idlJson = require("./idl/synapse_agent_sap.json");
+// Use require.resolve() for Next.js static export compatibility
+const idlPath = require.resolve("./idl/synapse_agent_sap.json");
+const idlJson = require(idlPath);
 
 export interface SapClientOpts {
   connection?: Connection;
