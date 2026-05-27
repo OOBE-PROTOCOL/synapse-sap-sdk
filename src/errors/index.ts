@@ -348,3 +348,6 @@ export class SapPermissionError extends SapError {
 
 // ── Legacy Error Code Enum (backward compatibility) ────
 export { SapErrorCode } from '../errors';
+
+// ── Legacy Error Utilities (backward compatibility) ────
+export { decodeSapError, isRetryableError, isClientValidationFailure } from '../errors';
