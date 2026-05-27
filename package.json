@@ -48,6 +48,7 @@
     }
   },
   "sideEffects": false,
+  "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json",
     "postbuild": "node scripts/fix-esm-imports.js",
