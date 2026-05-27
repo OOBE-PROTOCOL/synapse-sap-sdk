@@ -1,10 +1,56 @@
 {
   "name": "@oobe-protocol-labs/synapse-sap-sdk",
-  "version": "0.19.4",
-  "description": "Synapse Agent Protocol (SAP) SDK for Solana — v0.19.4 complete exports hotfix",
+  "version": "0.19.5",
+  "description": "Synapse Agent Protocol (SAP) SDK for Solana — v0.19.5 Next.js + Node.js dual-format",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
-  "types": "dist/esm/index.d.ts",
+  "types": "dist/cjs/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/cjs/index.d.ts",
+      "require": "./dist/cjs/index.js",
+      "import": "./dist/esm/index.js"
+    },
+    "./types": {
+      "types": "./dist/cjs/types.d.ts",
+      "require": "./dist/cjs/types.js",
+      "import": "./dist/esm/types.js"
+    },
+    "./pdas": {
+      "types": "./dist/cjs/pdas/index.d.ts",
+      "require": "./dist/cjs/pdas/index.js",
+      "import": "./dist/esm/pdas/index.js"
+    },
+    "./instructions": {
+      "types": "./dist/cjs/instructions/index.d.ts",
+      "require": "./dist/cjs/instructions/index.js",
+      "import": "./dist/esm/instructions/index.js"
+    },
+    "./accounts": {
+      "types": "./dist/cjs/accounts/index.d.ts",
+      "require": "./dist/cjs/accounts/index.js",
+      "import": "./dist/esm/accounts/index.js"
+    },
+    "./events": {
+      "types": "./dist/cjs/events/index.d.ts",
+      "require": "./dist/cjs/events/index.js",
+      "import": "./dist/esm/events/index.js"
+    },
+    "./utils": {
+      "types": "./dist/cjs/utils/index.d.ts",
+      "require": "./dist/cjs/utils/index.js",
+      "import": "./dist/esm/utils/index.js"
+    },
+    "./errors": {
+      "types": "./dist/cjs/errors/index.d.ts",
+      "require": "./dist/cjs/errors/index.js",
+      "import": "./dist/esm/errors/index.js"
+    },
+    "./constants": {
+      "types": "./dist/cjs/constants/index.d.ts",
+      "import": "./dist/esm/constants/index.js"
+    }
+  },
   "files": [
     "dist",
     "README.md",
