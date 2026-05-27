@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.1] — 2026-05-27 — CRITICAL HOTFIX (IDL + ESM)
+
+**HOTFIX RELEASE** — Fixes critical issues in v0.19.0 published artifact.
+
+### Fixed
+- **IDL in dist/esm/idl/**: Synced `src/idl/synapse_agent_sap.json` with `target/idl/synapse_agent_sap.json` (v0.18.0). The v0.19.0 build incorrectly bundled IDL v0.25.0 in the dist directory, causing `registerAgent` to build 6 accounts instead of 5.
+  - **Before (v0.19.0)**: 6 accounts (wallet, agent, agent_stats, pricing_menu, global_registry, system_program) ❌
+  - **After (v0.19.1)**: 5 accounts (wallet, agent, agent_stats, global_registry, system_program) ✅
+  - **Root cause**: TypeScript copied `src/idl/` to `dist/esm/idl/` during build, but we had only fixed `src/idl.json`
+
+- **idlTypes ESM import**: Fixed post-build script to exclude `idlTypes` (it's a file, not a directory).
+  - **Before (v0.19.0)**: `export * from './idlTypes/index.js'` → ERR_MODULE_NOT_FOUND ❌
+  - **After (v0.19.1)**: `export * from './idlTypes.js'` → Works correctly ✅
+  - **Root cause**: Script blindly replaced all imports, but `idlTypes.ts` is a file, not a directory
+
+### Changed
+- **Post-build script**: Excludes `idlTypes` from directory import fix (only fixes actual directories)
+- **Version bump**: 0.19.0 → 0.19.1 (patch release, critical hotfix)
+
+### Documentation
+- **Ledger module**: Clarified that `client.ledger` wrapper doesn't exist yet — use raw program methods:
+  ```typescript
+  // Correct usage (no high-level wrapper yet)
+  await client.program.methods
+    .initLedger()
+    .accounts({ agent, owner: signer.publicKey })
+    .signers([signer])
+    .rpc();
+  ```
+
+### Thanks
+- **Covenant team** for catching these critical issues in the v0.19.0 published artifact
+
 ## [0.19.0] — 2026-05-26 — IDL Sync v0.18.0 + Critical Bugfixes
 
 **CRITICAL RELEASE** — Syncs SDK with mainnet program v0.18.0, fixes PDA derivation, transaction signing, and ESM imports.
