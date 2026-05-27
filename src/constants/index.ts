@@ -42,6 +42,18 @@ export {
   TOOL_CATEGORY_VALUES,
   HTTP_METHOD_VALUES,
 } from "./limits";
+
+// ── Legacy Constants (backward compatibility) ─────────
+export {
+  MAX_CALLS_PER_SETTLEMENT,
+  MAX_RECEIPTS_PER_PROOF,
+  MAX_MERKLE_DEPTH,
+  MAX_SUBSCRIPTION_DURATION_YEARS,
+  MIN_STAKE_LAMPORTS,
+  COMPLETE_UNSTAKE_DELAY_DAYS,
+  STAKE_COVERAGE_BPS,
+} from "../constants";
+
 // ── Network Identifiers (x402) ───────────────────────────────
 export { SapNetwork } from "./network";
 export type { SapNetworkId } from "./network";
