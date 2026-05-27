@@ -1,7 +1,7 @@
 {
   "name": "@oobe-protocol-labs/synapse-sap-sdk",
-  "version": "0.19.5",
-  "description": "Synapse Agent Protocol (SAP) SDK for Solana — v0.19.5 Next.js + Node.js dual-format",
+  "version": "0.19.6",
+  "description": "Synapse Agent Protocol (SAP) SDK for Solana — v0.19.6 Next.js + Node.js dual-format (FINAL)",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "types": "dist/cjs/index.d.ts",
