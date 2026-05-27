@@ -30,8 +30,31 @@ export {
   SAP_PROGRAM_ID,
 } from "./programs";
 
-// ── Legacy Program ID (backward compatibility) ─────────
-export { PROGRAM_ID, ENDPOINTS } from "../constants";
+// ── Legacy Constants (backward compatibility) ─────────
+// Export EVERYTHING from legacy constants.ts
+export {
+  PROGRAM_ID,
+  ENDPOINTS,
+  DISCRIMINATOR_SIZE,
+  PUBKEY_SIZE,
+  U8_SIZE,
+  U16_SIZE,
+  U32_SIZE,
+  U64_SIZE,
+  U128_SIZE,
+  I64_SIZE,
+  BOOL_SIZE,
+  OPTION_SIZE,
+  MAX_CALLS_PER_SETTLEMENT,
+  MAX_VOLUME_CURVE_POINTS,
+  MAX_RECEIPTS_PER_PROOF,
+  MAX_MERKLE_DEPTH,
+  MAX_SUBSCRIPTION_DURATION_YEARS,
+  STAKE_COVERAGE_BPS,
+  MIN_STAKE_LAMPORTS,
+  COMPLETE_UNSTAKE_DELAY_DAYS,
+  DEFAULT_COMMITMENT,
+} from "../constants";
 
 // ── PDA Seeds ────────────────────────────────────────
 export { SEEDS } from "./seeds";
@@ -45,20 +68,6 @@ export {
   TOOL_CATEGORY_VALUES,
   HTTP_METHOD_VALUES,
 } from "./limits";
-
-// ── Legacy Limits (backward compatibility) ─────────
-export { MAX_VOLUME_CURVE_POINTS } from "../constants";
-
-// ── Legacy Constants (backward compatibility) ─────────
-export {
-  MAX_CALLS_PER_SETTLEMENT,
-  MAX_RECEIPTS_PER_PROOF,
-  MAX_MERKLE_DEPTH,
-  MAX_SUBSCRIPTION_DURATION_YEARS,
-  MIN_STAKE_LAMPORTS,
-  COMPLETE_UNSTAKE_DELAY_DAYS,
-  STAKE_COVERAGE_BPS,
-} from "../constants";
 
 // ── Network Identifiers (x402) ───────────────────────────────
 export { SapNetwork } from "./network";
