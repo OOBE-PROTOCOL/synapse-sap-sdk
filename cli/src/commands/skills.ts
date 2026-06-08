@@ -8,7 +8,7 @@ import { Command } from "commander";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { log, output } from "../logger";
+import { log, output } from "../logger.js";
 
 const SKILLS_REPO = "OOBE-PROTOCOL/synapse-sap-sdk";
 const SKILLS_TAG = "v0.15.0-skills";

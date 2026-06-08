@@ -51,7 +51,7 @@ synapse-sap memory inscribe --data "base64-payload" --session 0 --epoch 0
 
 ---
 
-## Command Reference (v0.15.0)
+## Command Reference (v0.20.0)
 
 ### `agent` — Agent Lifecycle
 
@@ -160,7 +160,7 @@ Priority: CLI flags > Env vars > Config file > Defaults
 
 ---
 
-## Architecture (v0.15.0)
+## Architecture (v0.20.0)
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -180,7 +180,7 @@ Priority: CLI flags > Env vars > Config file > Defaults
 │          └── x402.ts      (headers, verify)              │
 │                                                          │
 ├──────────────────────────────────────────────────────────┤
-│  @oobe-protocol-labs/synapse-sap-sdk@0.15.0             │
+│  @oobe-protocol-labs/synapse-sap-sdk@0.20.0             │
 │                                                          │
 │  SapClient · createSapClient() · buildTransaction()      │
 │  AgentModule · EscrowModule · VaultModule · SessionModule│

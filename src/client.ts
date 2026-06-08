@@ -8,13 +8,16 @@ import {
   TransactionInstruction, VersionedTransaction
 } from "@solana/web3.js";
 import { Program, AnchorProvider, Wallet, setProvider, Idl } from "@coral-xyz/anchor";
+import { createRequire } from "node:module";
 import { PROGRAM_ID } from "./constants";
 import {
   AgentModule, AttestationModule, DigestModule, DisputeModule,
   EscrowModule, GlobalModule, IndexingModule, MiscModule,
   SessionModule, StakingModule, SubscriptionModule, ToolsModule, VaultModule,
 } from "./instructions";
-import idlJson from "./idl/synapse_agent_sap.json";
+
+const requireJson = createRequire(`${process.cwd()}/package.json`);
+const idlJson = requireJson("@oobe-protocol-labs/synapse-sap-sdk/idl/synapse_agent_sap.json");
 
 export interface SapClientOpts {
   connection?: Connection;

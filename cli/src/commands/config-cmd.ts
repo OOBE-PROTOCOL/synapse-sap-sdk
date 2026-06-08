@@ -6,8 +6,8 @@
 import { Command } from "commander";
 import * as fs from "fs";
 import * as path from "path";
-import { loadConfig, saveConfig, type CliConfig } from "../config";
-import { log, output } from "../logger";
+import { loadConfig, saveConfig, type CliConfig } from "../config.js";
+import { log, output } from "../logger.js";
 
 const EDITABLE_KEYS = [
   "rpcUrl",

@@ -94,3 +94,10 @@ export {
   isAcceptedUsdcMint,
   isAcceptedPaymentToken,
 } from "./payments";
+
+// ── Treasury wallet ──────────────────────────────────────────────
+export {
+  TREASURY_WALLET,
+  getTreasuryWallet,
+  isTreasuryWallet,
+} from "./treasury";

@@ -6,8 +6,8 @@
 import { Command } from "commander";
 import * as fs from "fs";
 import * as path from "path";
-import { loadConfig } from "../config";
-import { log, output, saveTmp } from "../logger";
+import { loadConfig } from "../config.js";
+import { log, output, saveTmp } from "../logger.js";
 
 interface CheckResult {
   name: string;

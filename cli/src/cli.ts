@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * @module cli
- * @description synapse-sap CLI — v0.15.0 Edition
+ * @description synapse-sap CLI — v0.20.0 Edition
  *
  * Complete toolbox for the Synapse Agent Protocol (SAP v2):
  *   - Agent lifecycle management
@@ -11,20 +11,20 @@
  *   - Memory systems (vault, session, inscribe)
  *   - Environment & config management
  *
- * @since v0.15.0
- * @requires @oobe-protocol-labs/synapse-sap-sdk@^0.15.0
+ * @since v0.20.0
+ * @requires @oobe-protocol-labs/synapse-sap-sdk@^0.20.0
  */
 
 import { Command } from "commander";
-import { loadConfig } from "./config";
-import { configureLogger } from "./logger";
+import { loadConfig } from "./config.js";
+import { configureLogger } from "./logger.js";
 
 // ── Command imports ──────────────────────────────────
-import { registerAgentCommands } from "./commands/agent";
-import { registerEscrowCommands } from "./commands/escrow";
-import { registerX402Commands } from "./commands/x402";
-import { registerMerchantCommands } from "./commands/merchant";
-import { registerMemoryCommands } from "./commands/memory";
+import { registerAgentCommands } from "./commands/agent.js";
+import { registerEscrowCommands } from "./commands/escrow.js";
+import { registerX402Commands } from "./commands/x402.js";
+import { registerMerchantCommands } from "./commands/merchant.js";
+import { registerMemoryCommands } from "./commands/memory.js";
 
 // ═══════════════════════════════════════════════════════════════════
 //  Program
@@ -34,8 +34,8 @@ const program = new Command();
 
 program
   .name("synapse-sap")
-  .description("synapse-sap CLI — v0.15.0 Edition\nComplete toolbox for the Synapse Agent Protocol (SAP v2) on Solana")
-  .version("0.15.0")
+  .description("synapse-sap CLI — v0.20.0 Edition\nComplete toolbox for the Synapse Agent Protocol (SAP v2) on Solana")
+  .version("0.20.0")
   .addHelpText("after", `
 Quick Start:
   $ synapse-sap agent register --name "My Agent"
@@ -66,7 +66,7 @@ Documentation:
     configureLogger({ json: opts.json, silent: opts.silent });
   });
 
-import { registerSkillsCommands } from "./commands/skills";
+import { registerSkillsCommands } from "./commands/skills.js";
 
 // ── Register all command groups ──────────────────────
 registerAgentCommands(program);

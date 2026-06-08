@@ -1,17 +1,99 @@
 # x402 Payments
 
-> SAP's native micropayment standard. Pre-fund an escrow, call with HTTP headers, settle on-chain.
+> **SDK Version**: 0.20.0
+> **EscrowV2 Module**: v0.7.0+ (DisputeWindow auto-bundle: v0.13.0)
 
 > **Protocol version guide:**
 > | Feature | Use | Since |
 > |---------|-----|-------|
 > | Escrow creation & settlement | `client.escrowV2` (recommended) | SDK v0.7.0 |
+> | **DisputeWindow auto-bundle** | `client.escrowV2.settle()` (default) | SDK v0.13.0 |
 > | Receipt batch inscription | `client.receipt.inscribeReceiptBatch()` | SDK v0.8.0 |
 > | Dispute resolution | `client.receipt.autoResolveDispute()` | SDK v0.8.0 |
 > | V1 escrow (low-level) | `client.escrow` — **deprecated**, use `client.escrowV2` | SDK v0.1.0 |
 >
 > For the complete payment pipeline see the skill guides:
 > [`skills/client.md §9` (consumer)](./skills/client.md) · [`skills/merchant.md §11` (agent)](./skills/merchant.md)
+
+---
+
+## EscrowV2 Module — v0.13.0 Breaking Changes
+
+### DisputeWindow Auto-Bundle (v0.13.0)
+
+**Breaking Change**: When `settlementSecurity === DisputeWindow`, `client.escrowV2.settle()` now **auto-bundles** `settleCallsV2 + createPendingSettlement` into a single transaction.
+
+**Why**: Pre-v0.13.0, callers had to manually call two instructions in sequence:
+```typescript
+// ❌ OLD (v0.12.x) — ERROR PRONE
+await client.escrowV2.settleCallsV2(...);        // Step 1
+await client.escrowV2.createPendingSettlement(...); // Step 2 (often forgotten!)
+```
+
+If Step 2 was forgotten or failed, it created an **orphan PendingSettlement** with `escrow.pending_amount = 0`, causing `finalizeSettlement()` to abort with `ArithmeticOverflow` (error 6075).
+
+**New Flow** (v0.13.0+):
+```typescript
+// ✅ NEW (v0.13.0+) — SAFE
+await client.escrowV2.settle(agentWallet, nonce, {
+  callsToSettle: 10,
+  serviceHash: hash,
+});
+// Auto-bundles both IX in 1 TX — no foot-guns
+```
+
+**Opt-Out** (advanced users only):
+```typescript
+// Skip auto-bundle for custom receipt-merkle batching
+await client.escrowV2.settle(agentWallet, nonce, {
+  callsToSettle: 10,
+  serviceHash: hash,
+  skipAutoPending: true, // Don't bundle createPendingSettlement
+});
+```
+
+**Opt-In** (inscribe merkle root):
+```typescript
+// Bundle with receipt merkle root inscription
+await client.escrowV2.settle(agentWallet, nonce, {
+  callsToSettle: 10,
+  serviceHash: hash,
+  receiptMerkleRoot: [...], // Inscribed in bundled pending
+});
+```
+
+### nextSettlementIndex Helper (v0.12.8)
+
+**Problem**: Using `escrow.settlementIndex` directly causes `Allocate: account already in use` errors.
+
+**Solution**: Use the helper:
+```typescript
+const index = await client.escrowV2.nextSettlementIndex(
+  agentWallet,
+  depositorWallet,
+  nonce
+);
+
+await client.escrowV2.finalizeSettlement(
+  agentWallet,
+  depositorWallet,
+  nonce,
+  index
+);
+```
+
+### finalizeSettlement Preflight (v0.12.9)
+
+**Safety Check**: Pre-flight validation detects orphan settlements before signing:
+```typescript
+// Throws clear error if pending PDA missing or amount mismatch
+await client.escrowV2.finalizeSettlement(...);
+```
+
+**Error Messages**:
+- `"pending PDA not found"` → Settlement index incorrect, use `nextSettlementIndex()`
+- `"amount exceeds pending"` → Orphan settlement, recovery path required
+- `"already finalized"` → Already completed, nothing to do
 
 ---
 
@@ -25,7 +107,7 @@ x402 turns every agent call into a verifiable financial transaction. No invoices
 └─────┬──────┘                              └─────┬──────┘
       │                                           │
       │  1. Discover pricing (agent.pricing)      │
-      │  ─────────────────────────────────────►    │
+      │  ─────────────────────────────────────►   │
       │                                           │
       │  2. Create escrow + deposit funds         │
       │  ─── createEscrow (on-chain TX) ──────►   │

@@ -1,10 +1,11 @@
 # Architecture
 
+> **SDK Version**: 0.20.0
 > How the SDK is organized, how data flows, and why every piece exists.
 
 ## Overview
 
-The `@synapse-sap-sdk` follows a layered, modular architecture. At the top sits a single entry point  |`SapClient` | which exposes every protocol domain as a lazily-instantiated module or registry. There are no circular dependencies, no hidden singletons, and no ambient state. You hold the client; the client holds everything else.
+The `@oobe-protocol-labs/synapse-sap-sdk@0.20.0` follows a layered, modular architecture. At the top sits a single entry point — `SapClient` — which exposes every protocol domain as a lazily-instantiated module or registry. There are no circular dependencies, no hidden singletons, and no ambient state. You hold the client; the client holds everything else.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -31,8 +32,8 @@ The `@synapse-sap-sdk` follows a layered, modular architecture. At the top sits 
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-**8 modules** handle low-level instruction dispatch.  
-**4 registries** compose modules into ergonomic workflows.  
+**8 modules** handle low-level instruction dispatch.
+**4 registries** compose modules into ergonomic workflows.
 **1 event parser** decodes on-chain logs into typed events.
 
 ---

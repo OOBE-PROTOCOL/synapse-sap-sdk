@@ -1,12 +1,12 @@
 /**
  * @module cli/commands/x402
- * @description x402 operations — v0.15.0 aligned.
+ * @description x402 operations — v0.20.0 aligned.
  */
 import { Command } from "commander";
-import { loadConfig } from "../config";
-import { buildContext, parseWallet } from "../context";
+import { loadConfig } from "../config.js";
+import { buildContext, parseWallet } from "../context.js";
 import { Pdas } from "@oobe-protocol-labs/synapse-sap-sdk";
-import { log, output } from "../logger";
+import { log, output } from "../logger.js";
 
 export function registerX402Commands(program: Command): void {
   const x402 = program.command("x402").description("x402 micropayment operations");

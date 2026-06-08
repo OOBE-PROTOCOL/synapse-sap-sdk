@@ -1,32 +1,37 @@
 // ================================================================
 //  synapse-sap-sdk / src/index.ts
-//  Barrel export — v0.25.0 aligned
+//  Public barrel export
 // ================================================================
 
-export { PROGRAM_ID, SEEDS, ENDPOINTS, MAX_CALLS_PER_SETTLEMENT,
-  MAX_VOLUME_CURVE_POINTS, MAX_RECEIPTS_PER_PROOF,
-  MAX_MERKLE_DEPTH, MAX_SUBSCRIPTION_DURATION_YEARS,
-  STAKE_COVERAGE_BPS, MIN_STAKE_LAMPORTS,
-  COMPLETE_UNSTAKE_DELAY_DAYS
-} from './constants';
+export { SapClient, createSapClient } from "./core/client";
+export type { SapClientOpts } from "./core/client";
+export { SapConnection, KeypairWallet } from "./core/connection";
+export type { SapCluster, SapConnectionConfig, SapWallet } from "./core/connection";
 
-// Re-export IDL-generated types FIRST (single source of truth)
-export * from './idlTypes';
+export * from "./constants";
+export * from "./idlTypes";
+export * from "./errors";
 
-export { SapErrorCode, decodeSapError, isRetryableError, isClientValidationFailure } from './errors';
-
-export { SapClient, createSapClient } from './client';
-export type { SapClientOpts } from './client';
-
-export * as Pdas from './pdas';
-export * as Accounts from './accounts';
-export * as Events from './events';
-export * as Instructions from './instructions';
-export * as Utils from './utils';
+export * as Pdas from "./pdas";
+export * as Pda from "./pda";
+export * as Accounts from "./accounts";
+export * as Events from "./events";
+export * as Instructions from "./instructions";
+export * as Modules from "./modules";
+export * as Registries from "./registries";
+export * as Parser from "./parser";
+export * as Plugin from "./plugin";
+export * as Postgres from "./postgres";
+export * as Utils from "./utils";
 
 export {
-  validateAgentInput, validateEscrowCreate, validateEscrowDeposit,
-  validateEscrowSettle, validateEscrowClose, validateAgentClose,
-  validateSubscriptionCreate, validateReceiptProof,
-  computeEscrowMaxObligation
-} from './utils/validate';
+  validateAgentInput,
+  validateEscrowCreate,
+  validateEscrowDeposit,
+  validateEscrowSettle,
+  validateEscrowClose,
+  validateAgentClose,
+  validateSubscriptionCreate,
+  validateReceiptProof,
+  computeEscrowMaxObligation,
+} from "./utils/validate";

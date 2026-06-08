@@ -1,19 +1,21 @@
 /**
  * @module cli/context
- * @description CLI execution context — v0.15.0 aligned.
+ * @description CLI execution context — v0.20.0 aligned.
  */
 import * as fs from "fs";
 import * as path from "path";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { SapClient, createSapClient, Pdas } from "@oobe-protocol-labs/synapse-sap-sdk";
-import type { CliConfig } from "./config";
-import { log } from "./logger";
+import { SapClient, createSapClient } from "@oobe-protocol-labs/synapse-sap-sdk/client";
+import { getTreasuryWallet } from "@oobe-protocol-labs/synapse-sap-sdk/constants";
+import type { CliConfig } from "./config.js";
+import { log } from "./logger.js";
 
 export interface CliContext {
   readonly config: CliConfig;
   readonly client: SapClient;
   readonly wallet: Keypair;
   readonly programId: PublicKey;
+  readonly treasuryWallet: PublicKey;
 }
 
 export function loadKeypair(config: CliConfig): Keypair {
@@ -51,10 +53,11 @@ export function buildContext(config: CliConfig): CliContext {
     signAllTransactions: async (txs: any[]) => txs,
   } as any);
   const programId = new PublicKey(config.programId);
+  const treasuryWallet = getTreasuryWallet();
 
   log.debug(`Wallet: ${wallet.publicKey.toBase58()}`);
   log.debug(`RPC: ${config.rpc}`);
-  return { config, client, wallet, programId };
+  return { config, client, wallet, programId, treasuryWallet };
 }
 
 export function parseWallet(input: string): PublicKey {

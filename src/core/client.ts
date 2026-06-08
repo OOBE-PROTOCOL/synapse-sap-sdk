@@ -24,8 +24,18 @@
  * ```
  */
 
-import { type AnchorProvider, Program } from "@coral-xyz/anchor";
-import type { PublicKey } from "@solana/web3.js";
+import { AnchorProvider, Program } from "@coral-xyz/anchor";
+import { createRequire } from "node:module";
+import {
+  ComputeBudgetProgram,
+  Connection,
+  TransactionMessage,
+  VersionedTransaction,
+  type Commitment,
+  type PublicKey,
+  type Signer,
+  type TransactionInstruction,
+} from "@solana/web3.js";
 import { SAP_PROGRAM_ID } from "../constants";
 import { AgentModule } from "../modules/agent";
 import { FeedbackModule } from "../modules/feedback";
@@ -48,12 +58,21 @@ import { AgentBuilder } from "../registries/builder";
 import { MetaplexBridge } from "../registries/metaplex-bridge";
 import { FairScaleRegistry, type FairScaleConfig } from "../registries/fairscale";
 
-// IDL is embedded inside the SDK — no external workspace dependency
-import idl from "../idl/synapse_agent_sap.json";
+// IDL is embedded inside the SDK — no external workspace dependency.
+const requireJson = createRequire(`${process.cwd()}/package.json`);
+const idl = requireJson("@oobe-protocol-labs/synapse-sap-sdk/idl/synapse_agent_sap.json");
 
 /** Re-usable Anchor program type (untyped — SDK provides its own types). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SapProgram = Program<any>;
+
+export interface SapClientOpts {
+  connection?: Connection;
+  rpcUrl?: string;
+  commitment?: Commitment;
+  wallet?: AnchorProvider["wallet"];
+  programId?: PublicKey;
+}
 
 /**
  * @name SapClient
@@ -102,6 +121,24 @@ export class SapClient {
   readonly program: SapProgram;
 
   /**
+   * @name connection
+   * @description Underlying Solana RPC connection used by the provider.
+   * @readonly
+   * @category Core
+   * @since v0.20.0
+   */
+  readonly connection: Connection;
+
+  /**
+   * @name programId
+   * @description SAP program address targeted by this client.
+   * @readonly
+   * @category Core
+   * @since v0.20.0
+   */
+  readonly programId: PublicKey;
+
+  /**
    * @name walletPubkey
    * @description The provider wallet's public key, extracted from the
    * Anchor provider for convenience. This is the default authority /
@@ -140,6 +177,8 @@ export class SapClient {
 
   private constructor(program: SapProgram) {
     this.program = program;
+    this.connection = (program.provider as AnchorProvider).connection;
+    this.programId = program.programId;
     this.walletPubkey = (program.provider as AnchorProvider).wallet.publicKey;
   }
 
@@ -213,6 +252,87 @@ export class SapClient {
    */
   static fromProgram(program: SapProgram): SapClient {
     return new SapClient(program);
+  }
+
+  /**
+   * @name fromOptions
+   * @description Create a client from RPC/connection options. This preserves
+   * the v0.19 `createSapClient(rpcUrl, wallet)` path while returning the
+   * full v0.20 client surface.
+   *
+   * @param opts - Connection, wallet, commitment, and program ID options.
+   * @returns A fully-initialised `SapClient`.
+   *
+   * @category Core
+   * @since v0.20.0
+   */
+  static fromOptions(opts: SapClientOpts = {}): SapClient {
+    const connection = opts.connection ?? new Connection(
+      opts.rpcUrl ?? "https://api.mainnet-beta.solana.com",
+      opts.commitment ?? "confirmed",
+    );
+    const wallet = opts.wallet ?? {
+      publicKey: SAP_PROGRAM_ID,
+      signTransaction: async <T>(tx: T) => tx,
+      signAllTransactions: async <T>(txs: T[]) => txs,
+    } as AnchorProvider["wallet"];
+    const provider = new AnchorProvider(connection, wallet, {
+      commitment: opts.commitment ?? "confirmed",
+    });
+    return SapClient.from(provider, opts.programId ?? SAP_PROGRAM_ID);
+  }
+
+  get methods(): SapProgram["methods"] {
+    return this.program.methods;
+  }
+
+  async fetchAccount<T = unknown>(name: string, address: PublicKey): Promise<T | null> {
+    try {
+      const accounts = this.program.account as Record<string, { fetch(address: PublicKey): Promise<T> }>;
+      return await accounts[name].fetch(address);
+    } catch {
+      return null;
+    }
+  }
+
+  async buildTransaction(
+    ixs: TransactionInstruction[],
+    payer: PublicKey,
+    priority?: { microLamports?: number; limit?: number },
+  ): Promise<VersionedTransaction> {
+    const { blockhash } = await this.connection.getLatestBlockhash();
+    const instructions: TransactionInstruction[] = [];
+
+    if (priority?.microLamports) {
+      instructions.push(ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: priority.microLamports,
+      }));
+    }
+    if (priority?.limit) {
+      instructions.push(ComputeBudgetProgram.setComputeUnitLimit({
+        units: priority.limit,
+      }));
+    }
+
+    instructions.push(...ixs);
+    const msg = new TransactionMessage({
+      payerKey: payer,
+      recentBlockhash: blockhash,
+      instructions,
+    }).compileToV0Message();
+    return new VersionedTransaction(msg);
+  }
+
+  async sendTransaction(
+    tx: VersionedTransaction,
+    signers: Signer[],
+    opts?: { commitment?: Commitment; maxRetries?: number },
+  ): Promise<string> {
+    tx.sign(signers);
+    return await this.connection.sendTransaction(tx, {
+      preflightCommitment: opts?.commitment ?? "confirmed",
+      maxRetries: opts?.maxRetries ?? 3,
+    });
   }
 
   // ═════════════════════════════════════════════
@@ -580,4 +700,11 @@ export class SapClient {
       this.#fairscaleConfig,
     ));
   }
+}
+
+export function createSapClient(
+  rpcUrl: string,
+  wallet?: AnchorProvider["wallet"],
+): SapClient {
+  return SapClient.fromOptions({ rpcUrl, wallet });
 }

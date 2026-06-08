@@ -7,7 +7,7 @@ import { Command } from "commander";
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
-import { log, output } from "../logger";
+import { log, output } from "../logger.js";
 
 /**
  * Load a keypair from a file path or inline string.

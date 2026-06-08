@@ -6,9 +6,9 @@
 import { Command } from "commander";
 import * as fs from "fs";
 import * as path from "path";
-import { loadConfig } from "../config";
-import { buildContext } from "../context";
-import { log, output } from "../logger";
+import { loadConfig } from "../config.js";
+import { buildContext } from "../context.js";
+import { log, output } from "../logger.js";
 
 // Known built-in plugin types
 const BUILT_IN_PLUGINS = [

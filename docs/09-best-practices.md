@@ -1,8 +1,62 @@
 # Best Practices
 
-> Patterns, pitfalls, and production-ready conventions for the SAP v2 SDK.
+> **SDK Version**: 0.20.0
+> **Program Compatibility**: 0.18.0
+> Patterns, pitfalls, and production-ready conventions for the SAP SDK.
 
 This guide distills the lessons we've learned from building and operating agents on-chain. Follow these recommendations and you'll avoid the most common failure modes.
+
+---
+
+## Production Defaults (v0.20.0)
+
+### EscrowV2 — DisputeWindow Mode
+
+```typescript
+// ✅ RECOMMENDED for production
+const escrow = await client.escrowV2.create(agentWallet, {
+  settlementSecurity: { disputeWindow: {} },
+  disputeWindowSlots: 2_160, // ~15 min mainnet
+  arbiter: arbiterPubkey,
+
+  // Pricing
+  pricePerCall: 1_000,
+  maxCalls: 100,
+  initialDeposit: 100_000,
+
+  // Token
+  tokenMint: null, // SOL
+  tokenDecimals: 9,
+});
+```
+
+**Never use**:
+```typescript
+// ❌ DEPRECATED — SelfReport removed
+settlementSecurity: { selfReport: {} }
+
+// ❌ DEVNET ONLY — Too short for mainnet
+disputeWindowSlots: 1
+```
+
+### Settlement Flow (v0.13.0+)
+
+```typescript
+// ✅ Auto-bundled (DisputeWindow mode)
+await client.escrowV2.settle(agentWallet, nonce, {
+  callsToSettle: 10,
+  serviceHash: hash,
+});
+
+// ✅ Use helper for settlement index
+const index = await client.escrowV2.nextSettlementIndex(
+  agentWallet, depositorWallet, nonce
+);
+
+await client.escrowV2.finalizeSettlement(
+  agentWallet, depositorWallet, nonce, index
+);
+```
 
 ---
 
@@ -34,7 +88,7 @@ Use the `SapConnection` factory methods for quick setup:
 const conn = SapConnection.devnet();
 
 // Mainnet — custom RPC
-const conn = SapConnection.mainnet("https://https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=");
+const conn = SapConnection.mainnet("https://us-1-mainnet.oobeprotocol.ai/rpc?api_key=");
 
 // Localnet — localhost:8899
 const conn = SapConnection.localnet();
@@ -42,7 +96,23 @@ const conn = SapConnection.localnet();
 
 ---
 
-## Error Handling
+## Error Handling (v0.20.0)
+
+The SDK exposes a structured error hierarchy from the `errors/` module. Every SDK error extends the base `SapError` class, so you can catch broadly or match specific failure types.
+
+### Common Error Codes
+
+| Code | Name | When | Recovery |
+|------|------|------|----------|
+| 6075 | ArithmeticOverflow | Orphan settlement | Use `nextSettlementIndex()` |
+| 6093 | InvalidCoSigner | Wrong co-signer arg | Pass `Keypair` as 7th arg |
+| 6098 | SettlementAlreadyFinalized | Already completed | Nothing to do |
+| 6099 | DisputeWindowNotExpired | Too early | Wait for window |
+| 6100 | DisputeWindowExpired | Deadline passed | File before deadline |
+| 6101 | NotDepositor | Wrong signer | Use depositor wallet |
+| 6102 | DisputeAlreadyFiled | Duplicate | Wait for resolution |
+
+### Error Hierarchy
 
 The SDK exposes a structured error hierarchy from the `errors/` module. Every SDK error extends the base `SapError` class, so you can catch broadly or match specific failure types.
 

@@ -4,10 +4,10 @@
  */
 
 import { Command } from "commander";
-import { loadConfig } from "../config";
-import { buildContext } from "../context";
-import { log, output } from "../logger";
-import { createSpinner, displayTable, formatSol, status } from "../ui";
+import { loadConfig } from "../config.js";
+import { buildContext } from "../context.js";
+import { log, output } from "../logger.js";
+import { createSpinner, displayTable, formatSol, status } from "../ui/index.js";
 
 export function registerAnalyticsCommands(program: Command): void {
   const analytics = program

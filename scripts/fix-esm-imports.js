@@ -3,44 +3,87 @@
  * Post-build script: Add .js extensions to ESM imports
  */
 
-import { execSync } from 'child_process';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from 'fs';
+import path from 'path';
 
 console.log('🔧 Adding .js extensions to ESM imports...\n');
 
-// Fix DIRECTORY imports: from './dir' → from './dir/index.js'
-const dirs = ['constants', 'pdas', 'accounts', 'events', 'instructions', 'utils', 'errors', 'registries', 'modules'];
-
-for (const dir of dirs) {
-  try {
-    execSync(`find dist/esm -name "*.js" -exec sed -i '' "s/from '\\.\\/${dir}'/from '\\.\\/${dir}\\/index.js'/g" {} \\;`);
-    console.log(`✓ Fixed: ./${dir} → ./${dir}/index.js`);
-  } catch (e) {
-    // Ignore errors
-  }
+function listJsFiles(dir) {
+  if (!existsSync(dir)) return [];
+  const entries = readdirSync(dir).flatMap((entry) => {
+    const fullPath = path.join(dir, entry);
+    return statSync(fullPath).isDirectory() ? listJsFiles(fullPath) : [fullPath];
+  });
+  return entries.filter((entry) => entry.endsWith('.js'));
 }
 
-// Fix FILE imports: from './file' → from './file.js'
-const files = ['client', 'idlTypes'];
+function resolveEsmSpecifier(filePath, specifier) {
+  if (!specifier.startsWith('./') && !specifier.startsWith('../')) return specifier;
+  if (/\.(js|json|node|wasm)$/.test(specifier)) return specifier;
 
-for (const file of files) {
-  try {
-    execSync(`find dist/esm -name "*.js" -exec sed -i '' "s/from '\\.\\/${file}'/from '\\.\\/${file}.js'/g" {} \\;`);
-    console.log(`✓ Fixed: ./${file} → ./${file}.js`);
-  } catch (e) {
-    // Ignore errors
-  }
+  const basePath = path.resolve(path.dirname(filePath), specifier);
+  if (existsSync(`${basePath}.js`)) return `${specifier}.js`;
+  if (existsSync(path.join(basePath, 'index.js'))) return `${specifier}/index.js`;
+  if (existsSync(`${basePath}.json`)) return `${specifier}.json`;
+  return specifier;
 }
 
-// Also fix CJS (directories only, CJS doesn't need .js for files)
-for (const dir of dirs) {
-  try {
-    execSync(`find dist/cjs -name "*.js" -exec sed -i '' "s/from '\\.\\/${dir}'/from '\\.\\/${dir}\\/index.js'/g" {} \\;`);
-    console.log(`✓ Fixed (CJS): ./${dir} → ./${dir}/index.js`);
-  } catch (e) {
-    // Ignore errors
-  }
+function toDestructuredBinding(importList) {
+  return importList
+    .split(',')
+    .map((binding) => binding.trim())
+    .filter(Boolean)
+    .map((binding) => binding.replace(/\s+as\s+/g, ': '))
+    .join(', ');
 }
+
+let fixedImports = 0;
+let fixedAnchorImports = 0;
+for (const filePath of listJsFiles('dist/esm')) {
+  const original = readFileSync(filePath, 'utf8');
+  let next = original.replace(
+    /(from\s+['"])(\.\.?\/[^'"]+)(['"])/g,
+    (match, prefix, specifier, suffix) => {
+      const resolved = resolveEsmSpecifier(filePath, specifier);
+      if (resolved !== specifier) fixedImports += 1;
+      return `${prefix}${resolved}${suffix}`;
+    },
+  );
+  next = next.replace(
+    /(\bimport\s+['"])(\.\.?\/[^'"]+)(['"])/g,
+    (match, prefix, specifier, suffix) => {
+      const resolved = resolveEsmSpecifier(filePath, specifier);
+      if (resolved !== specifier) fixedImports += 1;
+      return `${prefix}${resolved}${suffix}`;
+    },
+  );
+  next = next.replace(
+    /import\s+\{\s*([^}]+?)\s*\}\s+from\s+['"]@coral-xyz\/anchor['"];?/g,
+    (match, importList) => {
+      fixedAnchorImports += 1;
+      return [
+        'import __anchor from "@coral-xyz/anchor";',
+        `const { ${toDestructuredBinding(importList)} } = __anchor;`,
+      ].join('\n');
+    },
+  );
+  if (next !== original) writeFileSync(filePath, next);
+}
+
+console.log(`✓ Fixed ${fixedImports} ESM relative import specifiers`);
+console.log(`✓ Rewrote ${fixedAnchorImports} Anchor CJS named imports`);
 
 console.log('\n✅ Done!');
+
+mkdirSync('dist/cjs', { recursive: true });
+writeFileSync('dist/cjs/package.json', '{ "type": "commonjs" }\n');
+console.log('✓ Added dist/cjs/package.json for CommonJS consumers');
 
 console.log('\n✅ Done! (idlTypes excluded - it is a file, not a directory)');

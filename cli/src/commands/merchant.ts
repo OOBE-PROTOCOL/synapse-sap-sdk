@@ -1,14 +1,16 @@
 /**
  * @module cli/commands/merchant
- * @description Merchant/agent operations — v0.15.0 aligned.
+ * @description Merchant/agent operations — v0.20.0 aligned.
  * Uses: client.agent.registerAgent, client.staking.initStake, client.vault.addVaultDelegate
  */
 import { Command } from "commander";
-import { BN } from "@coral-xyz/anchor";
-import { loadConfig } from "../config";
-import { buildContext, parseWallet } from "../context";
+import anchor from "@coral-xyz/anchor";
+import { loadConfig } from "../config.js";
+import { buildContext, parseWallet } from "../context.js";
 import { Pdas } from "@oobe-protocol-labs/synapse-sap-sdk";
-import { log, output } from "../logger";
+import { log, output } from "../logger.js";
+
+const { BN } = anchor;
 
 export function registerMerchantCommands(program: Command): void {
   const merchant = program.command("merchant").description("Merchant / agent operations");

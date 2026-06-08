@@ -22,7 +22,10 @@
  * @since v0.1.0
  */
 
-import idlJson from "./synapse_agent_sap.json";
+import { createRequire } from "node:module";
+
+const requireJson = createRequire(`${process.cwd()}/package.json`);
+const idlJson = requireJson("@oobe-protocol-labs/synapse-sap-sdk/idl/synapse_agent_sap.json");
 
 // ── Anchor IDL shape ────────────────────────────────
 // We use `typeof idlJson` so the type stays in sync with

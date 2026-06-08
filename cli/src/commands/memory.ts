@@ -1,15 +1,17 @@
 /**
  * @module cli/commands/memory
- * @description Memory vault & session — v0.15.0 aligned.
+ * @description Memory vault & session — v0.20.0 aligned.
  * Uses: client.vault.initVault, client.session.openSession, client.vault.inscribeMemory
  * Pdas: getAgentPDA, getVaultPDA, getSessionLedgerPDA, getEpochPagePDA, getGlobalPDA
  */
 import { Command } from "commander";
-import { BN } from "@coral-xyz/anchor";
-import { loadConfig } from "../config";
-import { buildContext } from "../context";
+import anchor from "@coral-xyz/anchor";
+import { loadConfig } from "../config.js";
+import { buildContext } from "../context.js";
 import { Pdas } from "@oobe-protocol-labs/synapse-sap-sdk";
-import { log, output } from "../logger";
+import { log, output } from "../logger.js";
+
+const { BN } = anchor;
 
 export function registerMemoryCommands(program: Command): void {
   const memory = program.command("memory").description("On-chain memory systems");

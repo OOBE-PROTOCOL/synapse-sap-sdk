@@ -1,16 +1,18 @@
 /**
  * @module cli/commands/escrow
- * @description Escrow v2 lifecycle — v0.15.0 aligned.
+ * @description Escrow v2 lifecycle — v0.20.0 aligned.
  * Uses: client.escrow.createEscrowV2, depositEscrowV2, settleCallsV2, closeEscrowV2
  * Pdas: getAgentPDA, getEscrowV2PDA, getAgentStatsPDA, getAgentStakePDA, getGlobalPDA
  */
 import { Command } from "commander";
-import { BN } from "@coral-xyz/anchor";
+import anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
-import { loadConfig } from "../config";
-import { buildContext, parseWallet } from "../context";
+import { loadConfig } from "../config.js";
+import { buildContext, parseWallet } from "../context.js";
 import { Pdas } from "@oobe-protocol-labs/synapse-sap-sdk";
-import { log, output } from "../logger";
+import { log, output } from "../logger.js";
+
+const { BN } = anchor;
 
 export function registerEscrowCommands(program: Command): void {
   const escrow = program.command("escrow").description("Escrow v2 lifecycle management");
