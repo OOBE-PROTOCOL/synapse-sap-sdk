@@ -7,6 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-06-08
+
+### Added
+
+- **Restored public SDK surface for application consumers** with explicit package exports for:
+  - root SDK entry point
+  - `constants`
+  - `idl`
+  - `core`
+  - `client`
+  - `registries` and `registries/*`
+  - `modules` and `modules/*`
+  - `events` and `events/*`
+  - `postgres` and `postgres/*`
+  - `parser`, `plugin`, `pda`, `pdas`, `utils`, `errors`, and `types`
+- **`SapClient.fromOptions()`** for creating the full client from RPC/connection options while preserving the existing `createSapClient(rpcUrl, wallet?)` workflow.
+- **Compatibility methods on the full `SapClient`**:
+  - `connection`
+  - `programId`
+  - `methods`
+  - `fetchAccount()`
+  - `buildTransaction()`
+  - `sendTransaction()`
+- **Treasury constants in the public constants barrel**:
+  - `TREASURY_WALLET`
+  - `getTreasuryWallet()`
+  - `isTreasuryWallet()`
+- **Migration guide** for v0.12.x through v0.20.0 with EscrowV2 settlement guidance and ESM import guidance.
+
+### Changed
+
+- Bumped SDK package version to `0.20.0`.
+- Updated the root SDK barrel to expose the full `core` client by default, including `SapClient.from(provider)` and `SapClient.fromProgram(program)`.
+- Kept the legacy lightweight client available through the `@oobe-protocol-labs/synapse-sap-sdk/client` subpath for older CLI-style integrations.
+- Updated SDK documentation to reference `0.20.0` and the canonical package name.
+- Aligned the bundled CLI package to `0.20.0`, ESM output, and the SDK `^0.20.0` dependency range.
+
+### Fixed
+
+- Removed the duplicate `exports` object in `package.json` that caused Node/package managers to ignore earlier subpath exports.
+- Fixed missing exports that forced consumers to import private files from `dist/esm/...`.
+- Fixed native Node ESM resolution for generated relative imports by post-processing emitted ESM specifiers to include `.js`, `.json`, or `/index.js`.
+- Fixed CommonJS consumption under a root `"type": "module"` package by emitting `dist/cjs/package.json` with `"type": "commonjs"`.
+- Fixed native Node ESM runtime compatibility with `@coral-xyz/anchor` CommonJS named imports in generated ESM output.
+- Fixed bundled IDL loading in both ESM and CommonJS by loading the JSON artifact through the package JSON export.
+- Fixed CLI runtime compatibility with ESM dependencies and Node16-style module resolution.
+
+### Migration Notes
+
+- Consumers should import public SDK modules through package subpaths, for example:
+  - `@oobe-protocol-labs/synapse-sap-sdk`
+  - `@oobe-protocol-labs/synapse-sap-sdk/constants`
+  - `@oobe-protocol-labs/synapse-sap-sdk/registries`
+  - `@oobe-protocol-labs/synapse-sap-sdk/registries/metaplex-bridge`
+  - `@oobe-protocol-labs/synapse-sap-sdk/postgres`
+- Avoid importing from `dist/esm/...` or `dist/cjs/...`; those paths are implementation details.
+- Applications that need the full registry/client surface should use the root export:
+  ```ts
+  import { SapClient } from "@oobe-protocol-labs/synapse-sap-sdk";
+
+  const client = SapClient.from(provider);
+  ```
+- Legacy integrations that still rely on the lightweight generated instruction wrapper can import:
+  ```ts
+  import { createSapClient } from "@oobe-protocol-labs/synapse-sap-sdk/client";
+  ```
+
+### Validation
+
+- Verified SDK build with `npm run build`.
+- Verified package dry-run with `npm pack --dry-run`.
+- Verified native ESM imports across 19 public subpaths.
+- Verified CommonJS `require()` across 19 public subpaths.
+- Verified CLI build and `node cli/dist/cli.js --help`.
+
+## [0.19.8] - 2026-06-08
+
+### Fixed
+
+- Patched ESM JSON import handling for the bundled IDL artifact.
+- Published the final `0.19.x` compatibility fix before the `0.20.0` public export cleanup.
+
 ## [0.19.1] — 2026-05-27 — CRITICAL HOTFIX (IDL + ESM)
 
 **HOTFIX RELEASE** — Fixes critical issues in v0.19.0 published artifact.
@@ -915,7 +997,23 @@ scheduler in ~5-10 s instead of 35-40 s at base fee.
 - **Subpath exports** — `@synapse-sap/sdk/agent`, `@synapse-sap/sdk/pda`, etc.
 - **Strict TypeScript** — `strict`, `noUncheckedIndexedAccess`, `noUnusedLocals`, `noUnusedParameters`.
 
-[Unreleased]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.19.8...v0.20.0
+[0.19.8]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.19.1...v0.19.8
+[0.19.1]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.19.0...v0.19.1
+[0.19.0]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.18.1...v0.19.0
+[0.18.1]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.18.0...v0.18.1
+[0.18.0]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.15.1...v0.18.0
+[0.15.1]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.15.0...v0.15.1
+[0.15.0]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.14.0...v0.15.0
+[0.14.0]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.11.0...v0.14.0
+[0.11.0]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.10.1...v0.11.0
+[0.10.1]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.9.2...v0.10.1
+[0.9.2]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.9.0...v0.9.2
+[0.9.0]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.4.1...v0.4.2
 [0.2.1]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.2.0...v0.2.1

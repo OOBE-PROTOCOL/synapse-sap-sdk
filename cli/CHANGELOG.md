@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.20.0] - 2026-06-08
+
+### Changed
+
+- Aligned CLI package version with SDK `0.20.0`.
+- Updated the CLI SDK dependency range to `^0.20.0`.
+- Switched CLI compilation to Node16-compatible ESM output.
+- Added explicit `.js` extensions to local CLI imports so the compiled package runs correctly in native Node ESM.
+- Updated CLI help text, README version references, and package metadata to `0.20.0`.
+
+### Fixed
+
+- Fixed CLI build compatibility with the SDK `exports` map introduced in `0.20.0`.
+- Fixed runtime compatibility with ESM-only dependencies such as `chalk` and `ora`.
+- Fixed runtime compatibility with `@coral-xyz/anchor` CommonJS exports by importing Anchor through its default export where the CLI needs `BN`.
+- Fixed analytics context initialization by exposing the protocol treasury wallet through CLI context.
+
+### Validation
+
+- Verified CLI build with `npm --prefix cli run build`.
+- Verified runtime startup with `node cli/dist/cli.js --help`.
+
 ## [0.18.0-rc.0] — 2026-05-23 — CLI PRO: Revenue Edition
 
 ### 🎉 Major Release — Professional CLI with Revenue Features
@@ -173,5 +195,7 @@ _Nothing yet — contributions welcome!_
 
 ---
 
+[Unreleased]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.19.8...v0.20.0
+[0.18.0-rc.0]: https://github.com/OOBE-PROTOCOL/synapse-sap-sdk/compare/v0.15.0...v0.18.0-rc.0
 [0.6.0]: https://github.com/OOBE-PROTOCOL/synapse-sap-cli/releases/tag/v0.6.0
-[Unreleased]: https://github.com/OOBE-PROTOCOL/synapse-sap-cli/compare/v0.6.0...HEAD
