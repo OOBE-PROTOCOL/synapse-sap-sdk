@@ -61,13 +61,13 @@ export class SnsModule {
   private sapProgramId: PublicKey;
   private defaultCommitment: Commitment;
 
-  constructor(config: SnsModuleConfig) {
+  constructor(config: { connection: Connection; sapProgramId: string | PublicKey; defaultCommitment?: Commitment }) {
     this.connection = config.connection;
-    this.sapProgramId = new PublicKey(config.sapProgramId);
+    this.sapProgramId = typeof config.sapProgramId === 'string' ? new PublicKey(config.sapProgramId) : config.sapProgramId;
     this.defaultCommitment = config.defaultCommitment || 'confirmed';
     
     logger.info('[SnsModule] Initialized', {
-      sapProgramId: config.sapProgramId,
+      sapProgramId: this.sapProgramId.toBase58(),
       network: config.connection.rpcEndpoint.includes('devnet') ? 'devnet' : 'mainnet',
     });
   }
@@ -173,25 +173,22 @@ export class SnsModule {
    * SECURITY FIXES APPLIED:
    * 1. Signer verification - ensures signer matches agentWallet
    * 2. Domain name sanitization - prevents invalid/homograph domains
-   * 3. URL validation - ensures x402Endpoint/agentUri are valid HTTP(S) URLs
-   * 4. Complete record PDA tracking - returns all created record PDAs
-   * 5. Commitment level configuration - allows user-specified commitment
-   * 6. Space calculation - dynamically calculates required space
+   * 3. Complete record PDA tracking - returns all created record PDAs
+   * 4. Commitment level configuration - allows user-specified commitment
+   * 5. Space calculation - dynamically calculates required space
    * 
-   * @param params - Registration parameters with role-based DNS configuration
+   * @param params - Registration parameters with modular records
    * @returns Registration result with domain, agent info, and records list
    * 
    * @throws {Error} If signer does not match agentWallet
    * @throws {Error} If domain is already taken
-   * @throws {Error} If DNS configuration is invalid for role
    * @throws {Error} If registration fails
    */
-  async registerAgentDomain(params: SapSnsRegistrationParams): Promise<SnsRegistrationResult> {
+  async registerAgentDomain(params: SnsRegistrationParams): Promise<SnsRegistrationResult> {
     const {
       agentWallet,
       domainName,
-      dnsConfig,
-      optionalRecords = [],
+      records,
       signer,
       space: providedSpace,
       setAsPrimary = false,
@@ -248,13 +245,11 @@ export class SnsModule {
       needsCreation: needsAtaCreation,
     });
 
-    // 4. Calculate required space
-    const recordsToCreate = [
-      { type: Record.SOL, value: agentWallet.toBase58() },
-      { type: Record.TXT, value: dnsConfig.txtValue },
-      ...optionalRecords.map(r => ({ type: r.type, value: r.value })),
-      ...(dnsConfig.additionalRecords?.map((r: SapDnsRecordConfig) => ({ type: r.type, value: r.value })) || []),
-    ];
+    // 4. Calculate required space from records
+    const recordsToCreate = Object.entries(records).map(([type, value]) => ({
+      type: type as Record,
+      value,
+    }));
     
     const requiredSpace = this.calculateRequiredSpace(recordsToCreate);
     const space = Math.max(providedSpace || 600, requiredSpace);
@@ -274,71 +269,26 @@ export class SnsModule {
       usdcAta
     );
 
-    // 6. Build required records with PDA tracking
+    // 6. Build record instructions with PDA tracking
     const recordInstructions: TransactionInstruction[] = [];
     const recordPdas: { [key: string]: PublicKey } = {};
+    const createdRecords: string[] = [];
 
-    // REQUIRED: SOL record (agent wallet)
-    const solRecordPda = getRecordKeySync(fullDomain, Record.SOL);
-    recordPdas.SOL = solRecordPda;
-    recordInstructions.push(
-      await createRecordInstruction(
-        this.connection,
-        fullDomain,
-        Record.SOL,
-        agentWallet.toBase58(),
-        agentWallet,
-        agentWallet
-      )
-    );
-
-    // REQUIRED: TXT record (agent-chosen data)
-    recordPdas.DNS = getRecordKeySync(fullDomain, Record.TXT);
-    recordInstructions.push(
-      await createRecordInstruction(
-        this.connection,
-        fullDomain,
-        Record.TXT,
-        dnsConfig.txtValue,
-        agentWallet,
-        agentWallet
-      )
-    );
-
-    // OPTIONAL: Additional records - async map to handle promises
-    const optionalRecordInstructions = await Promise.all(
-      optionalRecords.map(async (optRecord: { type: Record; value: string }, index: number) => {
-        const recordKey = `optional_${index}`;
-        recordPdas[recordKey] = getRecordKeySync(fullDomain, optRecord.type);
-        return createRecordInstruction(
+    for (const [recordType, recordValue] of Object.entries(records)) {
+      const type = recordType as Record;
+      const recordPda = getRecordKeySync(fullDomain, type);
+      recordPdas[recordType] = recordPda;
+      createdRecords.push(recordType);
+      recordInstructions.push(
+        await createRecordInstruction(
           this.connection,
           fullDomain,
-          optRecord.type,
-          optRecord.value,
+          type,
+          recordValue,
           agentWallet,
           agentWallet
-        );
-      })
-    );
-    recordInstructions.push(...optionalRecordInstructions);
-
-    // OPTIONAL: Additional DNS records from dnsConfig
-    if (dnsConfig.additionalRecords) {
-      const additionalRecordInstructions = await Promise.all(
-        dnsConfig.additionalRecords.map(async (additional: SapDnsRecordConfig, index: number) => {
-          const recordKey = `additional_${index}`;
-          recordPdas[recordKey] = getRecordKeySync(fullDomain, additional.type);
-          return createRecordInstruction(
-            this.connection,
-            fullDomain,
-            additional.type,
-            additional.value,
-            agentWallet,
-            agentWallet
-          );
-        })
+        )
       );
-      recordInstructions.push(...additionalRecordInstructions);
     }
 
     // 7. Combine all instructions
@@ -364,20 +314,12 @@ export class SnsModule {
     // 9. Derive domain PDA
     const { pubkey: domainPda } = getDomainKeySync(fullDomain);
 
-    // 10. Compile records list
-    const records = [
-      Record.SOL,
-      Record.TXT,
-      ...optionalRecords.map((r: { type: Record; value: string }) => r.type),
-      ...(dnsConfig.additionalRecords?.map((r: SapDnsRecordConfig) => r.type) || []),
-    ];
-
     logger.info('[SnsModule] Domain registered on-chain!', {
       domain: fullDomain,
       network: isDevnet ? 'devnet' : 'mainnet',
       signature,
       domainPda: domainPda.toBase58(),
-      records,
+      records: createdRecords,
     });
 
     return {
@@ -385,9 +327,9 @@ export class SnsModule {
       domainPda,
       agentPda,
       transactionSignature: signature,
-      recordPdas, // CRITICAL FIX #5: Complete PDA tracking
+      recordPdas,
       setAsPrimary,
-      records,
+      records: createdRecords,
     };
   }
 
@@ -516,7 +458,7 @@ export class SnsModule {
   /**
    * Validate SNS records for SAP agent compliance (on-chain only)
    */
-  async validateAgentRecords(domain: string): Promise<RecordValidationResult> {
+  async validateAgentRecords(domain: string): Promise<{ valid: boolean; errors: string[]; warnings: string[] }> {
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -551,7 +493,7 @@ export class SnsModule {
         }
         if (dnsType === Record.TXT) {
           // TXT should contain URL for SAP agents
-          if (!dnsRecord.startsWith('http://') && !dnsRecord.startsWith('https://') && !dnsRecord.startsWith('sapRole:')) {
+          if (!dnsRecord.startsWith('http://') && !dnsRecord.startsWith('https://')) {
             warnings.push(
               `TXT record does not appear to be a URL: "${dnsRecord}". ` +
               'For SAP agents, TXT typically contains an endpoint URI.'
