@@ -81,3 +81,13 @@ export const LOCALNET_SAP_PROGRAM_ID = new PublicKey(SAP_PROGRAM_ADDRESS);
  * @see {@link MAINNET_SAP_PROGRAM_ID}
  */
 export const SAP_PROGRAM_ID = MAINNET_SAP_PROGRAM_ID;
+
+/**
+ * Legacy PROGRAM_ID string (backward compatibility).
+ *
+ * @name PROGRAM_ID
+ * @description String program ID for legacy code.
+ * @category Constants
+ * @since v0.1.0
+ */
+export const PROGRAM_ID = SAP_PROGRAM_ADDRESS;

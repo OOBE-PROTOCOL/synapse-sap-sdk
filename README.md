@@ -29,6 +29,7 @@
 - [API Reference](#api-reference)
 - [Development](#development)
 - [License](#license)
+- [SNS Integration (Optional)](#sns-integration-optional)
 
 ---
 
@@ -47,6 +48,7 @@
 - **Tree-shakeable** — import only what you need
 - **Embedded IDL** — zero external workspace dependency; npm-ready
 - **Strict TypeScript** — `strict`, `noUncheckedIndexedAccess`, `noUnusedLocals`
+- **SNS Integration** — Optional `.sol` domain registration with SAP agent identity linkage (v0.21.0+)
 
 ## Installation
 
@@ -984,3 +986,257 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full development guidelines.
 ## License
 
 [MIT](LICENSE)
+
+---
+
+## SNS Integration (Optional)
+
+**Available from v0.21.0+** — Optional `.sol` domain registration with SAP agent identity linkage.
+
+### Overview
+
+SNS (Solana Name Service) integration allows SAP agents to register human-readable `.sol` domains that are automatically linked to their SAP agent identity on-chain.
+
+**Key Features:**
+- ✅ Optional domain registration during agent setup
+- ✅ Automatic SAP record linkage (agent wallet, PDA, capabilities)
+- ✅ On-chain identity verification via domain resolution
+- ✅ Full domain lifecycle management (renew, transfer, delete)
+- ✅ Social identity integration (Twitter/X handles)
+- ✅ Hierarchical agent systems (subdomains)
+- ✅ Domain marketplace (fixed-price listings, offers)
+
+### Quick Start
+
+#### Option 1: Register Agent + Domain Together
+
+```typescript
+import { SnsModule } from '@synapse-sap/sdk/modules/sns';
+
+const sns = new SnsModule({ connection, sapProgramId });
+
+const result = await sns.registerAgentDomain({
+  agentWallet: signer.publicKey,
+  domainName: 'trading-bot',  // Will become trading-bot.sol
+  capabilities: ['jupiter:swap', 'kamino:lend'],
+  setAsPrimary: true,  // Set as primary domain for wallet
+  signer,
+});
+
+console.log('✅ Agent PDA:', result.agentPda.toBase58());
+console.log('✅ Domain:', result.domain);
+console.log('✅ Domain PDA:', result.domainPda.toBase58());
+```
+
+#### Option 2: Register Agent First, Domain Later
+
+```typescript
+// 1. Register SAP agent (standard flow)
+await client.agent.register({...});
+
+// 2. Register domain separately
+const result = await sns.registerAgentDomain({
+  agentWallet: signer.publicKey,
+  domainName: 'my-agent',
+  signer,
+});
+```
+
+### CLI Usage
+
+```bash
+# Check domain availability
+synapse-sap sns check trading-bot
+
+# Register domain for agent
+synapse-sap sns register trading-bot \
+  --role merchant \
+  --x402-endpoint https://api.example.com/x402 \
+  --keypair ~/.config/solana/id.json \
+  --set-primary
+
+# Resolve domain to agent identity
+synapse-sap resolve trading-bot.sol
+
+# Fetch all records
+synapse-sap records trading-bot.sol
+```
+
+### Optional Registration Flow (User Choice)
+
+When registering an agent, users can choose whether to register a domain:
+
+```typescript
+// MCP Tool: sap_register_agent
+{
+  name: "Trading Bot",
+  description: "AI-powered trading agent",
+  capabilities: ["jupiter:swap"],
+  pricePerCall: 1000,
+  
+  // Optional SNS integration (user chooses)
+  registerSnsDomain: true,        // Ask user or set programmatically
+  snsDomainName: "trading-bot",   // Optional, auto-generated if not provided
+  snsDurationYears: 1,            // 1-10 years
+}
+```
+
+**Flow:**
+1. Register SAP agent → `agentPda`
+2. If `registerSnsDomain=true`:
+   - Check domain availability
+   - Register `.sol` domain
+   - Set SNS records with SAP data
+3. Return `{ agentPda, domain, domainPda, signature }`
+
+### Advanced Features
+
+#### Domain Lifecycle Management
+
+```typescript
+import {
+  renewSnsDomain,
+  transferSnsDomain,
+  deleteSnsDomain,
+  isDomainExpiringSoon,
+} from '@synapse-sap/sdk/utils/sns-lifecycle';
+
+// Renew expiring domain
+await renewSnsDomain({
+  connection,
+  payer: signer,
+  domainName: 'trading-bot.sol',
+  years: 1,
+});
+
+// Transfer to new owner
+await transferSnsDomain({
+  connection,
+  currentOwner: signer,
+  newOwner: newOwnerPublicKey,
+  domainName: 'trading-bot.sol',
+});
+
+// Check expiration (30-day warning)
+const expiring = await isDomainExpiringSoon({
+  connection,
+  domainName: 'trading-bot.sol',
+  thresholdDays: 30,
+});
+```
+
+#### Social Identity (Twitter/X)
+
+```typescript
+import { setTwitterHandle, verifyTwitterOwnership } from '@synapse-sap/sdk/utils/sns-social';
+
+// Link Twitter handle
+await setTwitterHandle({
+  connection,
+  owner: signer,
+  domainName: 'trading-bot.sol',
+  twitterHandle: 'crypto_trader',  // WITHOUT @ symbol
+});
+
+// Verify ownership (bidirectional check)
+const verified = await verifyTwitterOwnership({
+  domainName: 'trading-bot.sol',
+  twitterHandle: 'crypto_trader',
+});
+```
+
+#### Subdomains (Hierarchical Agents)
+
+```typescript
+import { createSubdomain } from '@synapse-sap/sdk/utils/sns-subdomains';
+
+// Parent agent creates subdomain for sub-agent
+const result = await createSubdomain({
+  connection,
+  parentOwner: parentSigner,
+  subdomainName: 'arbitrage',
+  parentDomain: 'trading-bot.sol',
+  subdomainOwner: subAgentWallet,
+  records: [
+    { type: Record.TXT, value: 'role:sub-agent,strategy:arbitrage' },
+  ],
+});
+
+// Result: arbitrage.trading-bot.sol
+```
+
+#### Domain Marketplace
+
+```typescript
+import { listDomainForSale, buyListedDomain } from '@synapse-sap/sdk/utils/sns-marketplace';
+
+// List domain for sale
+const listing = await listDomainForSale({
+  connection,
+  seller: signer,
+  domainName: 'trading-bot.sol',
+  price: 500,  // 500 USDC
+  expiry: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60),
+});
+
+// Buy listed domain
+const purchase = await buyListedDomain({
+  connection,
+  buyer: buyerSigner,
+  domainName: 'trading-bot.sol',
+  seller: sellerPublicKey,
+});
+```
+
+### Skills Integration
+
+The SDK includes **6 specialized SNS skills**:
+
+| Skill | Purpose | Load With |
+|-------|---------|-----------|
+| `sap-sns` | SAP agent registration | `skill_view('sap-sns')` |
+| `sns-integration` | Core adapter layer | `skill_view('sns-integration')` |
+| `sns-sales-listings` | Marketplace features | `skill_view('sns-sales-listings')` |
+| `sns-domain-management` | Lifecycle operations | `skill_view('sns-domain-management')` |
+| `sns-x-handle-methods` | Social identity | `skill_view('sns-x-handle-methods')` |
+| `sns-subdomains` | Hierarchical agents | `skill_view('sns-subdomains')` |
+
+### Dependencies
+
+```json
+{
+  "@bonfida/spl-name-service": "3.0.9",
+  "@solana/web3.js": "^1.98.4",
+  "@solana/spl-token": "0.4.6",
+  "@bonfida/name-offers": "^1.0.0"  // Optional: marketplace features
+}
+```
+
+### Cost Breakdown
+
+| Action | Cost | Refundable |
+|--------|------|------------|
+| Domain Registration (1 year) | ~20 USDC | ❌ |
+| Renew Domain (1 year) | ~20 USDC | ❌ |
+| Transfer Domain | ~0.005 SOL | ❌ |
+| Delete/Burn Domain | ~0.003 SOL | ✅ Rent returned |
+| Set Twitter Handle | ~0.005 SOL | ❌ |
+| Create Subdomain | ~20 USDC | ❌ |
+
+### Documentation
+
+- **Complete Guide:** [`docs/partnerships/sns/`](docs/partnerships/sns/)
+- **Setup Guide:** [`docs/partnerships/sns/01-setup-guide.md`](docs/partnerships/sns/01-setup-guide.md)
+- **Technical Reference:** [`docs/partnerships/sns/02-technical-reference.md`](docs/partnerships/sns/02-technical-reference.md)
+- **Skills Documentation:** [`docs/SNS_SKILLS_COMPLETE.md`](docs/SNS_SKILLS_COMPLETE.md)
+
+### External Resources
+
+- **SNS Official Site:** https://www.sns.id/
+- **SNS for Agents:** https://www.sns.id/agent
+- **SNS Documentation:** https://docs.sns.id/
+- **SNS MCP Server:** https://mcp.sns.id/mcp
+
+---
+
+## Development

@@ -9,12 +9,12 @@ import {
 } from "@solana/web3.js";
 import { Program, AnchorProvider, Wallet, setProvider, Idl } from "@coral-xyz/anchor";
 import { createRequire } from "node:module";
-import { PROGRAM_ID } from "./constants";
+import { PROGRAM_ID } from "./constants/index.js";
 import {
   AgentModule, AttestationModule, DigestModule, DisputeModule,
   EscrowModule, GlobalModule, IndexingModule, MiscModule,
   SessionModule, StakingModule, SubscriptionModule, ToolsModule, VaultModule,
-} from "./instructions";
+} from "./instructions/index.js";
 
 const requireJson = createRequire(`${process.cwd()}/package.json`);
 const idlJson = requireJson("@oobe-protocol-labs/synapse-sap-sdk/idl/synapse_agent_sap.json");

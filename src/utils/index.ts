@@ -4,6 +4,7 @@
 // ================================================================
 
 export * from "./validate";
+export { logger } from "./logger";
 
 // ── Merkle helpers for receipt proofs ──
 export { sha256, hashToArray } from "./hash";

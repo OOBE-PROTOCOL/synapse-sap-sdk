@@ -33,6 +33,59 @@
 
 ---
 
+## 🌐 SNS Integration Skills (NEW v0.21.0)
+
+### 6. **sap-sns** — SNS Domain Registration (Optional)
+- **Use when:** Registering `.sol` domains for SAP agents with automatic identity linkage
+- **Optional feature:** Users choose during agent registration whether to register a domain
+- **Key topics:**
+  - Optional domain registration during agent setup
+  - Automatic SAP record linkage (agentWallet, agentPda, capabilities)
+  - On-chain identity verification via domain resolution
+  - CLI commands: `sns check`, `sns register`, `resolve`, `records`
+- **Integration:** MCP tool `sap_register_agent` with `registerSnsDomain: true` option
+- **Documentation:** [`/skills/sns-skill/README.md`](sns-skill/README.md) — Complete guide
+
+### 7. **sns-integration** — Core SNS Adapter
+- **Use when:** General SNS domain management independent from SAP
+- **Key topics:** Availability checks, record management, primary domains, portfolio tracking
+- **Functions:** `checkAvailability()`, `buildRegisterDomainTx()`, `getDomainRecords()`
+
+### 8. **sns-sales-listings** — Domain Marketplace
+- **Use when:** Listing agent domains for sale, making offers, buying domains
+- **Key topics:** Fixed Price Offers, Unsolicited Offers, P2P trading
+- **Functions:** `listDomainForSale()`, `makeOffer()`, `buyListed()`, `acceptOffer()`
+
+### 9. **sns-domain-management** — Domain Lifecycle
+- **Use when:** Renewing, transferring, deleting domains, checking expiration
+- **Key topics:** Domain renewal, ownership transfer, permanent deletion, expiration monitoring
+- **Functions:** `renewDomain()`, `transferDomain()`, `deleteDomain()`, `isExpiringSoon()`
+
+### 10. **sns-x-handle-methods** — Social Identity
+- **Use when:** Linking Twitter/X handles to agent domains, verifying social identity
+- **Key topics:** Twitter handle records, bidirectional verification, social graph
+- **Functions:** `setTwitterHandle()`, `getTwitterHandle()`, `verifyTwitterOwnership()`
+
+### 11. **sns-subdomains** — Hierarchical Agents
+- **Use when:** Creating sub-agents under main agent domain, multi-agent hierarchies
+- **Key topics:** Subdomain creation, resolution, registrar patterns
+- **Functions:** `createSubdomain()`, `resolveSubdomain()`, `SubdomainRegistrar`
+
+### 12. **sns-skill** — Complete SNS Guide (NEW)
+- **Use when:** Learning how to use SNS with SAP (SDK + CLI)
+- **Key topics:** Modular record system, libre arbitrio, tipizzazione, esempi pratici
+- **Documentation:** [`/skills/sns-skill/README.md`](sns-skill/README.md)
+- **Includes:**
+  - Build records (modulare)
+  - Register domain (SDK + CLI)
+  - Fetch records (modulare)
+  - Update/delete records
+  - Best practices
+  - Type definitions
+  - Esempi reali (6 scenari)
+
+---
+
 ## 🚀 Advanced Skills (6)
 
 ### 6. **sap-advanced** — Production Patterns
@@ -107,7 +160,8 @@
 
 | Use Case | Primary Skill | Secondary Skills |
 |----------|--------------|------------------|
-| **Register Agent** | sap-merchant | sap-mcp, sap-nft |
+| **Register Agent** | sap-merchant | sap-mcp, sap-nft, **sap-sns (optional)** |
+| **Register Agent + Domain** | **sap-sns** | sap-merchant, sns-integration |
 | **Create Escrow** | sap-client | sap-enterprise, sap-gaming |
 | **Settle Calls** | sap-merchant | sap-defi, sap-advanced |
 | **Treasury Tracking** | sap-advanced | sap-enterprise |
@@ -117,6 +171,10 @@
 | **B2B Services** | sap-enterprise | sap-advanced |
 | **AI Agent Tools** | sap-mcp | sap-advanced |
 | **Memory Systems** | sap-memory | sap-advanced |
+| **Domain Marketplace** | **sns-sales-listings** | sap-sns |
+| **Domain Lifecycle** | **sns-domain-management** | sap-sns |
+| **Social Identity** | **sns-x-handle-methods** | sap-sns |
+| **Hierarchical Agents** | **sns-subdomains** | sap-sns |
 
 ---
 

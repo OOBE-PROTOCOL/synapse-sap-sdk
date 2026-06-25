@@ -35,3 +35,14 @@ export {
   validateReceiptProof,
   computeEscrowMaxObligation,
 } from "./utils/validate";
+
+// SNS SDK - Standalone domain management (independent from SAP)
+export { SnsSdk, Record } from "./modules/sns-standalone";
+export type {
+  DomainAvailability,
+  DomainPortfolioItem,
+  DomainRecords,
+  RegistrationTransaction,
+  PrimaryDomainTransaction,
+  SnsSdkConfig,
+} from "./modules/sns-standalone";

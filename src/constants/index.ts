@@ -28,36 +28,11 @@ export {
   DEVNET_SAP_PROGRAM_ID,
   LOCALNET_SAP_PROGRAM_ID,
   SAP_PROGRAM_ID,
-} from "./programs";
-
-// ── Legacy Constants (backward compatibility) ─────────
-// Export EVERYTHING from legacy constants.ts
-export {
   PROGRAM_ID,
-  ENDPOINTS,
-  DISCRIMINATOR_SIZE,
-  PUBKEY_SIZE,
-  U8_SIZE,
-  U16_SIZE,
-  U32_SIZE,
-  U64_SIZE,
-  U128_SIZE,
-  I64_SIZE,
-  BOOL_SIZE,
-  OPTION_SIZE,
-  MAX_CALLS_PER_SETTLEMENT,
-  MAX_VOLUME_CURVE_POINTS,
-  MAX_RECEIPTS_PER_PROOF,
-  MAX_MERKLE_DEPTH,
-  MAX_SUBSCRIPTION_DURATION_YEARS,
-  STAKE_COVERAGE_BPS,
-  MIN_STAKE_LAMPORTS,
-  COMPLETE_UNSTAKE_DELAY_DAYS,
-  DEFAULT_COMMITMENT,
-} from "../constants";
+} from "./programs.js";
 
 // ── PDA Seeds ────────────────────────────────────────
-export { SEEDS } from "./seeds";
+export { SEEDS } from "./seeds.js";
 export type { SeedKey } from "./seeds";
 
 // ── Limits & Versions ────────────────────────────────
@@ -67,11 +42,11 @@ export {
   VAULT_PROTOCOL_VERSION,
   TOOL_CATEGORY_VALUES,
   HTTP_METHOD_VALUES,
-} from "./limits";
+} from "./limits.js";
 
 // ── Network Identifiers (x402) ───────────────────────────────
-export { SapNetwork } from "./network";
-export type { SapNetworkId } from "./network";
+export { SapNetwork } from "./network.js";
+export type { SapNetworkId } from "./network.js";
 
 // ── Mainnet Addresses ────────────────────────────────────────
 export {
@@ -83,7 +58,7 @@ export {
   PROGRAM_METADATA_PROGRAM,
   TOOL_CATEGORY_ADDRESSES,
   TOOL_CATEGORY_ADDRESS_LIST,
-} from "./addresses";
+} from "./addresses.js";
 
 // ── Payment-token allowlist & stake collateral (v0.10.0) ─────
 export {
@@ -93,11 +68,11 @@ export {
   MAX_DELEGATE_DURATION_SECS,
   isAcceptedUsdcMint,
   isAcceptedPaymentToken,
-} from "./payments";
+} from "./payments.js";
 
 // ── Treasury wallet ──────────────────────────────────────────────
 export {
   TREASURY_WALLET,
   getTreasuryWallet,
   isTreasuryWallet,
-} from "./treasury";
+} from "./treasury.js";

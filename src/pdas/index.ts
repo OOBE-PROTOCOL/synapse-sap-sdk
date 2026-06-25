@@ -4,7 +4,7 @@
 // ================================================================
 
 import { PublicKey } from "@solana/web3.js";
-import { SEEDS, PROGRAM_ID } from "../constants";
+import { SEEDS, PROGRAM_ID } from "../constants/index.js";
 import BN from "bn.js";
 
 const PROGRAM_PUBLIC_KEY = new PublicKey(PROGRAM_ID);
