@@ -1,7 +1,7 @@
 {
   "name": "@oobe-protocol-labs/synapse-sap-sdk",
   "version": "0.21.0",
-  "description": "Synapse Agent Protocol (SAP) SDK for Solana - v0.21.0 SNS Integration with Modular Record System",
+  "description": "Synapse Agent Protocol (SAP) SDK for Solana | v0.21.0 SNS Integration with Modular Record System",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",

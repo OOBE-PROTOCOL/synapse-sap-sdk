@@ -2,8 +2,8 @@
  * @module modules/sns
  * @description SNS (Solana Name Service) integration module for SAP SDK
  * 
- * Engineering-first design: Minimal required records (SOL + DNS),
- * role-based configuration (Merchant vs Citizen), on-chain only validation.
+ * Modular, free-choice design: Agents choose which records to expose.
+ * No roles, no requirements, complete freedom.
  * 
  * @since v0.21.0
  * @packageDocumentation
@@ -30,14 +30,11 @@ import {
   getAssociatedTokenAddressSync,
 } from '@solana/spl-token';
 import type {
-  SapSnsRegistrationParams,
+  SnsRegistrationParams,
   SnsRegistrationResult,
   SnsResolutionResult,
-  SnsModuleConfig,
-  RecordValidationResult,
-  SapDnsRecordConfig,
+  SnsRecordMap,
 } from '../types/sns.js';
-import { SapAgentRole } from '../types/sns.js';
 import { getAgentPDA } from '../pdas/index.js';
 import { logger } from '../utils/logger.js';
 import { USDC_MINT } from '../constants/sns.js';
@@ -54,7 +51,7 @@ const rateLimitState = {
  * SNS Integration Module
  * 
  * Provides seamless integration between SAP agents and SNS domains.
- * Minimal required records: SOL (wallet) + DNS (role-based).
+ * Modular record system: agents freely choose which records to expose.
  * All other records are optional and agent-specific.
  * 
  * @since v0.21.0
@@ -193,14 +190,12 @@ export class SnsModule {
     const {
       agentWallet,
       domainName,
-      role,
       dnsConfig,
       optionalRecords = [],
       signer,
       space: providedSpace,
       setAsPrimary = false,
       commitment,
-      explicitRoleDeclaration,
     } = params;
 
     // CRITICAL FIX #1: Verify signer matches agent wallet
@@ -211,7 +206,6 @@ export class SnsModule {
     logger.info('[SnsModule] Registering agent domain', {
       domainName,
       agentWallet: agentWallet.toBase58(),
-      role,
       setAsPrimary,
     });
 
@@ -254,15 +248,12 @@ export class SnsModule {
       needsCreation: needsAtaCreation,
     });
 
-    // CRITICAL FIX #3: Validate DNS record URLs before building instructions
-    const validatedDnsRecord = this.buildDnsRecordForRole(role, dnsConfig);
-
     // 4. Calculate required space
     const recordsToCreate = [
       { type: Record.SOL, value: agentWallet.toBase58() },
-      validatedDnsRecord,
+      { type: Record.TXT, value: dnsConfig.txtValue },
       ...optionalRecords.map(r => ({ type: r.type, value: r.value })),
-      ...(dnsConfig.additionalRecords?.map(r => ({ type: r.type, value: r.value })) || []),
+      ...(dnsConfig.additionalRecords?.map((r: SapDnsRecordConfig) => ({ type: r.type, value: r.value })) || []),
     ];
     
     const requiredSpace = this.calculateRequiredSpace(recordsToCreate);
@@ -301,14 +292,14 @@ export class SnsModule {
       )
     );
 
-    // REQUIRED: DNS record based on role
-    recordPdas.DNS = getRecordKeySync(fullDomain, validatedDnsRecord.type);
+    // REQUIRED: TXT record (agent-chosen data)
+    recordPdas.DNS = getRecordKeySync(fullDomain, Record.TXT);
     recordInstructions.push(
       await createRecordInstruction(
         this.connection,
         fullDomain,
-        validatedDnsRecord.type,
-        validatedDnsRecord.value,
+        Record.TXT,
+        dnsConfig.txtValue,
         agentWallet,
         agentWallet
       )
@@ -316,7 +307,7 @@ export class SnsModule {
 
     // OPTIONAL: Additional records - async map to handle promises
     const optionalRecordInstructions = await Promise.all(
-      optionalRecords.map(async (optRecord, index) => {
+      optionalRecords.map(async (optRecord: { type: Record; value: string }, index: number) => {
         const recordKey = `optional_${index}`;
         recordPdas[recordKey] = getRecordKeySync(fullDomain, optRecord.type);
         return createRecordInstruction(
@@ -334,7 +325,7 @@ export class SnsModule {
     // OPTIONAL: Additional DNS records from dnsConfig
     if (dnsConfig.additionalRecords) {
       const additionalRecordInstructions = await Promise.all(
-        dnsConfig.additionalRecords.map(async (additional, index) => {
+        dnsConfig.additionalRecords.map(async (additional: SapDnsRecordConfig, index: number) => {
           const recordKey = `additional_${index}`;
           recordPdas[recordKey] = getRecordKeySync(fullDomain, additional.type);
           return createRecordInstruction(
@@ -348,22 +339,6 @@ export class SnsModule {
         })
       );
       recordInstructions.push(...additionalRecordInstructions);
-    }
-
-    // CRITICAL FIX #4: Add explicit role declaration record if requested
-    if (explicitRoleDeclaration) {
-      const roleRecordPda = getRecordKeySync(fullDomain, Record.TXT);
-      recordPdas.roleDeclaration = roleRecordPda;
-      recordInstructions.push(
-        await createRecordInstruction(
-          this.connection,
-          fullDomain,
-          Record.TXT,
-          `sapRole:${role}`,
-          agentWallet,
-          agentWallet
-        )
-      );
     }
 
     // 7. Combine all instructions
@@ -392,10 +367,9 @@ export class SnsModule {
     // 10. Compile records list
     const records = [
       Record.SOL,
-      validatedDnsRecord.type,
-      ...optionalRecords.map(r => r.type),
-      ...(dnsConfig.additionalRecords?.map(r => r.type) || []),
-      ...(explicitRoleDeclaration ? [Record.TXT] : []),
+      Record.TXT,
+      ...optionalRecords.map((r: { type: Record; value: string }) => r.type),
+      ...(dnsConfig.additionalRecords?.map((r: SapDnsRecordConfig) => r.type) || []),
     ];
 
     logger.info('[SnsModule] Domain registered on-chain!', {
@@ -413,46 +387,8 @@ export class SnsModule {
       transactionSignature: signature,
       recordPdas, // CRITICAL FIX #5: Complete PDA tracking
       setAsPrimary,
-      role,
       records,
     };
-  }
-
-  /**
-   * Helper: Build DNS record based on agent role with URL validation
-   * 
-   * SECURITY FIX: Validates URLs before returning
-   */
-  private buildDnsRecordForRole(
-    role: SapAgentRole,
-    config: SapDnsRecordConfig
-  ): { type: Record; value: string } {
-    switch (role) {
-      case SapAgentRole.MERCHANT: {
-        const endpoint = (config as any).x402Endpoint;
-        if (!this.isValidHttpUrl(endpoint)) {
-          throw new Error(`[SnsModule] Invalid x402Endpoint: "${endpoint}" - must be valid HTTP/HTTPS URL`);
-        }
-        return {
-          type: Record.TXT,
-          value: endpoint,
-        };
-      }
-      
-      case SapAgentRole.CITIZEN: {
-        const uri = (config as any).agentUri;
-        if (!this.isValidHttpUrl(uri)) {
-          throw new Error(`[SnsModule] Invalid agentUri: "${uri}" - must be valid HTTP/HTTPS URL`);
-        }
-        return {
-          type: Record.TXT,
-          value: uri,
-        };
-      }
-      
-      default:
-        throw new Error(`[SnsModule] Unknown agent role: ${role}`);
-    }
   }
 
   /**
@@ -493,28 +429,15 @@ export class SnsModule {
       // Get TXT record (contains x402 endpoint or agent URI)
       const txtRecord = await this.getSnsRecord(normalizedDomain, Record.TXT);
 
-      // Infer role from TXT record content or explicit declaration
-      let role: SapAgentRole | null = null;
       let x402Endpoint: string | undefined;
       let agentUri: string | undefined;
 
       if (txtRecord) {
-        // Check for explicit role declaration first
-        if (txtRecord.startsWith('sapRole:')) {
-          const declaredRole = txtRecord.replace('sapRole:', '');
-          if (declaredRole === 'merchant' || declaredRole === 'citizen') {
-            role = declaredRole === 'merchant' ? SapAgentRole.MERCHANT : SapAgentRole.CITIZEN;
-          }
-        }
-        
-        // Fall back to heuristic inference if no explicit declaration
-        if (!role) {
-          role = this.inferAgentRoleFromTxt(txtRecord);
-        }
-        
-        if (role === SapAgentRole.MERCHANT) {
+        // TXT record can contain any agent-specific data
+        // Agents freely choose what to expose (x402 endpoint, agent URI, or other data)
+        if (txtRecord.startsWith('http://') || txtRecord.startsWith('https://')) {
+          // Could be either x402Endpoint or agentUri - agents choose freely
           x402Endpoint = txtRecord;
-        } else if (role === SapAgentRole.CITIZEN) {
           agentUri = txtRecord;
         }
       }
@@ -523,7 +446,6 @@ export class SnsModule {
         domain: normalizedDomain,
         agentPda: expectedAgentPda, // CRITICAL FIX: Properly derived PDA
         wallet,
-        role,
         metadata: {
           x402Endpoint,
           agentUri,
@@ -536,7 +458,6 @@ export class SnsModule {
 
       logger.info('[SnsModule] Domain resolved', {
         domain: normalizedDomain,
-        role,
         wallet: wallet.toBase58(),
         agentPda: expectedAgentPda.toBase58(),
       });
@@ -593,28 +514,6 @@ export class SnsModule {
   }
 
   /**
-   * Infer agent role from TXT record content
-   * 
-   * IMPROVED: Better heuristics with explicit fallback
-   */
-  private inferAgentRoleFromTxt(txtValue: string): SapAgentRole | null {
-    const value = txtValue.toLowerCase();
-
-    // Strong indicators of merchant role
-    if (value.includes('x402') || value.includes('/x402') || value.includes('payment')) {
-      return SapAgentRole.MERCHANT;
-    }
-
-    // Check for common payment endpoint patterns
-    if (value.includes('/pay') || value.includes('/checkout') || value.includes('/invoice')) {
-      return SapAgentRole.MERCHANT;
-    }
-
-    // Default to citizen for non-payment URIs
-    return SapAgentRole.CITIZEN;
-  }
-
-  /**
    * Validate SNS records for SAP agent compliance (on-chain only)
    */
   async validateAgentRecords(domain: string): Promise<RecordValidationResult> {
@@ -654,8 +553,8 @@ export class SnsModule {
           // TXT should contain URL for SAP agents
           if (!dnsRecord.startsWith('http://') && !dnsRecord.startsWith('https://') && !dnsRecord.startsWith('sapRole:')) {
             warnings.push(
-              `TXT record does not appear to be a URL or role declaration: "${dnsRecord}". ` +
-              'For SAP agents, TXT should contain x402 endpoint (merchant) or agent URI (citizen).'
+              `TXT record does not appear to be a URL: "${dnsRecord}". ` +
+              'For SAP agents, TXT typically contains an endpoint URI.'
             );
           }
         }
@@ -749,5 +648,4 @@ export class SnsModule {
 }
 
 // Re-export types and enums for convenience
-export { SapAgentRole } from '../types/sns.js';
 export { Record } from '@bonfida/spl-name-service';

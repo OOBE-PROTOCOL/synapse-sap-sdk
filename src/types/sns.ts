@@ -1,277 +1,246 @@
 /**
  * @module types/sns
- * @description SNS (Solana Name Service) integration types — Engineering-first, role-based design
+ * @description SNS (Solana Name Service) integration types — Modular, free-choice design
  * @category Types
  * @since v0.21.0
  */
 
 import { PublicKey, Signer, Commitment } from '@solana/web3.js';
-import { Record } from '@bonfida/spl-name-service';
 
 /**
- * SAP Agent Role — determines DNS record requirements
+ * SNS Record Map — All possible record types
+ * 
+ * Agents choose freely which records to expose.
+ * No roles, no requirements, complete freedom.
  * 
  * @since v0.21.0
  */
-export enum SapAgentRole {
-  /**
-   * Merchant: Provides services/tools to other agents
-   * MUST expose x402 payment endpoint for micropayments
-   */
-  MERCHANT = 'merchant',
+export interface SnsRecordMap {
+  // Core (always present)
+  SOL: string;
+  Pic: string;
   
-  /**
-   * Citizen: Consumer/buyer in SAP ecosystem
-   * MAY expose any verification URI (portfolio, social, docs)
-   */
-  CITIZEN = 'citizen'
+  // Optional records (agent chooses)
+  TXT?: string;
+  Url?: string;
+  Twitter?: string;
+  Discord?: string;
+  Telegram?: string;
+  Github?: string;
+  Email?: string;
+  IPFS?: string;
+  ARWV?: string;
+  IPNS?: string;
+  ETH?: string;
+  BTC?: string;
+  BSC?: string;
+  Injective?: string;
+  LTC?: string;
+  DOGE?: string;
+  A?: string;
+  AAAA?: string;
+  CNAME?: string;
+  Reddit?: string;
+  Background?: string;
+  Backpack?: string;
+  POINT?: string;
+  BASE?: string;
+  SHDW?: string;
 }
 
 /**
- * Generic DNS record structure for SAP agents
+ * SAP Structured Data — Optional data in TXT record
+ * 
+ * Agents can expose SAP-specific data in TXT record.
+ * Completely optional and extensible.
  * 
  * @since v0.21.0
  */
-export interface SapDnsRecord {
-  /** DNS record type */
-  type: Record.A | Record.AAAA | Record.CNAME | Record.TXT;
-  /** Record value (UTF-8 string) */
-  value: string;
-  /** Optional: human-readable label for UI display */
-  label?: string;
+export interface SapStructuredData {
+  /** SAP SDK version */
+  version?: string;
+  /** Agent capabilities (e.g., ["jupiter:swap", "kamino:lend"]) */
+  capabilities?: string[];
+  /** Supported protocols (e.g., ["jupiter", "kamino"]) */
+  protocols?: string[];
+  /** Pricing information */
+  pricing?: {
+    pricePerCall?: number;
+    maxCallsPerSettlement?: number;
+    acceptedTokens?: string[];
+  };
+  /** Reputation metrics */
+  reputation?: {
+    totalCalls?: number;
+    avgLatencyMs?: number;
+    uptimePercent?: number;
+  };
+  /** Extensible — agents can add custom fields */
+  [key: string]: unknown;
 }
 
 /**
- * DNS Record configuration based on agent role
+ * Social Profiles — Optional social media presence
  * 
  * @since v0.21.0
  */
-export type SapDnsRecordConfig = 
-  | {
-      role: SapAgentRole.MERCHANT;
-      /** x402 endpoint URL for payment processing */
-      x402Endpoint: string;  // e.g., "https://api.merchant.com/x402"
-      /** Optional: additional DNS records */
-      additionalRecords?: SapDnsRecord[];
-    }
-  | {
-      role: SapAgentRole.CITIZEN;
-      /** Any URI for verification (portfolio, social, docs, etc.) */
-      agentUri: string;  // e.g., "https://portfolio.example.com"
-      /** Optional: additional DNS records */
-      additionalRecords?: SapDnsRecord[];
-    };
+export interface SocialProfiles {
+  twitter?: string;
+  discord?: string;
+  telegram?: string;
+  github?: string;
+}
 
 /**
- * Optional non-DNS records that agents may add
+ * Metadata URLs — Optional metadata locations
  * 
  * @since v0.21.0
  */
-export interface SapOptionalRecord {
-  /** SNS Record type (non-DNS) */
-  type: Exclude<Record, Record.A | Record.AAAA | Record.CNAME | Record.TXT>;
-  /** Record value (UTF-8 string) */
-  value: string;
-  /** Optional: human-readable label */
-  label?: string;
+export interface MetadataUrls {
+  endpoint?: string;
+  website?: string;
+  ipfs?: string;
+  arweave?: string;
+  ipns?: string;
 }
 
 /**
- * Complete SNS registration parameters for SAP agents
- * 
- * Design principle: Only SOL record is mandatory.
- * DNS record (A/AAAA/CNAME/TXT) is required based on role.
- * All other records are optional and agent-specific.
+ * Contact Info — Optional contact methods
  * 
  * @since v0.21.0
  */
-export interface SapSnsRegistrationParams {
-  /** Agent wallet public key (will be stored in SOL record) */
-  agentWallet: PublicKey;
-  
-  /** Domain name WITHOUT .sol suffix */
-  domainName: string;
-  
-  /** Agent role (determines DNS record requirements) */
-  role: SapAgentRole;
-  
-  /** DNS configuration based on role */
-  dnsConfig: SapDnsRecordConfig;
-  
-  /** Optional: additional non-DNS records (Pic, Url, Twitter, etc.) */
-  optionalRecords?: SapOptionalRecord[];
-  
-  /** Transaction signer (must be agent wallet owner) */
-  signer: Signer;
-  
-  /** Optional: space allocation in bytes (default: 600) */
-  space?: number;
-  
-  /** Optional: set as primary domain for wallet */
-  setAsPrimary?: boolean;
-  
-  /** Optional: commitment level for transactions (default: 'confirmed') */
-  commitment?: Commitment;
-  
-  /** Optional: explicit role declaration stored on-chain (overrides heuristic inference) */
-  explicitRoleDeclaration?: boolean;
+export interface ContactInfo {
+  email?: string;
 }
 
 /**
- * Legacy SAP Agent SNS Records configuration
+ * Multi-Chain Addresses — Optional cross-chain identity
  * 
- * @deprecated v0.21.0 — Use SapAgentRole + SapDnsRecordConfig instead
- * 
- * These records were stored as TXT records on SNS and linked the domain
- * to the SAP Agent identity. Now replaced by role-based minimal design.
+ * @since v0.21.0
  */
-export interface SapAgentSnsRecords {
-  /** Agent wallet address (base58) - REQUIRED */
-  agentWallet: string;
-  
-  /** Agent PDA (base58) - REQUIRED, links domain to SAP agent */
-  agentPda: string;
-  
-  /** SAP Program ID (base58) - REQUIRED */
-  sapProgramId: string;
-  
-  /** Agent capabilities (JSON string) - OPTIONAL */
-  capabilities?: string;
-  
-  /** Metadata URI for additional agent info - OPTIONAL */
-  metadataUri?: string;
-  
-  /** Web2 domain linked to agent (e.g., "agent.example.com") - OPTIONAL */
-  web2Domain?: string;
-  
-  /** Agent endpoint URL for SAP registration (e.g., "https://api.agent.com/sap") - OPTIONAL */
-  agentEndpoint?: string;
+export interface MultiChainAddresses {
+  eth?: string;
+  btc?: string;
+  bsc?: string;
+  injective?: string;
+  ltc?: string;
+  doge?: string;
 }
 
 /**
- * SNS Registration parameters (legacy)
+ * DNS Records — Optional DNS configuration
  * 
- * @deprecated v0.21.0 — Use SapSnsRegistrationParams instead
+ * @since v0.21.0
+ */
+export interface DnsRecords {
+  a?: string;
+  aaaa?: string;
+  cname?: string;
+}
+
+/**
+ * Builder Options — Modular record builder configuration
+ * 
+ * All options except core (wallet, agentPda) are optional.
+ * Agents choose freely what to expose.
+ * 
+ * @since v0.21.0
+ */
+export interface SnsRecordBuilderOptions {
+  // Core (always required)
+  /** Agent wallet public key */
+  wallet: PublicKey;
+  /** Agent PDA (on-chain identity) */
+  agentPda: PublicKey;
+  
+  // Optional packs (agent chooses)
+  /** Include identity pack (social, contact) */
+  includeIdentity?: boolean;
+  /** Include decentralized pack (IPFS, ARWV) */
+  includeDecentralized?: boolean;
+  /** Include multi-chain pack (ETH, BTC, etc) */
+  includeMultiChain?: boolean;
+  /** Include DNS pack (A, AAAA, CNAME) */
+  includeDns?: boolean;
+  
+  // Actual data (optional, agent decides)
+  /** SAP structured data for TXT record */
+  sapData?: SapStructuredData;
+  /** Social media profiles */
+  social?: SocialProfiles;
+  /** Metadata URLs */
+  metadata?: MetadataUrls;
+  /** Contact information */
+  contact?: ContactInfo;
+  /** Multi-chain addresses */
+  multiChain?: MultiChainAddresses;
+  /** DNS records */
+  dns?: DnsRecords;
+  
+  // Custom records
+  /** Custom record overrides */
+  customRecords?: Partial<SnsRecordMap>;
+}
+
+/**
+ * SNS Registration Parameters
+ * 
+ * @since v0.21.0
  */
 export interface SnsRegistrationParams {
   /** Agent wallet public key */
   agentWallet: PublicKey;
-  
-  /** Desired domain name (without .sol suffix) */
+  /** Domain name WITHOUT .sol suffix */
   domainName: string;
-  
-  /** Registration duration in years (1-10) - Note: currently fixed to 1 year */
+  /** Records to register (built with buildSnsRecords) */
+  records: SnsRecordMap;
+  /** Transaction signer (must match agentWallet) */
+  signer: Signer;
+  /** Registration duration in years (default: 1) */
   durationYears?: number;
-  
-  /** Agent capabilities - OPTIONAL */
-  capabilities?: string[];
-  
-  /** Metadata URI for additional agent info - OPTIONAL */
-  metadataUri?: string;
-  
-  /** Web2 domain to link - OPTIONAL */
-  web2Domain?: string;
-  
-  /** Agent endpoint URL for SAP registration - OPTIONAL */
-  agentEndpoint?: string;
-  
-  /** Transaction signer */
-  signer: any; // Signer from @solana/web3.js
-  
-  /** Set this domain as primary for the wallet - OPTIONAL, default false */
+  /** Set as primary domain (default: false) */
   setAsPrimary?: boolean;
+  /** Commitment level (default: 'confirmed') */
+  commitment?: Commitment;
+  /** Space allocation in bytes (default: 600) */
+  space?: number;
 }
 
 /**
- * SNS Registration result
+ * SNS Registration Result
  * 
  * @since v0.21.0
  */
 export interface SnsRegistrationResult {
-  /** Full domain name (with .sol) */
+  /** Full domain with .sol suffix */
   domain: string;
-  
-  /** Domain PDA */
+  /** Domain account PDA */
   domainPda: PublicKey;
-  
-  /** Agent PDA */
+  /** SAP agent PDA */
   agentPda: PublicKey;
-  
   /** Transaction signature */
   transactionSignature: string;
-  
-  /** SNS record PDAs */
+  /** All record PDAs */
   recordPdas: { [key: string]: PublicKey };
-  
-  /** Whether domain was set as primary */
+  /** Whether set as primary domain */
   setAsPrimary: boolean;
-  
-  /** Agent role */
-  role: SapAgentRole;
-  
-  /** Records that were created */
+  /** List of created record types */
   records: string[];
 }
 
 /**
- * SNS Domain information
- * 
- * @since v0.21.0
- */
-export interface SnsDomainInfo {
-  /** Domain name */
-  domain: string;
-  
-  /** Domain PDA */
-  domainPda: PublicKey;
-  
-  /** Owner wallet */
-  owner: PublicKey;
-  
-  /** Registration timestamp */
-  registeredAt: Date;
-  
-  /** Expiration timestamp */
-  expiresAt: Date;
-  
-  /** Whether domain is linked to SAP agent */
-  isSapAgent: boolean;
-  
-  /** Agent role (if linked to SAP) */
-  agentRole?: SapAgentRole;
-  
-  /** SAP agent PDA (if linked) */
-  agentPda?: PublicKey;
-  
-  /** x402 endpoint (if merchant) */
-  x402Endpoint?: string;
-  
-  /** Agent URI (if citizen) */
-  agentUri?: string;
-  
-  /** Whether this is the primary domain for the owner */
-  isPrimary: boolean;
-}
-
-/**
- * SNS Resolution result
+ * SNS Resolution Result
  * 
  * @since v0.21.0
  */
 export interface SnsResolutionResult {
   /** Domain name */
   domain: string;
-  
-  /** Agent PDA */
+  /** Derived SAP agent PDA */
   agentPda: PublicKey;
-  
-  /** Wallet address */
+  /** Owner wallet from SOL record */
   wallet: PublicKey;
-  
-  /** Agent role */
-  role: SapAgentRole | null;
-  
-  /** Agent metadata */
+  /** Metadata extracted from records */
   metadata: {
     x402Endpoint?: string;
     agentUri?: string;
@@ -280,69 +249,52 @@ export interface SnsResolutionResult {
     web2Domain?: string;
     agentEndpoint?: string;
   };
-  
   /** All SNS records */
   records: { [key: string]: string };
 }
 
 /**
- * SNS Module configuration
+ * SNS Fetch Options — Modular fetching
  * 
  * @since v0.21.0
  */
-export interface SnsModuleConfig {
-  /** Solana connection */
-  connection: any; // Connection from @solana/web3.js
-  
-  /** SAP Program ID */
-  sapProgramId: string;
-  
-  /** Optional: default commitment level for transactions (default: 'confirmed') */
-  defaultCommitment?: Commitment;
+export interface SnsFetchOptions {
+  /** Include core records (SOL, Pic) */
+  includeCore?: boolean;
+  /** Include and parse SAP data from TXT */
+  includeSapData?: boolean;
+  /** Include social records */
+  includeSocial?: boolean;
+  /** Include multi-chain records */
+  includeMultiChain?: boolean;
+  /** Include metadata records (IPFS, ARWV, Url) */
+  includeMetadata?: boolean;
 }
 
 /**
- * Domain availability check result
+ * Fetched SNS Records
  * 
  * @since v0.21.0
  */
-export interface DomainAvailability {
-  /** Domain name */
-  domain: string;
-  
-  /** Whether domain is available */
-  available: boolean;
-  
-  /** Error message if check failed */
-  error?: string;
+export interface FetchedSnsRecords {
+  /** Core identity */
+  core?: {
+    wallet: PublicKey;
+    avatar: string;
+  };
+  /** SAP structured data */
+  sapData?: SapStructuredData;
+  /** Social profiles */
+  social?: SocialProfiles;
+  /** Multi-chain addresses */
+  multiChain?: MultiChainAddresses;
+  /** Metadata URLs */
+  metadata?: MetadataUrls;
 }
 
 /**
- * Record validation result
+ * Re-export Record enum from Bonfida SDK for convenience
  * 
  * @since v0.21.0
  */
-export interface RecordValidationResult {
-  /** Whether records are valid */
-  valid: boolean;
-  /** Error messages */
-  errors: string[];
-  /** Warning messages */
-  warnings: string[];
-}
-
-export default {
-  SapAgentRole: undefined as unknown as typeof SapAgentRole,
-  SapDnsRecord: undefined as unknown as SapDnsRecord,
-  SapDnsRecordConfig: undefined as unknown as SapDnsRecordConfig,
-  SapOptionalRecord: undefined as unknown as SapOptionalRecord,
-  SapSnsRegistrationParams: undefined as unknown as SapSnsRegistrationParams,
-  SapAgentSnsRecords: undefined as unknown as SapAgentSnsRecords,
-  SnsRegistrationParams: undefined as unknown as SnsRegistrationParams,
-  SnsRegistrationResult: undefined as unknown as SnsRegistrationResult,
-  SnsDomainInfo: undefined as unknown as SnsDomainInfo,
-  SnsResolutionResult: undefined as unknown as SnsResolutionResult,
-  SnsModuleConfig: undefined as unknown as SnsModuleConfig,
-  DomainAvailability: undefined as unknown as DomainAvailability,
-  RecordValidationResult: undefined as unknown as RecordValidationResult,
-};
+export { Record } from '@bonfida/spl-name-service';

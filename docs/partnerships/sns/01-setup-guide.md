@@ -142,16 +142,15 @@ if (!available) {
 Configure registration based on agent role:
 
 ```typescript
-import { SapAgentRole, SapSnsRegistrationParams } from '@oobe-protocol-labs/synapse-sap-sdk/types/sns';
 import { Record } from '@bonfida/spl-name-service';
 
 // Merchant agent (provides services, requires x402 endpoint)
 const merchantParams: SapSnsRegistrationParams = {
   agentWallet: agentWallet.publicKey,
   domainName: 'trading-bot',
-  role: SapAgentRole.MERCHANT,
+  // role removed - free choice philosophy
   dnsConfig: {
-    role: SapAgentRole.MERCHANT,
+    // role removed - free choice philosophy
     x402Endpoint: 'https://api.trading-bot.com/x402',
     additionalRecords: [
       { type: Record.Url, value: 'https://trading-bot.com', label: 'Website' },
@@ -172,9 +171,9 @@ const merchantParams: SapSnsRegistrationParams = {
 const citizenParams: SapSnsRegistrationParams = {
   agentWallet: agentWallet.publicKey,
   domainName: 'alice',
-  role: SapAgentRole.CITIZEN,
+  // role removed - free choice philosophy
   dnsConfig: {
-    role: SapAgentRole.CITIZEN,
+    // role removed - free choice philosophy
     agentUri: 'https://portfolio.example.com/alice',
   },
   signer: agentWallet,
@@ -323,9 +322,9 @@ await connection.requestAirdrop(agentWallet.publicKey, 2_000_000_000); // 2 SOL
 const result = await snsModule.registerAgentDomain({
   agentWallet: agentWallet.publicKey,
   domainName: 'test-agent',
-  role: SapAgentRole.MERCHANT,
+  // role removed - free choice philosophy
   dnsConfig: {
-    role: SapAgentRole.MERCHANT,
+    // role removed - free choice philosophy
     x402Endpoint: 'https://test.example.com/x402',
   },
   signer: agentWallet,

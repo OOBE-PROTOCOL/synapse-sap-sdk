@@ -36,13 +36,5 @@ export {
   computeEscrowMaxObligation,
 } from "./utils/validate";
 
-// SNS SDK - Standalone domain management (independent from SAP)
-export { SnsSdk, Record } from "./modules/sns-standalone";
-export type {
-  DomainAvailability,
-  DomainPortfolioItem,
-  DomainRecords,
-  RegistrationTransaction,
-  PrimaryDomainTransaction,
-  SnsSdkConfig,
-} from "./modules/sns-standalone";
+// SNS Integration - Modular record system with free choice philosophy
+// See docs/partnerships/sns/ for complete documentation

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.21.0] - 2026-06-25
 
-### 🎉 Major Features
+###  Major Features
 
 #### SNS Integration — Modular Record System
 Complete SNS (Solana Name Service) integration with modular, composable record system.
@@ -135,7 +135,7 @@ Complete SNS (Solana Name Service) integration with modular, composable record s
 
 ---
 
-### 🎯 Philosophy Compliance
+### Philosophy Compliance
 
 All features follow SAP core principles:
 
@@ -144,13 +144,13 @@ All features follow SAP core principles:
 | **Free Choice** | Every record optional, no obligations |
 | **Strong Typing** | TypeScript rigorous but flexible |
 | **Modularity** | Builder pattern, composable packs |
-| **No Imposition** | No rigid roles (merchant/citizen) |
+| **No Imposition** | No rigid roles  |
 | **URI Delegation** | Can point to off-chain metadata |
 | **Extensibility** | Custom data support |
 
 ---
 
-### 📦 Package Updates
+### Package Updates
 
 #### Dependencies
 - `@bonfida/spl-name-service@3.0.9` — Official SNS SDK
@@ -161,7 +161,7 @@ All features follow SAP core principles:
 
 ---
 
-### 🐛 Bug Fixes
+### Bug Fixes
 
 #### SNS Module
 - Fixed signer verification in `registerAgentDomain()`
@@ -178,7 +178,7 @@ All features follow SAP core principles:
 
 ---
 
-### 📊 Code Metrics
+### Code Metrics
 
 | Metric | Value |
 |--------|-------|
@@ -220,7 +220,7 @@ All features follow SAP core principles:
 
 ---
 
-### 🚀 Migration Guide
+### Migration Guide
 
 #### From v0.20.0 to v0.21.0
 
@@ -271,13 +271,13 @@ synapse-sap sns register trading-bot \
 
 ---
 
-### 📝 Known Issues
+### Known Issues
 
 **None** — All issues resolved before release.
 
 ---
 
-### 🎯 Future Roadmap
+###  Future Roadmap
 
 #### v0.22.0 (Planned)
 - Unit tests for SNS module
