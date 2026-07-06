@@ -46,18 +46,25 @@ layout that integrators already smoke-tested on devnet/mainnet.
   account automatically for SOL V2 settlements.
 - `EscrowV2Module.settle()` and `x402.settle()` now derive and include the
   treasury ATA automatically for SPL/USDC V2 settlement fees.
+- Legacy `Pdas` exports now delegate to the canonical `pda` helpers, including
+  `sap_stake(agent)`, `sap_stats(agent)`, `sap_pricing(agent)`, and
+  `sap_escrow_v2(agent, depositor, nonce)` derivations.
+- `AgentModule.register/update/deactivate/reactivate` now passes the full
+  account set required by the `1.0.0` IDL.
 - `agent.close()` now passes `pricingMenu` and `stake`, matching the v1.0.0
   program IDL so closing an agent returns the AgentStake collateral when no
   active escrow obligations remain.
 - Removed stale `settlementReceipt` / `receiptMerkleRoot` arguments from V2
   settlement builders that do not exist in the canonical `1.0.0` IDL.
-- Sanitized release history and package docs so no secret-like OpenVSX,
-  Postgres, or private RPC strings are reachable from release refs.
+- Sanitized release history and package docs so no previously reported
+  secret-like strings are reachable from release refs.
 
 ### Validation
 - SDK build passed.
 - CLI build passed.
 - SDK smoke tests passed.
+- Verified CJS and ESM dist imports for `Pdas.getAgentPDA()` and
+  `Pdas.getAgentStakePDA()`.
 - `npm pack --dry-run` produced `@oobe-protocol-labs/synapse-sap-sdk@1.0.0`.
 - `npm pack --dry-run` produced `synapse-sap-cli@1.0.0`.
 - Verified all embedded SDK IDL JSON files expose `metadata.version = 1.0.0`.

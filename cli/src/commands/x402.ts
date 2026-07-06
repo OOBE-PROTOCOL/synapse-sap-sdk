@@ -18,7 +18,7 @@ export function registerX402Commands(program: Command): void {
       const ctx = buildContext(loadConfig(program.opts()));
       try {
         const [agentPda] = Pdas.getAgentPDA(parseWallet(agentStr));
-        const [escrowPda] = Pdas.getEscrowV2PDA(agentPda, 0);
+        const [escrowPda] = Pdas.getEscrowV2PDA(agentPda, ctx.wallet.publicKey, 0);
         const data = await ctx.client.fetchAccount("escrowAccount", escrowPda);
         if (!data) { log.error("No escrow found"); process.exit(1); }
         output({

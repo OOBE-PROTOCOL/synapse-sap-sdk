@@ -2,7 +2,7 @@
  * @module cli/commands/escrow
  * @description Escrow v2 lifecycle — v1.0.0 aligned.
  * Uses: client.escrow.createEscrowV2, depositEscrowV2, settleCallsV2, closeEscrowV2
- * Pdas: getAgentPDA, getEscrowV2PDA, getAgentStatsPDA, getAgentStakePDA, getGlobalPDA
+ * Pdas: getAgentPDA, getEscrowV2PDA, getAgentStatsPDA, getAgentStakePDA, getPricingMenuPDA
  */
 import { Command } from "commander";
 import anchor from "@coral-xyz/anchor";
@@ -30,11 +30,10 @@ export function registerEscrowCommands(program: Command): void {
       try {
         const agentWallet = parseWallet(agentStr);
         const [agentPda] = Pdas.getAgentPDA(agentWallet);
-        const [agentStake] = Pdas.getAgentStakePDA(agentWallet);
-        const [agentStats] = Pdas.getAgentStatsPDA(agentWallet);
-        const [escrowPda] = Pdas.getEscrowV2PDA(agentPda, 0);
-        const [globalPda] = Pdas.getGlobalPDA();
-        const pricingMenu = globalPda; // placeholder
+        const [agentStake] = Pdas.getAgentStakePDA(agentPda);
+        const [agentStats] = Pdas.getAgentStatsPDA(agentPda);
+        const [escrowPda] = Pdas.getEscrowV2PDA(agentPda, ctx.wallet.publicKey, 0);
+        const [pricingMenu] = Pdas.getPricingMenuPDA(agentPda);
 
         const ix = await ctx.client.escrow.createEscrowV2({
           signer: ctx.wallet,
@@ -75,7 +74,7 @@ export function registerEscrowCommands(program: Command): void {
       const ctx = buildContext(loadConfig(program.opts()));
       try {
         const [agentPda] = Pdas.getAgentPDA(parseWallet(agentStr));
-        const [escrowPda] = Pdas.getEscrowV2PDA(agentPda, 0);
+        const [escrowPda] = Pdas.getEscrowV2PDA(agentPda, ctx.wallet.publicKey, 0);
 
         const ix = await ctx.client.escrow.depositEscrowV2({
           signer: ctx.wallet,
@@ -99,8 +98,8 @@ export function registerEscrowCommands(program: Command): void {
       const ctx = buildContext(loadConfig(program.opts()));
       try {
         const [agentPda] = Pdas.getAgentPDA(parseWallet(agentStr));
-        const [escrowPda] = Pdas.getEscrowV2PDA(agentPda, 0);
-        const [agentStats] = Pdas.getAgentStatsPDA(parseWallet(agentStr));
+        const [escrowPda] = Pdas.getEscrowV2PDA(agentPda, ctx.wallet.publicKey, 0);
+        const [agentStats] = Pdas.getAgentStatsPDA(agentPda);
         const callsToSettle = parseInt(opts.calls);
 
         const ix = await ctx.client.escrow.settleCallsV2({
@@ -126,7 +125,7 @@ export function registerEscrowCommands(program: Command): void {
       const ctx = buildContext(loadConfig(program.opts()));
       try {
         const [agentPda] = Pdas.getAgentPDA(parseWallet(agentStr));
-        const [escrowPda] = Pdas.getEscrowV2PDA(agentPda, 0);
+        const [escrowPda] = Pdas.getEscrowV2PDA(agentPda, ctx.wallet.publicKey, 0);
         const data = await ctx.client.fetchAccount("escrowAccount", escrowPda);
         output(data ?? { error: "Escrow not found", escrowPda: escrowPda.toBase58() });
       } catch (err) { log.error("info failed", { error: (err as Error).message }); process.exit(1); }

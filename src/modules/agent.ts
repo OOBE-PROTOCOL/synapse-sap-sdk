@@ -93,6 +93,7 @@ export class AgentModule extends BaseModule {
   async register(args: RegisterAgentArgs): Promise<TransactionSignature> {
     const [agentPda] = this.deriveAgent();
     const [statsPda] = this.deriveStats(agentPda);
+    const [pricingPda] = derivePricingMenu(agentPda);
     const [globalPda] = deriveGlobalRegistry();
 
     return this.methods
@@ -110,6 +111,7 @@ export class AgentModule extends BaseModule {
         wallet: this.walletPubkey,
         agent: agentPda,
         agentStats: statsPda,
+        pricingMenu: pricingPda,
         globalRegistry: globalPda,
         systemProgram: SystemProgram.programId,
       })
@@ -127,6 +129,7 @@ export class AgentModule extends BaseModule {
    */
   async update(args: UpdateAgentArgs): Promise<TransactionSignature> {
     const [agentPda] = this.deriveAgent();
+    const [pricingPda] = derivePricingMenu(agentPda);
 
     return this.methods
       .updateAgent(
@@ -142,6 +145,7 @@ export class AgentModule extends BaseModule {
       .accounts({
         wallet: this.walletPubkey,
         agent: agentPda,
+        pricingMenu: pricingPda,
         systemProgram: SystemProgram.programId,
       })
       .rpc();
@@ -157,6 +161,7 @@ export class AgentModule extends BaseModule {
   async deactivate(): Promise<TransactionSignature> {
     const [agentPda] = this.deriveAgent();
     const [statsPda] = this.deriveStats(agentPda);
+    const [globalPda] = deriveGlobalRegistry();
 
     return this.methods
       .deactivateAgent()
@@ -164,6 +169,7 @@ export class AgentModule extends BaseModule {
         wallet: this.walletPubkey,
         agent: agentPda,
         agentStats: statsPda,
+        globalRegistry: globalPda,
       })
       .rpc();
   }
@@ -178,6 +184,7 @@ export class AgentModule extends BaseModule {
   async reactivate(): Promise<TransactionSignature> {
     const [agentPda] = this.deriveAgent();
     const [statsPda] = this.deriveStats(agentPda);
+    const [globalPda] = deriveGlobalRegistry();
 
     return this.methods
       .reactivateAgent()
@@ -185,6 +192,7 @@ export class AgentModule extends BaseModule {
         wallet: this.walletPubkey,
         agent: agentPda,
         agentStats: statsPda,
+        globalRegistry: globalPda,
       })
       .rpc();
   }

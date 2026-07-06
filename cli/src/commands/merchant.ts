@@ -26,7 +26,8 @@ export function registerMerchantCommands(program: Command): void {
       try {
         const wallet = ctx.wallet.publicKey;
         const [agentPda] = Pdas.getAgentPDA(wallet);
-        const [agentStats] = Pdas.getAgentStatsPDA(wallet);
+        const [agentStats] = Pdas.getAgentStatsPDA(agentPda);
+        const [pricingMenu] = Pdas.getPricingMenuPDA(agentPda);
         const [globalPda] = Pdas.getGlobalPDA();
 
         const caps = opts.capabilities ? opts.capabilities.split(",").map((s: string) => ({
@@ -35,7 +36,7 @@ export function registerMerchantCommands(program: Command): void {
 
         const ix = await ctx.client.agent.registerAgent({
           signer: ctx.wallet, wallet, agent: agentPda, agentStats,
-          pricingMenu: globalPda, globalRegistry: globalPda,
+          pricingMenu, globalRegistry: globalPda,
           name: opts.name, description: opts.description,
           capabilities: caps, pricing: [], protocols: ["sap"],
           agentId: null, agentUri: null, x402Endpoint: null,

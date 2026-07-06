@@ -65,14 +65,15 @@ export class AgentModule {
       .instruction();
   }
 
-  /** register_agent (5 accounts, 8 args) */
-  async registerAgent(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; agentStats: PublicKey; globalRegistry: PublicKey; name: string; description: string; capabilities: Capability[]; pricing: PricingTier[]; protocols: string[]; agentId: (string | null); agentUri: (string | null); x402Endpoint: (string | null); remainingAccounts?: any[] }): Promise<TransactionInstruction> {
+  /** register_agent (6 accounts, 8 args) */
+  async registerAgent(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; agentStats: PublicKey; pricingMenu: PublicKey; globalRegistry: PublicKey; name: string; description: string; capabilities: Capability[]; pricing: PricingTier[]; protocols: string[]; agentId: (string | null); agentUri: (string | null); x402Endpoint: (string | null); remainingAccounts?: any[] }): Promise<TransactionInstruction> {
     return this.program
       .methods.registerAgent(ctx.name, ctx.description, ctx.capabilities, ctx.pricing, ctx.protocols, ctx.agentId, ctx.agentUri, ctx.x402Endpoint)
       .accounts({
         wallet: ctx.wallet,
         agent: ctx.agent,
         agentStats: ctx.agentStats,
+        pricingMenu: ctx.pricingMenu,
         globalRegistry: ctx.globalRegistry,
         systemProgram: SystemProgram.programId,
       })
@@ -82,12 +83,13 @@ export class AgentModule {
   }
 
   /** update_agent (3 accounts, 8 args) */
-  async updateAgent(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; name: (string | null); description: (string | null); capabilities: (Capability[] | null); pricing: (PricingTier[] | null); protocols: (string[] | null); agentId: (string | null); agentUri: (string | null); x402Endpoint: (string | null); remainingAccounts?: any[] }): Promise<TransactionInstruction> {
+  async updateAgent(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; pricingMenu: PublicKey; name: (string | null); description: (string | null); capabilities: (Capability[] | null); pricing: (PricingTier[] | null); protocols: (string[] | null); agentId: (string | null); agentUri: (string | null); x402Endpoint: (string | null); remainingAccounts?: any[] }): Promise<TransactionInstruction> {
     return this.program
       .methods.updateAgent(ctx.name, ctx.description, ctx.capabilities, ctx.pricing, ctx.protocols, ctx.agentId, ctx.agentUri, ctx.x402Endpoint)
       .accounts({
         wallet: ctx.wallet,
         agent: ctx.agent,
+        pricingMenu: ctx.pricingMenu,
         systemProgram: SystemProgram.programId,
       })
       .remainingAccounts(ctx.remainingAccounts ?? [])

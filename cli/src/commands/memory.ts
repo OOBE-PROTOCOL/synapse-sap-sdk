@@ -49,15 +49,15 @@ export function registerMemoryCommands(program: Command): void {
       try {
         const hex = opts.hash.replace(/^0x/, "");
         if (hex.length !== 64) { log.error("Hash must be 64 hex chars"); process.exit(1); }
-        const sessionHash = Array.from(Buffer.from(hex, "hex"));
+        const sessionHash = Buffer.from(hex, "hex");
         const wallet = ctx.wallet.publicKey;
         const [agentPda] = Pdas.getAgentPDA(wallet);
         const [vaultPda] = Pdas.getVaultPDA(agentPda);
-        const [sessionPda] = Pdas.getSessionLedgerPDA(vaultPda, new BN(0));
+        const [sessionPda] = Pdas.getSessionLedgerPDA(vaultPda, sessionHash);
 
         const ix = await ctx.client.session.openSession({
           signer: ctx.wallet, wallet, agent: agentPda, vault: vaultPda,
-          session: sessionPda, sessionHash,
+          session: sessionPda, sessionHash: Array.from(sessionHash),
         });
 
         const tx = await ctx.client.buildTransaction([ix], wallet);
@@ -78,7 +78,7 @@ export function registerMemoryCommands(program: Command): void {
         const [agentPda] = Pdas.getAgentPDA(wallet);
         const [vaultPda] = Pdas.getVaultPDA(agentPda);
         const [sessionPda] = Pdas.getSessionLedgerPDA(vaultPda, new BN(opts.session));
-        const [epochPagePda] = Pdas.getEpochPagePDA(vaultPda, new BN(opts.epoch));
+        const [epochPagePda] = Pdas.getEpochPagePDA(sessionPda, new BN(opts.epoch));
         const encryptedData = Buffer.from(opts.data || "test-payload", "base64");
 
         const ix = await ctx.client.vault.inscribeMemory({

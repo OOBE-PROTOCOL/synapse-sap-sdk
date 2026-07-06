@@ -15,6 +15,8 @@ First official stable release of the SAP CLI, aligned with SDK `1.0.0`.
 
 - Stable CLI release metadata for npm and GitHub release consumers.
 - Help text and banners aligned to the SAP `1.0.0` commerce release.
+- `agent close` and `agent close-stake` commands for normal agent closure and
+  legacy closed-agent StakePDA recovery.
 
 ### Changed
 
@@ -26,6 +28,8 @@ First official stable release of the SAP CLI, aligned with SDK `1.0.0`.
 
 - Removed stale V2 settlement receipt arguments from CLI escrow settlement
   builders.
+- Replaced stale placeholder PDA derivations with canonical v1.0.0 accounts for
+  agent registration, merchant registration, escrow V2, x402, and memory flows.
 - Kept CLI settlement flows aligned with the canonical V2 IDL:
   `settle_calls_v2` uses 5 base accounts and `create_pending_settlement` uses
   4 arguments.

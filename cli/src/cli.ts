@@ -50,7 +50,7 @@ Quick Start:
 
 Command Groups:
   wizard      Interactive MCP Server setup (creates config + isolated keypair)
-  agent       Agent lifecycle (list, info, register)
+  agent       Agent lifecycle (list, info, register, close, close-stake)
   escrow      Escrow v2 (create, deposit, settle, info)
   x402        Payment flows (headers, verify)
   merchant    Merchant ops (register, delegate)

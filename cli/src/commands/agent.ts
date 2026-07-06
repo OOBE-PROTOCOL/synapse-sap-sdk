@@ -1,8 +1,8 @@
 /**
  * @module cli/commands/agent
  * @description Agent lifecycle — v1.0.0 aligned.
- * Uses: client.agent.registerAgent(), client.agent.updateAgent(), deactivateAgent(), reactivateAgent()
- * Pdas: getAgentPDA(wallet), getAgentStatsPDA(wallet), getGlobalPDA()
+ * Uses: client.agent.registerAgent(), closeAgent(), and client.staking.closeStake()
+ * Pdas: getAgentPDA(wallet), getAgentStatsPDA(agent), getPricingMenuPDA(agent), getAgentStakePDA(agent), getGlobalPDA()
  */
 import { Command } from "commander";
 import anchor from "@coral-xyz/anchor";
@@ -61,12 +61,9 @@ export function registerAgentCommands(program: Command): void {
       try {
         const wallet = ctx.wallet.publicKey;
         const [agentPda] = Pdas.getAgentPDA(wallet);
-        const [agentStats] = Pdas.getAgentStatsPDA(wallet);
+        const [agentStats] = Pdas.getAgentStatsPDA(agentPda);
+        const [pricingMenu] = Pdas.getPricingMenuPDA(agentPda);
         const [globalRegistry] = Pdas.getGlobalPDA();
-
-        // Pricing menu PDA: derived from global registry + agent
-        // Use placeholder for pricing menu
-        const pricingMenu = Pdas.getGlobalPDA()[0]; // placeholder
 
         const caps = opts.capabilities ? opts.capabilities.split(",").map((s: string) => ({
           id: s.trim(), description: null, protocolId: "sap", version: "1.0",
@@ -98,5 +95,70 @@ export function registerAgentCommands(program: Command): void {
         log.info("Agent registered!");
         output({ txSignature: sig, agentPda: agentPda.toBase58() });
       } catch (err) { log.error("register failed", { error: (err as Error).message }); process.exit(1); }
+    });
+
+  agent.command("close")
+    .description("Close the current wallet's agent and return rent/stake when no active obligations remain")
+    .option("--simulate", "Dry run")
+    .action(async (opts) => {
+      const ctx = buildContext(loadConfig(program.opts()));
+      try {
+        const wallet = ctx.wallet.publicKey;
+        const [agentPda] = Pdas.getAgentPDA(wallet);
+        const [agentStats] = Pdas.getAgentStatsPDA(agentPda);
+        const [vaultCheck] = Pdas.getVaultPDA(agentPda);
+        const [pricingMenu] = Pdas.getPricingMenuPDA(agentPda);
+        const [stake] = Pdas.getAgentStakePDA(agentPda);
+        const [globalRegistry] = Pdas.getGlobalPDA();
+
+        const ix = await ctx.client.agent.closeAgent({
+          signer: ctx.wallet,
+          wallet,
+          agent: agentPda,
+          agentStats,
+          vaultCheck,
+          pricingMenu,
+          stake,
+          globalRegistry,
+        });
+
+        if (opts.simulate || program.opts().dryRun) {
+          output({ dryRun: true, agentPda: agentPda.toBase58(), stake: stake.toBase58() }); return;
+        }
+
+        const tx = await ctx.client.buildTransaction([ix], wallet);
+        const sig = await ctx.client.sendTransaction(tx, [ctx.wallet]);
+        output({ txSignature: sig, agentPda: agentPda.toBase58(), stake: stake.toBase58() });
+      } catch (err) { log.error("close failed", { error: (err as Error).message }); process.exit(1); }
+    });
+
+  agent.command("close-stake [agentWallet]")
+    .description("Recover a legacy StakePDA after its Agent PDA has already been closed")
+    .option("--simulate", "Dry run")
+    .action(async (agentWalletStr: string | undefined, opts) => {
+      const ctx = buildContext(loadConfig(program.opts()));
+      try {
+        const agentWallet = agentWalletStr ? parseWallet(agentWalletStr) : ctx.wallet.publicKey;
+        if (!agentWallet.equals(ctx.wallet.publicKey)) {
+          throw new Error("close-stake must be signed by the agent wallet; use --keypair for that wallet");
+        }
+        const [agentPda] = Pdas.getAgentPDA(agentWallet);
+        const [stake] = Pdas.getAgentStakePDA(agentPda);
+
+        const ix = await ctx.client.staking.closeStake({
+          signer: ctx.wallet,
+          wallet: ctx.wallet.publicKey,
+          agent: agentPda,
+          stake,
+        });
+
+        if (opts.simulate || program.opts().dryRun) {
+          output({ dryRun: true, agentPda: agentPda.toBase58(), stake: stake.toBase58() }); return;
+        }
+
+        const tx = await ctx.client.buildTransaction([ix], ctx.wallet.publicKey);
+        const sig = await ctx.client.sendTransaction(tx, [ctx.wallet]);
+        output({ txSignature: sig, agentPda: agentPda.toBase58(), stake: stake.toBase58() });
+      } catch (err) { log.error("close-stake failed", { error: (err as Error).message }); process.exit(1); }
     });
 }

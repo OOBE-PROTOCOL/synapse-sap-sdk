@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import { PublicKey } from "@solana/web3.js";
 import idl from "../idl/synapse_agent_sap.json";
 import { EscrowModule, EscrowV2Module } from "../modules";
-import { deriveEscrow, deriveEscrowV2 } from "../pda";
+import {
+  deriveAgent,
+  deriveAgentStats,
+  deriveEscrow,
+  deriveEscrowV2,
+  derivePricingMenu,
+  deriveStake,
+} from "../pda";
+import * as Pdas from "../pdas";
 
 type IdlInstruction = {
   name: string;
@@ -78,6 +86,40 @@ describe("SDK smoke", () => {
     ]);
   });
 
+  it("keeps agent lifecycle builders aligned with pricing/global accounts", () => {
+    expect(instruction("register_agent").accounts.map((account) => account.name)).toEqual([
+      "wallet",
+      "agent",
+      "agent_stats",
+      "pricing_menu",
+      "global_registry",
+      "system_program",
+    ]);
+    expect(instruction("update_agent").accounts.map((account) => account.name)).toEqual([
+      "wallet",
+      "agent",
+      "pricing_menu",
+      "system_program",
+    ]);
+    expect(instruction("deactivate_agent").accounts.map((account) => account.name)).toEqual([
+      "wallet",
+      "agent",
+      "agent_stats",
+      "global_registry",
+    ]);
+    expect(instruction("reactivate_agent").accounts.map((account) => account.name)).toEqual([
+      "wallet",
+      "agent",
+      "agent_stats",
+      "global_registry",
+    ]);
+    expect(instruction("close_stake").accounts.map((account) => account.name)).toEqual([
+      "wallet",
+      "agent",
+      "stake",
+    ]);
+  });
+
   it("maps legacy SDK escrow aliases to V2 nonce zero", () => {
     const agent = new PublicKey("11111111111111111111111111111112");
     const depositor = new PublicKey("11111111111111111111111111111113");
@@ -88,5 +130,19 @@ describe("SDK smoke", () => {
     expect(legacyPda.toBase58()).toBe(v2Pda.toBase58());
     expect(legacyBump).toBe(v2Bump);
     expect(EscrowModule).toBe(EscrowV2Module);
+  });
+
+  it("keeps legacy Pdas aliases byte-aligned with canonical PDA helpers", () => {
+    const wallet = new PublicKey("11111111111111111111111111111112");
+    const depositor = new PublicKey("11111111111111111111111111111113");
+    const [agent] = deriveAgent(wallet);
+
+    expect(Pdas.getAgentPDA(wallet)[0].toBase58()).toBe(agent.toBase58());
+    expect(Pdas.getAgentStatsPDA(agent)[0].toBase58()).toBe(deriveAgentStats(agent)[0].toBase58());
+    expect(Pdas.getPricingMenuPDA(agent)[0].toBase58()).toBe(derivePricingMenu(agent)[0].toBase58());
+    expect(Pdas.getAgentStakePDA(agent)[0].toBase58()).toBe(deriveStake(agent)[0].toBase58());
+    expect(Pdas.getEscrowV2PDA(agent, depositor, 0)[0].toBase58()).toBe(
+      deriveEscrowV2(agent, depositor, 0)[0].toBase58(),
+    );
   });
 });
