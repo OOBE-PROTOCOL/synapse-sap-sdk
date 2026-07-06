@@ -1,5 +1,5 @@
 // ===============================================================
-//  Escrow Module — IDL v0.25.0
+//  Escrow Module — IDL v0.3.0
 //  6 instructions
 // ===============================================================
 
@@ -72,8 +72,8 @@ export class EscrowModule {
       .instruction();
   }
 
-  /** settle_calls_v2 (6 accounts, 3 args) */
-  async settleCallsV2(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; agentStats: PublicKey; escrow: PublicKey; settlementReceipt: PublicKey; escrowNonce: BN; callsToSettle: BN; serviceHash: number[]; remainingAccounts?: any[] }): Promise<TransactionInstruction> {
+  /** settle_calls_v2 (5 accounts, 3 args) */
+  async settleCallsV2(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; agentStats: PublicKey; escrow: PublicKey; escrowNonce: BN; callsToSettle: BN; serviceHash: number[]; remainingAccounts?: any[] }): Promise<TransactionInstruction> {
     return this.program
       .methods.settleCallsV2(ctx.escrowNonce, ctx.callsToSettle, ctx.serviceHash)
       .accounts({
@@ -81,7 +81,6 @@ export class EscrowModule {
         agent: ctx.agent,
         agentStats: ctx.agentStats,
         escrow: ctx.escrow,
-        settlementReceipt: ctx.settlementReceipt,
         systemProgram: SystemProgram.programId,
       })
       .remainingAccounts(ctx.remainingAccounts ?? [])

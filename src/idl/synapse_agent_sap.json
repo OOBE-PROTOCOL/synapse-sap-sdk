@@ -2,9 +2,9 @@
   "address": "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ",
   "metadata": {
     "name": "synapse_agent_sap",
-    "version": "0.18.0",
+    "version": "0.3.0",
     "spec": "0.1.0",
-    "description": "Synapse Agent SAP program for Solana"
+    "description": "Created with Anchor"
   },
   "docs": [
     "SAP v2 — Onchain agent identity, reputation, and discovery protocol."
@@ -439,6 +439,202 @@
       ]
     },
     {
+      "name": "auto_resolve_dispute",
+      "docs": [
+        "Permissionless auto-resolution after proof deadline."
+      ],
+      "discriminator": [
+        145,
+        254,
+        222,
+        128,
+        182,
+        85,
+        88,
+        124
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Anyone can crank"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "depositor",
+          "writable": true
+        },
+        {
+          "name": "agent_wallet",
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow.agent",
+                "account": "EscrowAccountV2"
+              },
+              {
+                "kind": "account",
+                "path": "escrow.depositor",
+                "account": "EscrowAccountV2"
+              },
+              {
+                "kind": "account",
+                "path": "escrow.escrow_nonce",
+                "account": "EscrowAccountV2"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pending_settlement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  112,
+                  101,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow"
+              },
+              {
+                "kind": "account",
+                "path": "pending_settlement.settlement_index",
+                "account": "PendingSettlement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dispute",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pending_settlement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent_stats",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow.agent",
+                "account": "EscrowAccountV2"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent_stake",
+          "docs": [
+            "v0.11 H-3: AgentStake is now a typed required account so the slash on",
+            "DepositorWins outcomes is guaranteed instead of silently skipped when",
+            "the caller forgets to pass it via remaining_accounts."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow.agent",
+                "account": "EscrowAccountV2"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "cancel_subscription",
       "docs": [
         "Depositor cancels subscription. Remaining balance refunded."
@@ -584,7 +780,8 @@
           "writable": true,
           "signer": true,
           "relations": [
-            "agent"
+            "agent",
+            "stake"
           ]
         },
         {
@@ -655,6 +852,60 @@
                   117,
                   108,
                   116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pricing_menu",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  112,
+                  114,
+                  105,
+                  99,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
                 ]
               },
               {
@@ -1191,65 +1442,6 @@
       ]
     },
     {
-      "name": "close_escrow",
-      "docs": [
-        "Close empty escrow PDA. Withdraw first."
-      ],
-      "discriminator": [
-        139,
-        171,
-        94,
-        146,
-        191,
-        91,
-        144,
-        50
-      ],
-      "accounts": [
-        {
-          "name": "depositor",
-          "writable": true,
-          "signer": true,
-          "relations": [
-            "escrow"
-          ]
-        },
-        {
-          "name": "escrow",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "escrow.agent",
-                "account": "EscrowAccount"
-              },
-              {
-                "kind": "account",
-                "path": "depositor"
-              }
-            ]
-          }
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "close_escrow_v2",
       "docs": [
         "Close empty V2 escrow. No pending settlements allowed."
@@ -1308,6 +1500,33 @@
               {
                 "kind": "account",
                 "path": "escrow.escrow_nonce",
+                "account": "EscrowAccountV2"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent_stats",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow.agent",
                 "account": "EscrowAccountV2"
               }
             ]
@@ -1907,6 +2126,87 @@
       "args": []
     },
     {
+      "name": "close_stake",
+      "docs": [
+        "Recover stake collateral after an agent has already been closed."
+      ],
+      "discriminator": [
+        92,
+        229,
+        76,
+        76,
+        25,
+        26,
+        189,
+        239
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "stake"
+          ]
+        },
+        {
+          "name": "agent",
+          "docs": [
+            "seed-verified and must match the stake.account agent field."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "close_subscription",
       "docs": [
         "Close cancelled subscription PDA. Reclaim rent."
@@ -2340,10 +2640,16 @@
         {
           "name": "wallet",
           "writable": true,
-          "signer": true
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
         },
         {
           "name": "agent",
+          "docs": [
+            "v0.11 M-2: typed agent account."
+          ],
           "pda": {
             "seeds": [
               {
@@ -2503,108 +2809,6 @@
       ]
     },
     {
-      "name": "create_escrow",
-      "docs": [
-        "Create escrow. Locks price_per_call + optional max_calls. token_mint: None=SOL."
-      ],
-      "discriminator": [
-        253,
-        215,
-        165,
-        116,
-        36,
-        108,
-        68,
-        80
-      ],
-      "accounts": [
-        {
-          "name": "depositor",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "agent",
-          "docs": [
-            "Agent to prepay for — anyone can create escrow"
-          ]
-        },
-        {
-          "name": "escrow",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "agent"
-              },
-              {
-                "kind": "account",
-                "path": "depositor"
-              }
-            ]
-          }
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "price_per_call",
-          "type": "u64"
-        },
-        {
-          "name": "max_calls",
-          "type": "u64"
-        },
-        {
-          "name": "initial_deposit",
-          "type": "u64"
-        },
-        {
-          "name": "expires_at",
-          "type": "i64"
-        },
-        {
-          "name": "volume_curve",
-          "type": {
-            "vec": {
-              "defined": {
-                "name": "VolumeCurveBreakpoint"
-              }
-            }
-          }
-        },
-        {
-          "name": "token_mint",
-          "type": {
-            "option": "pubkey"
-          }
-        },
-        {
-          "name": "token_decimals",
-          "type": "u8"
-        }
-      ]
-    },
-    {
       "name": "create_escrow_v2",
       "docs": [
         "Create V2 escrow with settlement security mode."
@@ -2627,6 +2831,88 @@
         },
         {
           "name": "agent"
+        },
+        {
+          "name": "agent_stake",
+          "docs": [
+            "v0.10 hardening: agent MUST have an active stake ≥ MIN_STAKE",
+            "before any new escrow can be opened."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent_stats",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pricing_menu",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  112,
+                  114,
+                  105,
+                  99,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
         },
         {
           "name": "escrow",
@@ -3249,74 +3535,6 @@
       "args": []
     },
     {
-      "name": "deposit_escrow",
-      "docs": [
-        "Deposit additional SOL into an existing escrow."
-      ],
-      "discriminator": [
-        226,
-        112,
-        158,
-        176,
-        178,
-        118,
-        153,
-        128
-      ],
-      "accounts": [
-        {
-          "name": "depositor",
-          "writable": true,
-          "signer": true,
-          "relations": [
-            "escrow"
-          ]
-        },
-        {
-          "name": "escrow",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "escrow.agent",
-                "account": "EscrowAccount"
-              },
-              {
-                "kind": "account",
-                "path": "depositor"
-              }
-            ]
-          }
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "amount",
-          "type": "u64"
-        }
-      ]
-    },
-    {
       "name": "deposit_escrow_v2",
       "docs": [
         "Deposit into V2 escrow."
@@ -3414,10 +3632,16 @@
         {
           "name": "wallet",
           "writable": true,
-          "signer": true
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
         },
         {
           "name": "agent",
+          "docs": [
+            "v0.11 M-2: typed agent account."
+          ],
           "pda": {
             "seeds": [
               {
@@ -3617,6 +3841,10 @@
               32
             ]
           }
+        },
+        {
+          "name": "dispute_type",
+          "type": "u8"
         }
       ]
     },
@@ -4434,10 +4662,16 @@
         {
           "name": "wallet",
           "writable": true,
-          "signer": true
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
         },
         {
           "name": "agent",
+          "docs": [
+            "v0.11 M-2: typed agent account — stake cannot be opened for a non-existent agent."
+          ],
           "pda": {
             "seeds": [
               {
@@ -5072,6 +5306,157 @@
       ]
     },
     {
+      "name": "inscribe_receipt_batch",
+      "docs": [
+        "Agent commits a batch of receipt merkle roots."
+      ],
+      "discriminator": [
+        119,
+        91,
+        168,
+        213,
+        167,
+        150,
+        149,
+        246
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              },
+              {
+                "kind": "account",
+                "path": "escrow.depositor",
+                "account": "EscrowAccountV2"
+              },
+              {
+                "kind": "account",
+                "path": "escrow.escrow_nonce",
+                "account": "EscrowAccountV2"
+              }
+            ]
+          }
+        },
+        {
+          "name": "receipt_batch",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  114,
+                  101,
+                  99,
+                  101,
+                  105,
+                  112,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow"
+              },
+              {
+                "kind": "arg",
+                "path": "batch_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "batch_index",
+          "type": "u32"
+        },
+        {
+          "name": "merkle_root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "call_count",
+          "type": "u32"
+        },
+        {
+          "name": "period_start",
+          "type": "i64"
+        },
+        {
+          "name": "period_end",
+          "type": "i64"
+        }
+      ]
+    },
+    {
       "name": "inscribe_tool_schema",
       "docs": [
         "Inscribe JSON schema to TX log. schema_type: 0=input, 1=output, 2=desc."
@@ -5150,124 +5535,6 @@
           "type": "u8"
         }
       ]
-    },
-    {
-      "name": "migrate_escrow_v1_to_v2",
-      "docs": [
-        "Migrate V1 escrow to V2 (nonce=0, SelfReport mode)."
-      ],
-      "discriminator": [
-        70,
-        76,
-        99,
-        21,
-        154,
-        50,
-        111,
-        221
-      ],
-      "accounts": [
-        {
-          "name": "depositor",
-          "writable": true,
-          "signer": true,
-          "relations": [
-            "escrow_v1"
-          ]
-        },
-        {
-          "name": "agent"
-        },
-        {
-          "name": "escrow_v1",
-          "docs": [
-            "V1 escrow being migrated — will be closed"
-          ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "agent"
-              },
-              {
-                "kind": "account",
-                "path": "depositor"
-              }
-            ]
-          }
-        },
-        {
-          "name": "escrow_v2",
-          "docs": [
-            "V2 escrow — init with nonce=0 (first escrow for this pair)"
-          ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119,
-                  95,
-                  118,
-                  50
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "agent"
-              },
-              {
-                "kind": "account",
-                "path": "depositor"
-              },
-              {
-                "kind": "const",
-                "value": [
-                  0,
-                  0,
-                  0,
-                  0,
-                  0,
-                  0,
-                  0,
-                  0
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
     },
     {
       "name": "open_session",
@@ -5805,6 +6072,34 @@
           }
         },
         {
+          "name": "pricing_menu",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  112,
+                  114,
+                  105,
+                  99,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
           "name": "global_registry",
           "writable": true,
           "pda": {
@@ -6189,148 +6484,6 @@
       ]
     },
     {
-      "name": "report_calls",
-      "docs": [
-        "Self-report call metrics. No reputation_score effect."
-      ],
-      "discriminator": [
-        143,
-        169,
-        71,
-        138,
-        233,
-        73,
-        228,
-        11
-      ],
-      "accounts": [
-        {
-          "name": "wallet",
-          "signer": true
-        },
-        {
-          "name": "agent",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  97,
-                  103,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet"
-              }
-            ]
-          }
-        },
-        {
-          "name": "agent_stats",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  115
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "agent"
-              }
-            ]
-          }
-        }
-      ],
-      "args": [
-        {
-          "name": "calls_served",
-          "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "report_tool_invocations",
-      "docs": [
-        "Report tool invocation count (self-reported by agent owner)."
-      ],
-      "discriminator": [
-        230,
-        128,
-        104,
-        96,
-        231,
-        196,
-        188,
-        163
-      ],
-      "accounts": [
-        {
-          "name": "wallet",
-          "signer": true,
-          "relations": [
-            "agent"
-          ]
-        },
-        {
-          "name": "agent",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  97,
-                  103,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet"
-              }
-            ]
-          },
-          "relations": [
-            "tool"
-          ]
-        },
-        {
-          "name": "tool",
-          "writable": true
-        }
-      ],
-      "args": [
-        {
-          "name": "invocations",
-          "type": "u64"
-        }
-      ]
-    },
-    {
       "name": "request_unstake",
       "docs": [
         "Request unstake — starts 7-day cooldown. Supports partial unstake."
@@ -6348,10 +6501,16 @@
       "accounts": [
         {
           "name": "wallet",
-          "signer": true
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
         },
         {
           "name": "agent",
+          "docs": [
+            "v0.11 M-2: typed agent account."
+          ],
           "pda": {
             "seeds": [
               {
@@ -6406,172 +6565,6 @@
         {
           "name": "amount",
           "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "resolve_dispute",
-      "docs": [
-        "Arbiter resolves dispute. outcome: 2=DepositorWins, 3=AgentWins."
-      ],
-      "discriminator": [
-        231,
-        6,
-        202,
-        6,
-        96,
-        103,
-        12,
-        230
-      ],
-      "accounts": [
-        {
-          "name": "arbiter",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "depositor",
-          "writable": true
-        },
-        {
-          "name": "agent_wallet",
-          "writable": true
-        },
-        {
-          "name": "escrow",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119,
-                  95,
-                  118,
-                  50
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "escrow.agent",
-                "account": "EscrowAccountV2"
-              },
-              {
-                "kind": "account",
-                "path": "escrow.depositor",
-                "account": "EscrowAccountV2"
-              },
-              {
-                "kind": "account",
-                "path": "escrow.escrow_nonce",
-                "account": "EscrowAccountV2"
-              }
-            ]
-          }
-        },
-        {
-          "name": "pending_settlement",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  112,
-                  101,
-                  110,
-                  100,
-                  105,
-                  110,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "escrow"
-              },
-              {
-                "kind": "account",
-                "path": "pending_settlement.settlement_index",
-                "account": "PendingSettlement"
-              }
-            ]
-          }
-        },
-        {
-          "name": "dispute",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  100,
-                  105,
-                  115,
-                  112,
-                  117,
-                  116,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "pending_settlement"
-              }
-            ]
-          }
-        },
-        {
-          "name": "agent_stats",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  115
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "escrow.agent",
-                "account": "EscrowAccountV2"
-              }
-            ]
-          }
-        }
-      ],
-      "args": [
-        {
-          "name": "outcome",
-          "type": "u8"
         }
       ]
     },
@@ -7052,254 +7045,6 @@
       "args": []
     },
     {
-      "name": "settle_batch",
-      "docs": [
-        "Batch settle up to 10 settlements in one TX. Volume curve spans batch."
-      ],
-      "discriminator": [
-        22,
-        2,
-        21,
-        223,
-        225,
-        122,
-        163,
-        214
-      ],
-      "accounts": [
-        {
-          "name": "wallet",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "agent",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  97,
-                  103,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet"
-              }
-            ]
-          }
-        },
-        {
-          "name": "agent_stats",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  115
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "agent"
-              }
-            ]
-          }
-        },
-        {
-          "name": "escrow",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "agent"
-              },
-              {
-                "kind": "account",
-                "path": "escrow.depositor",
-                "account": "EscrowAccount"
-              }
-            ]
-          }
-        }
-      ],
-      "args": [
-        {
-          "name": "settlements",
-          "type": {
-            "vec": {
-              "defined": {
-                "name": "Settlement"
-              }
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "settle_calls",
-      "docs": [
-        "Agent settles calls — claims funds from escrow. service_hash = proof of work."
-      ],
-      "discriminator": [
-        100,
-        156,
-        197,
-        134,
-        219,
-        245,
-        3,
-        170
-      ],
-      "accounts": [
-        {
-          "name": "wallet",
-          "docs": [
-            "Agent owner — signs settlement + receives payment"
-          ],
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "agent",
-          "docs": [
-            "PDA derivation for escrow + stats."
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  97,
-                  103,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet"
-              }
-            ]
-          }
-        },
-        {
-          "name": "agent_stats",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  115
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "agent"
-              }
-            ]
-          }
-        },
-        {
-          "name": "escrow",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "agent"
-              },
-              {
-                "kind": "account",
-                "path": "escrow.depositor",
-                "account": "EscrowAccount"
-              }
-            ]
-          }
-        },
-        {
-          "name": "depositor"
-        }
-      ],
-      "args": [
-        {
-          "name": "calls_to_settle",
-          "type": "u64"
-        },
-        {
-          "name": "service_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
-      ]
-    },
-    {
       "name": "settle_calls_v2",
       "docs": [
         "Agent settles calls via V2 escrow. Mode-dispatched."
@@ -7526,6 +7271,210 @@
       ]
     },
     {
+      "name": "submit_receipt_proof",
+      "docs": [
+        "Agent submits receipt proofs during dispute resolution."
+      ],
+      "discriminator": [
+        116,
+        134,
+        236,
+        210,
+        42,
+        154,
+        122,
+        182
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "signer": true
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              },
+              {
+                "kind": "account",
+                "path": "escrow.depositor",
+                "account": "EscrowAccountV2"
+              },
+              {
+                "kind": "account",
+                "path": "escrow.escrow_nonce",
+                "account": "EscrowAccountV2"
+              }
+            ]
+          }
+        },
+        {
+          "name": "receipt_batch",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  114,
+                  101,
+                  99,
+                  101,
+                  105,
+                  112,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow"
+              },
+              {
+                "kind": "account",
+                "path": "receipt_batch.batch_index",
+                "account": "ReceiptBatch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pending_settlement",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  112,
+                  101,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow"
+              },
+              {
+                "kind": "account",
+                "path": "pending_settlement.settlement_index",
+                "account": "PendingSettlement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dispute",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pending_settlement"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "receipt_hashes",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        },
+        {
+          "name": "merkle_proofs",
+          "type": {
+            "vec": {
+              "vec": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "update_agent",
       "docs": [
         "Partial agent metadata update. None = unchanged."
@@ -7570,6 +7519,34 @@
               {
                 "kind": "account",
                 "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pricing_menu",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  112,
+                  95,
+                  112,
+                  114,
+                  105,
+                  99,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
               }
             ]
           }
@@ -7733,67 +7710,6 @@
       ]
     },
     {
-      "name": "update_reputation",
-      "docs": [
-        "Self-report latency & uptime. No reputation_score effect."
-      ],
-      "discriminator": [
-        194,
-        220,
-        43,
-        201,
-        54,
-        209,
-        49,
-        178
-      ],
-      "accounts": [
-        {
-          "name": "wallet",
-          "signer": true,
-          "relations": [
-            "agent"
-          ]
-        },
-        {
-          "name": "agent",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  97,
-                  103,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet"
-              }
-            ]
-          }
-        }
-      ],
-      "args": [
-        {
-          "name": "avg_latency_ms",
-          "type": "u32"
-        },
-        {
-          "name": "uptime_percent",
-          "type": "u8"
-        }
-      ]
-    },
-    {
       "name": "update_tool",
       "docs": [
         "Update tool schema hashes + bump version. None = unchanged."
@@ -7907,70 +7823,6 @@
           "type": {
             "option": "u8"
           }
-        }
-      ]
-    },
-    {
-      "name": "withdraw_escrow",
-      "docs": [
-        "Client withdraws from escrow. Withdraws min(amount, balance)."
-      ],
-      "discriminator": [
-        81,
-        84,
-        226,
-        128,
-        245,
-        47,
-        96,
-        104
-      ],
-      "accounts": [
-        {
-          "name": "depositor",
-          "writable": true,
-          "signer": true,
-          "relations": [
-            "escrow"
-          ]
-        },
-        {
-          "name": "escrow",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  97,
-                  112,
-                  95,
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "escrow.agent",
-                "account": "EscrowAccount"
-              },
-              {
-                "kind": "account",
-                "path": "depositor"
-              }
-            ]
-          }
-        }
-      ],
-      "args": [
-        {
-          "name": "amount",
-          "type": "u64"
         }
       ]
     },
@@ -8198,6 +8050,19 @@
       ]
     },
     {
+      "name": "AgentPricingMenu",
+      "discriminator": [
+        181,
+        203,
+        249,
+        3,
+        52,
+        2,
+        117,
+        144
+      ]
+    },
+    {
       "name": "AgentStake",
       "discriminator": [
         47,
@@ -8273,19 +8138,6 @@
         103,
         214,
         46
-      ]
-    },
-    {
-      "name": "EscrowAccount",
-      "discriminator": [
-        36,
-        69,
-        48,
-        18,
-        128,
-        225,
-        125,
-        135
       ]
     },
     {
@@ -8403,6 +8255,19 @@
         81,
         212,
         207
+      ]
+    },
+    {
+      "name": "ReceiptBatch",
+      "discriminator": [
+        234,
+        250,
+        48,
+        59,
+        242,
+        148,
+        55,
+        76
       ]
     },
     {
@@ -8626,6 +8491,19 @@
         235,
         161,
         202
+      ]
+    },
+    {
+      "name": "DisputeAutoResolvedEvent",
+      "discriminator": [
+        33,
+        148,
+        81,
+        1,
+        157,
+        126,
+        255,
+        162
       ]
     },
     {
@@ -8863,6 +8741,32 @@
       ]
     },
     {
+      "name": "ReceiptBatchInscribedEvent",
+      "discriminator": [
+        32,
+        224,
+        182,
+        173,
+        163,
+        100,
+        111,
+        126
+      ]
+    },
+    {
+      "name": "ReceiptProofSubmittedEvent",
+      "discriminator": [
+        193,
+        245,
+        192,
+        165,
+        123,
+        181,
+        134,
+        166
+      ]
+    },
+    {
       "name": "RegisteredEvent",
       "discriminator": [
         75,
@@ -8964,6 +8868,19 @@
         129,
         144,
         198
+      ]
+    },
+    {
+      "name": "StakeClosedEvent",
+      "discriminator": [
+        212,
+        204,
+        207,
+        181,
+        185,
+        249,
+        134,
+        59
       ]
     },
     {
@@ -9120,6 +9037,19 @@
         65,
         22,
         57
+      ]
+    },
+    {
+      "name": "UnstakeCancelledEvent",
+      "discriminator": [
+        57,
+        228,
+        7,
+        42,
+        227,
+        64,
+        93,
+        51
       ]
     },
     {
@@ -9349,543 +9279,743 @@
     },
     {
       "code": 6029,
-      "name": "AgentNotRegistered",
-      "msg": "agent not registered"
-    },
-    {
-      "code": 6030,
-      "name": "UnauthorizedStakeAccess",
-      "msg": "unauthorized stake access"
-    },
-    {
-      "code": 6031,
       "name": "DuplicateTierId",
       "msg": "dup tier"
     },
     {
-      "code": 6032,
-      "name": "HashMismatch",
-      "msg": "hash mismatch"
-    },
-    {
-      "code": 6033,
-      "name": "PendingSettlementRequired",
-      "msg": "pending settlement required"
-    },
-    {
-      "code": 6034,
-      "name": "InvalidPendingSettlement",
-      "msg": "invalid pending settlement"
-    },
-    {
-      "code": 6035,
-      "name": "SystemProgramRequired",
-      "msg": "system program required"
-    },
-    {
-      "code": 6036,
+      "code": 6030,
       "name": "InvalidRateLimit",
       "msg": "rate=0"
     },
     {
-      "code": 6037,
+      "code": 6031,
       "name": "SplRequiresTokenMint",
       "msg": "spl needs mint"
     },
     {
-      "code": 6038,
+      "code": 6032,
       "name": "InvalidX402Endpoint",
       "msg": "x402 https"
     },
     {
-      "code": 6039,
+      "code": 6033,
       "name": "InvalidVolumeCurve",
       "msg": "curve order"
     },
     {
-      "code": 6040,
+      "code": 6034,
       "name": "TooManyVolumeCurvePoints",
       "msg": "curve>5"
     },
     {
-      "code": 6041,
+      "code": 6035,
       "name": "MinPriceExceedsMax",
       "msg": "min>max price"
     },
     {
-      "code": 6042,
+      "code": 6036,
       "name": "InvalidUptimePercent",
       "msg": "uptime 0-100"
     },
     {
-      "code": 6043,
+      "code": 6037,
       "name": "SessionClosed",
       "msg": "session closed"
     },
     {
-      "code": 6044,
+      "code": 6038,
       "name": "InvalidSequence",
       "msg": "bad seq"
     },
     {
-      "code": 6045,
+      "code": 6039,
       "name": "InvalidFragmentIndex",
       "msg": "frag idx"
     },
     {
-      "code": 6046,
+      "code": 6040,
       "name": "InscriptionTooLarge",
       "msg": "data>750"
     },
     {
-      "code": 6047,
+      "code": 6041,
       "name": "EmptyInscription",
       "msg": "empty data"
     },
     {
-      "code": 6048,
+      "code": 6042,
       "name": "InvalidTotalFragments",
       "msg": "frags<1"
     },
     {
-      "code": 6049,
+      "code": 6043,
       "name": "EpochMismatch",
       "msg": "epoch mismatch"
     },
     {
-      "code": 6050,
+      "code": 6044,
       "name": "VaultNotClosed",
       "msg": "vault open"
     },
     {
-      "code": 6051,
+      "code": 6045,
       "name": "SessionNotClosed",
       "msg": "session open"
     },
     {
-      "code": 6052,
+      "code": 6046,
       "name": "DelegateExpired",
       "msg": "delegate expired"
     },
     {
-      "code": 6053,
+      "code": 6047,
       "name": "InvalidDelegate",
       "msg": "bad delegate"
     },
     {
-      "code": 6054,
+      "code": 6048,
       "name": "ToolNameTooLong",
       "msg": "tool>32"
     },
     {
-      "code": 6055,
+      "code": 6049,
       "name": "EmptyToolName",
       "msg": "empty tool"
     },
     {
-      "code": 6056,
+      "code": 6050,
       "name": "InvalidToolNameHash",
       "msg": "tool hash"
     },
     {
-      "code": 6057,
+      "code": 6051,
       "name": "InvalidToolHttpMethod",
       "msg": "bad method"
     },
     {
-      "code": 6058,
+      "code": 6052,
       "name": "InvalidToolCategory",
       "msg": "bad category"
     },
     {
-      "code": 6059,
+      "code": 6053,
       "name": "ToolAlreadyInactive",
       "msg": "tool inactive"
     },
     {
-      "code": 6060,
+      "code": 6054,
       "name": "ToolAlreadyActive",
       "msg": "tool active"
     },
     {
-      "code": 6061,
+      "code": 6055,
       "name": "InvalidSchemaHash",
       "msg": "schema hash"
     },
     {
-      "code": 6062,
+      "code": 6056,
       "name": "InvalidSchemaType",
       "msg": "schema type"
     },
     {
-      "code": 6063,
+      "code": 6057,
       "name": "InvalidCheckpointIndex",
       "msg": "cp index"
     },
     {
-      "code": 6064,
+      "code": 6058,
       "name": "FeedbackNotRevoked",
       "msg": "not revoked"
     },
     {
-      "code": 6065,
+      "code": 6059,
       "name": "IndexNotEmpty",
       "msg": "idx not empty"
     },
     {
-      "code": 6066,
+      "code": 6060,
       "name": "SessionStillOpen",
       "msg": "session open"
     },
     {
-      "code": 6067,
+      "code": 6061,
       "name": "NoFieldsToUpdate",
       "msg": "no fields"
     },
     {
-      "code": 6068,
+      "code": 6062,
       "name": "InsufficientEscrowBalance",
       "msg": "low balance"
     },
     {
-      "code": 6069,
+      "code": 6063,
       "name": "EscrowMaxCallsExceeded",
       "msg": "max calls"
     },
     {
-      "code": 6070,
+      "code": 6064,
       "name": "EscrowEmpty",
       "msg": "escrow empty"
     },
     {
-      "code": 6071,
+      "code": 6065,
       "name": "EscrowNotEmpty",
       "msg": "escrow!=0"
     },
     {
-      "code": 6072,
+      "code": 6066,
       "name": "InvalidSettlementCalls",
       "msg": "calls<1"
     },
     {
-      "code": 6073,
+      "code": 6067,
       "name": "AttestationTypeTooLong",
       "msg": "atype>32"
     },
     {
-      "code": 6074,
+      "code": 6068,
       "name": "EmptyAttestationType",
       "msg": "empty atype"
     },
     {
-      "code": 6075,
+      "code": 6069,
       "name": "SelfAttestationNotAllowed",
       "msg": "self attest"
     },
     {
-      "code": 6076,
+      "code": 6070,
       "name": "AttestationAlreadyRevoked",
       "msg": "already revoked"
     },
     {
-      "code": 6077,
+      "code": 6071,
       "name": "AttestationNotRevoked",
       "msg": "not revoked"
     },
     {
-      "code": 6078,
+      "code": 6072,
       "name": "ToolCategoryIndexFull",
       "msg": "cat idx full"
     },
     {
-      "code": 6079,
+      "code": 6073,
       "name": "ToolNotInCategoryIndex",
       "msg": "not in cat"
     },
     {
-      "code": 6080,
+      "code": 6074,
       "name": "ToolCategoryMismatch",
       "msg": "cat mismatch"
     },
     {
-      "code": 6081,
+      "code": 6075,
       "name": "ArithmeticOverflow",
       "msg": "overflow"
     },
     {
-      "code": 6082,
+      "code": 6076,
       "name": "EscrowExpired",
       "msg": "escrow expired"
     },
     {
-      "code": 6083,
+      "code": 6077,
       "name": "AgentInactive",
       "msg": "agent inactive"
     },
     {
-      "code": 6084,
+      "code": 6078,
       "name": "AttestationExpired",
       "msg": "attest expired"
     },
     {
-      "code": 6085,
+      "code": 6079,
       "name": "BufferFull",
       "msg": "buf full"
     },
     {
-      "code": 6086,
+      "code": 6080,
       "name": "BufferDataTooLarge",
       "msg": "buf>750"
     },
     {
-      "code": 6087,
+      "code": 6081,
       "name": "Unauthorized",
       "msg": "unauthorized"
     },
     {
-      "code": 6088,
+      "code": 6082,
       "name": "InvalidSession",
       "msg": "bad session"
     },
     {
-      "code": 6089,
-      "name": "InvalidAccount",
-      "msg": "invalid account"
-    },
-    {
-      "code": 6090,
-      "name": "InvalidTreasury",
-      "msg": "invalid treasury"
-    },
-    {
-      "code": 6091,
+      "code": 6083,
       "name": "EmptyDigestHash",
       "msg": "empty hash"
     },
     {
-      "code": 6092,
+      "code": 6084,
       "name": "LedgerDataTooLarge",
       "msg": "ledger>750"
     },
     {
-      "code": 6093,
+      "code": 6085,
       "name": "LedgerRingEmpty",
       "msg": "ring empty"
     },
     {
-      "code": 6094,
+      "code": 6086,
       "name": "BatchEmpty",
       "msg": "batch empty"
     },
     {
-      "code": 6095,
+      "code": 6087,
       "name": "BatchTooLarge",
       "msg": "batch>10"
     },
     {
-      "code": 6096,
+      "code": 6088,
       "name": "SplTokenRequired",
       "msg": "spl accts"
     },
     {
-      "code": 6097,
+      "code": 6089,
       "name": "InvalidTokenAccount",
       "msg": "bad token"
     },
     {
-      "code": 6098,
+      "code": 6090,
       "name": "InvalidTokenProgram",
       "msg": "bad prog"
     },
     {
-      "code": 6099,
+      "code": 6091,
+      "name": "InvalidPaymentToken",
+      "msg": "payment token not accepted (USDC only)"
+    },
+    {
+      "code": 6092,
       "name": "InvalidSettlementSecurity",
       "msg": "bad security"
     },
     {
-      "code": 6100,
+      "code": 6093,
       "name": "CoSignerRequired",
       "msg": "cosigner"
     },
     {
-      "code": 6101,
+      "code": 6094,
       "name": "InvalidCoSigner",
       "msg": "bad cosigner"
     },
     {
-      "code": 6102,
+      "code": 6095,
       "name": "InvalidArbiter",
       "msg": "bad arbiter"
     },
     {
-      "code": 6103,
+      "code": 6096,
       "name": "ArbiterRequired",
       "msg": "arbiter=0"
     },
     {
-      "code": 6104,
+      "code": 6097,
       "name": "EscrowNonceReused",
       "msg": "nonce reused"
     },
     {
-      "code": 6105,
+      "code": 6098,
       "name": "SettlementNotPending",
       "msg": "not pending"
     },
     {
-      "code": 6106,
+      "code": 6099,
       "name": "SettlementAlreadyFinalized",
       "msg": "already final"
     },
     {
-      "code": 6107,
+      "code": 6100,
       "name": "DisputeWindowNotExpired",
       "msg": "too early"
     },
     {
-      "code": 6108,
+      "code": 6101,
       "name": "DisputeWindowExpired",
       "msg": "window closed"
     },
     {
-      "code": 6109,
+      "code": 6102,
       "name": "NotDepositor",
       "msg": "not depositor"
     },
     {
-      "code": 6110,
+      "code": 6103,
       "name": "DisputeAlreadyFiled",
       "msg": "dup dispute"
     },
     {
-      "code": 6111,
+      "code": 6104,
       "name": "DisputeStillOpen",
       "msg": "dispute open"
     },
     {
-      "code": 6112,
+      "code": 6105,
       "name": "NotArbiter",
       "msg": "not arbiter"
     },
     {
-      "code": 6113,
+      "code": 6106,
       "name": "InvalidDisputeOutcome",
       "msg": "bad outcome"
     },
     {
-      "code": 6114,
+      "code": 6107,
       "name": "StakeBelowMinimum",
       "msg": "stake<min"
     },
     {
-      "code": 6115,
+      "code": 6108,
       "name": "NoStakeAccount",
       "msg": "no stake"
     },
     {
-      "code": 6116,
+      "code": 6109,
       "name": "UnstakeAlreadyPending",
       "msg": "unstake pending"
     },
     {
-      "code": 6117,
+      "code": 6110,
       "name": "UnstakeCooldownNotMet",
       "msg": "cooldown"
     },
     {
-      "code": 6118,
+      "code": 6111,
       "name": "NoUnstakePending",
       "msg": "no unstake"
     },
     {
-      "code": 6119,
+      "code": 6112,
       "name": "SlashExceedsStake",
       "msg": "slash>stake"
     },
     {
-      "code": 6120,
+      "code": 6113,
       "name": "SubscriptionAlreadyActive",
       "msg": "sub active"
     },
     {
-      "code": 6121,
+      "code": 6114,
       "name": "SubscriptionCancelled",
       "msg": "sub cancelled"
     },
     {
-      "code": 6122,
+      "code": 6115,
       "name": "NoIntervalDue",
       "msg": "no due"
     },
     {
-      "code": 6123,
+      "code": 6116,
       "name": "SubscriptionInsufficientBalance",
       "msg": "sub low bal"
     },
     {
-      "code": 6124,
+      "code": 6117,
       "name": "InvalidBillingInterval",
       "msg": "bad interval"
     },
     {
-      "code": 6125,
+      "code": 6118,
       "name": "InvalidShardIndex",
       "msg": "bad shard"
     },
     {
-      "code": 6126,
+      "code": 6119,
       "name": "IndexPageFull",
       "msg": "page full"
     },
     {
-      "code": 6127,
+      "code": 6120,
       "name": "InvalidPageIndex",
       "msg": "bad page"
     },
     {
-      "code": 6128,
+      "code": 6121,
       "name": "IndexPageNotEmpty",
       "msg": "page≠empty"
     },
     {
-      "code": 6129,
+      "code": 6122,
       "name": "AlreadyMigrated",
       "msg": "already v2"
     },
     {
-      "code": 6130,
+      "code": 6123,
       "name": "MigrationV1Only",
       "msg": "v1 only"
     },
     {
-      "code": 6131,
+      "code": 6124,
       "name": "SettlementDisputed",
       "msg": "disputed"
     },
     {
-      "code": 6132,
+      "code": 6125,
       "name": "InvalidAgentWallet",
       "msg": "bad agent wallet"
     },
     {
-      "code": 6133,
+      "code": 6126,
       "name": "StakeAgentMismatch",
       "msg": "stake agent mismatch"
     },
     {
-      "code": 6134,
+      "code": 6127,
       "name": "NotAuthority",
       "msg": "not authority"
     },
     {
-      "code": 6135,
+      "code": 6128,
       "name": "UnstakeBelowRent",
       "msg": "unstake below rent"
     },
     {
-      "code": 6136,
+      "code": 6129,
       "name": "InsufficientStake",
       "msg": "insufficient stake"
+    },
+    {
+      "code": 6130,
+      "name": "SelfReportDeprecated",
+      "msg": "SelfReport deprecated"
+    },
+    {
+      "code": 6131,
+      "name": "ArbiterDeprecated",
+      "msg": "arbiter deprecated"
+    },
+    {
+      "code": 6132,
+      "name": "InvalidBatchIndex",
+      "msg": "bad batch idx"
+    },
+    {
+      "code": 6133,
+      "name": "InvalidPeriod",
+      "msg": "bad period"
+    },
+    {
+      "code": 6134,
+      "name": "InvalidDisputeType",
+      "msg": "bad dispute type"
+    },
+    {
+      "code": 6135,
+      "name": "ProofDeadlineExpired",
+      "msg": "proof expired"
+    },
+    {
+      "code": 6136,
+      "name": "ProofDeadlineNotExpired",
+      "msg": "proof not expired"
+    },
+    {
+      "code": 6137,
+      "name": "InvalidReceiptProof",
+      "msg": "bad receipt proof"
+    },
+    {
+      "code": 6138,
+      "name": "SettlementReplay",
+      "msg": "settlement replay"
+    },
+    {
+      "code": 6139,
+      "name": "PaymentTokenNotAllowed",
+      "msg": "token not allowed"
+    },
+    {
+      "code": 6140,
+      "name": "AgentStakeRequired",
+      "msg": "agent stake required"
+    },
+    {
+      "code": 6141,
+      "name": "DelegateExpiryInvalid",
+      "msg": "delegate expiry invalid"
+    },
+    {
+      "code": 6142,
+      "name": "EscrowNotClosed",
+      "msg": "escrow not closed"
+    },
+    {
+      "code": 6143,
+      "name": "VolumeCurveNotDescending",
+      "msg": "curve not descending"
+    },
+    {
+      "code": 6144,
+      "name": "DuplicateServiceHash",
+      "msg": "dup service hash"
+    },
+    {
+      "code": 6145,
+      "name": "StakeBelowCoverage",
+      "msg": "stake under coverage"
+    },
+    {
+      "code": 6146,
+      "name": "StakeNotClosable",
+      "msg": "stake not closable"
+    },
+    {
+      "code": 6147,
+      "name": "AgentStakeAccountMissing",
+      "msg": "agent stake account missing"
+    },
+    {
+      "code": 6148,
+      "name": "PricingTierNotFound",
+      "msg": "requested price_per_call does not match any tier in the agent pricing menu"
+    },
+    {
+      "code": 6149,
+      "name": "AgentStatsMigrationRequired",
+      "msg": "agent stats must be upgraded before this operation (active_escrows field missing)"
+    },
+    {
+      "code": 6150,
+      "name": "InvalidPricingMenu",
+      "msg": "pricing menu is invalid or empty (at least one tier required)"
+    },
+    {
+      "code": 6151,
+      "name": "MaxCallsPerSettlementExceeded",
+      "msg": "calls per settlement exceeds maximum allowed (max 10000)"
+    },
+    {
+      "code": 6152,
+      "name": "InvalidVolumeCurvePrice",
+      "msg": "volume curve breakpoint price must be > 0"
+    },
+    {
+      "code": 6153,
+      "name": "EscrowCoverageExceeded",
+      "msg": "escrow deposit would exceed the agent's staked coverage limit"
+    },
+    {
+      "code": 6154,
+      "name": "CoSignerIsAgentWallet",
+      "msg": "co-signer cannot be the agent wallet itself"
+    },
+    {
+      "code": 6155,
+      "name": "EscrowAlreadyExpired",
+      "msg": "escrow has already expired"
+    },
+    {
+      "code": 6156,
+      "name": "PendingSettlementExists",
+      "msg": "escrow has an unresolved pending settlement"
+    },
+    {
+      "code": 6157,
+      "name": "TokenAccountOwnerMismatch",
+      "msg": "token account owner mismatch"
+    },
+    {
+      "code": 6158,
+      "name": "InvalidTreasury",
+      "msg": "invalid protocol treasury account"
+    },
+    {
+      "code": 6159,
+      "name": "PendingSettlementRequired",
+      "msg": "pending settlement PDA required"
+    },
+    {
+      "code": 6160,
+      "name": "InvalidPendingSettlement",
+      "msg": "invalid pending settlement PDA"
+    },
+    {
+      "code": 6161,
+      "name": "PendingSettlementDeprecated",
+      "msg": "create_pending_settlement is deprecated; use settle_calls_v2"
+    },
+    {
+      "code": 6162,
+      "name": "MaxReceiptProofExceeded",
+      "msg": "receipt proof exceeds maximum allowed count"
+    },
+    {
+      "code": 6163,
+      "name": "MaxMerkleDepthExceeded",
+      "msg": "merkle proof depth exceeds maximum allowed"
+    },
+    {
+      "code": 6164,
+      "name": "PendingAmountMismatch",
+      "msg": "pending settlement amount does not match escrow pending amount"
+    },
+    {
+      "code": 6165,
+      "name": "StakeSlashLocksUnstake",
+      "msg": "stake slash would lock unstake request"
+    },
+    {
+      "code": 6166,
+      "name": "InvalidPricePerCall",
+      "msg": "price per call must be > 0"
+    },
+    {
+      "code": 6167,
+      "name": "SubscriptionIntervalOverflow",
+      "msg": "subscription intervals overflow"
+    },
+    {
+      "code": 6168,
+      "name": "AgentStatsVersionMismatch",
+      "msg": "agent stats version mismatch — migration required"
+    },
+    {
+      "code": 6169,
+      "name": "EscrowVersionMismatch",
+      "msg": "escrow version mismatch — migration required"
+    },
+    {
+      "code": 6170,
+      "name": "ReceiptProofAlreadySubmitted",
+      "msg": "receipt proof already submitted for this dispute"
+    },
+    {
+      "code": 6171,
+      "name": "DuplicateReceiptProof",
+      "msg": "duplicate receipt proof"
+    },
+    {
+      "code": 6172,
+      "name": "MissingReceiptSignature",
+      "msg": "missing verified receipt signature"
+    },
+    {
+      "code": 6173,
+      "name": "AgentCapabilityMismatch",
+      "msg": "agent does not declare this capability"
+    },
+    {
+      "code": 6174,
+      "name": "AgentProtocolMismatch",
+      "msg": "agent does not declare this protocol"
+    },
+    {
+      "code": 6175,
+      "name": "InvalidToolParameterCount",
+      "msg": "required params exceeds params count"
+    },
+    {
+      "code": 6176,
+      "name": "ActiveEscrowCounterUnderflow",
+      "msg": "active escrow counter underflow"
     }
   ],
   "types": [
@@ -10091,6 +10221,40 @@
       }
     },
     {
+      "name": "AgentPricingMenu",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "tiers",
+            "docs": [
+              "Copy of AgentAccount pricing at creation time.",
+              "Max 10 tiers — enough for typical SaaS ladder."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "PricingTier"
+                }
+              }
+            }
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "AgentStake",
       "type": {
         "kind": "struct",
@@ -10170,6 +10334,15 @@
           {
             "name": "is_active",
             "type": "bool"
+          },
+          {
+            "name": "active_escrows",
+            "docs": [
+              "v0.12 H-1 hardening: counter of open escrows for this agent.",
+              "Incremented on create_escrow, decremented on close_escrow.",
+              "close_agent refuses to execute unless this is zero."
+            ],
+            "type": "u32"
           },
           {
             "name": "updated_at",
@@ -10665,6 +10838,57 @@
       }
     },
     {
+      "name": "DisputeAutoResolvedEvent",
+      "docs": [
+        "Dispute auto-resolved via receipt proofs (no arbiter)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dispute",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_settlement",
+            "type": "pubkey"
+          },
+          {
+            "name": "escrow",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": "u8"
+          },
+          {
+            "name": "proven_calls",
+            "type": "u32"
+          },
+          {
+            "name": "claimed_calls",
+            "type": "u32"
+          },
+          {
+            "name": "agent_amount",
+            "type": "u64"
+          },
+          {
+            "name": "depositor_amount",
+            "type": "u64"
+          },
+          {
+            "name": "slash_amount",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "DisputeFiledEvent",
       "docs": [
         "Dispute filed by depositor."
@@ -10702,8 +10926,16 @@
             }
           },
           {
-            "name": "arbiter",
-            "type": "pubkey"
+            "name": "dispute_type",
+            "type": "u8"
+          },
+          {
+            "name": "dispute_bond",
+            "type": "u64"
+          },
+          {
+            "name": "proof_deadline",
+            "type": "i64"
           },
           {
             "name": "timestamp",
@@ -10731,6 +10963,12 @@
           },
           {
             "name": "AutoReleased"
+          },
+          {
+            "name": "PartialRefund"
+          },
+          {
+            "name": "Split"
           }
         ]
       }
@@ -10761,6 +10999,14 @@
             "type": "pubkey"
           },
           {
+            "name": "dispute_type",
+            "type": {
+              "defined": {
+                "name": "DisputeType"
+              }
+            }
+          },
+          {
             "name": "evidence_hash",
             "type": {
               "array": [
@@ -10779,14 +11025,18 @@
             }
           },
           {
-            "name": "arbiter",
-            "type": "pubkey"
-          },
-          {
             "name": "outcome",
             "type": {
               "defined": {
                 "name": "DisputeOutcome"
+              }
+            }
+          },
+          {
+            "name": "resolution_layer",
+            "type": {
+              "defined": {
+                "name": "ResolutionLayer"
               }
             }
           },
@@ -10810,6 +11060,22 @@
           {
             "name": "slash_amount",
             "type": "u64"
+          },
+          {
+            "name": "dispute_bond",
+            "type": "u64"
+          },
+          {
+            "name": "proven_calls",
+            "type": "u32"
+          },
+          {
+            "name": "claimed_calls",
+            "type": "u32"
+          },
+          {
+            "name": "proof_deadline",
+            "type": "i64"
           }
         ]
       }
@@ -10854,6 +11120,29 @@
           {
             "name": "timestamp",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DisputeType",
+      "docs": [
+        "Dispute type — determines resolution path."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "NonDelivery"
+          },
+          {
+            "name": "PartialDelivery"
+          },
+          {
+            "name": "Overcharge"
+          },
+          {
+            "name": "Quality"
           }
         ]
       }
@@ -10946,95 +11235,6 @@
           {
             "name": "timestamp",
             "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "EscrowAccount",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "bump",
-            "type": "u8"
-          },
-          {
-            "name": "agent",
-            "type": "pubkey"
-          },
-          {
-            "name": "depositor",
-            "type": "pubkey"
-          },
-          {
-            "name": "agent_wallet",
-            "type": "pubkey"
-          },
-          {
-            "name": "balance",
-            "type": "u64"
-          },
-          {
-            "name": "total_deposited",
-            "type": "u64"
-          },
-          {
-            "name": "total_settled",
-            "type": "u64"
-          },
-          {
-            "name": "total_calls_settled",
-            "type": "u64"
-          },
-          {
-            "name": "price_per_call",
-            "type": "u64"
-          },
-          {
-            "name": "max_calls",
-            "type": "u64"
-          },
-          {
-            "name": "created_at",
-            "type": "i64"
-          },
-          {
-            "name": "last_settled_at",
-            "type": "i64"
-          },
-          {
-            "name": "expires_at",
-            "type": "i64"
-          },
-          {
-            "name": "volume_curve",
-            "docs": [
-              "Tiered pricing curve (max 5 breakpoints). Spans tier boundaries."
-            ],
-            "type": {
-              "vec": {
-                "defined": {
-                  "name": "VolumeCurveBreakpoint"
-                }
-              }
-            }
-          },
-          {
-            "name": "token_mint",
-            "docs": [
-              "None = SOL, Some = SPL token."
-            ],
-            "type": {
-              "option": "pubkey"
-            }
-          },
-          {
-            "name": "token_decimals",
-            "docs": [
-              "Token decimals (9=SOL, 6=USDC). Informational."
-            ],
-            "type": "u8"
           }
         ]
       }
@@ -11148,6 +11348,9 @@
           },
           {
             "name": "arbiter",
+            "docs": [
+              "DEPRECATED in v0.7 — arbiter removed, disputes auto-resolved via receipts"
+            ],
             "type": {
               "option": "pubkey"
             }
@@ -11159,6 +11362,31 @@
           {
             "name": "pending_calls",
             "type": "u64"
+          },
+          {
+            "name": "receipt_batch_count",
+            "type": "u32"
+          },
+          {
+            "name": "dispute_bond_total",
+            "docs": [
+              "Cumulative dispute bonds held in escrow (orphan protection)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "max_obligation",
+            "docs": [
+              "Maximum balance allowed (set at creation time based on stake coverage)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "pending_settlement_count",
+            "docs": [
+              "Number of non-finalized PendingSettlement PDAs for this escrow."
+            ],
+            "type": "u32"
           }
         ]
       }
@@ -12051,6 +12279,15 @@
             }
           },
           {
+            "name": "receipt_merkle_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
             "name": "created_at",
             "type": "i64"
           },
@@ -12327,6 +12564,138 @@
       }
     },
     {
+      "name": "ReceiptBatch",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "escrow",
+            "type": "pubkey"
+          },
+          {
+            "name": "batch_index",
+            "type": "u32"
+          },
+          {
+            "name": "merkle_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "call_count",
+            "type": "u32"
+          },
+          {
+            "name": "period_start",
+            "type": "i64"
+          },
+          {
+            "name": "period_end",
+            "type": "i64"
+          },
+          {
+            "name": "inscribed_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReceiptBatchInscribedEvent",
+      "docs": [
+        "Receipt batch committed on-chain."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "escrow",
+            "type": "pubkey"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "batch_index",
+            "type": "u32"
+          },
+          {
+            "name": "merkle_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "call_count",
+            "type": "u32"
+          },
+          {
+            "name": "period_start",
+            "type": "i64"
+          },
+          {
+            "name": "period_end",
+            "type": "i64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReceiptProofSubmittedEvent",
+      "docs": [
+        "Receipt proof submitted during dispute."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dispute",
+            "type": "pubkey"
+          },
+          {
+            "name": "escrow",
+            "type": "pubkey"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "receipts_submitted",
+            "type": "u32"
+          },
+          {
+            "name": "receipts_verified",
+            "type": "u32"
+          },
+          {
+            "name": "total_proven",
+            "type": "u32"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "RegisteredEvent",
       "type": {
         "kind": "struct",
@@ -12380,6 +12749,26 @@
           {
             "name": "timestamp",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ResolutionLayer",
+      "docs": [
+        "Resolution layer — how the dispute was resolved."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Pending"
+          },
+          {
+            "name": "Auto"
+          },
+          {
+            "name": "Governance"
           }
         ]
       }
@@ -12607,36 +12996,6 @@
       }
     },
     {
-      "name": "Settlement",
-      "docs": [
-        "Individual settlement entry for batch."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "calls_to_settle",
-            "docs": [
-              "Calls to bill"
-            ],
-            "type": "u64"
-          },
-          {
-            "name": "service_hash",
-            "docs": [
-              "sha256 proof of service"
-            ],
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
       "name": "SettlementFinalizedEvent",
       "docs": [
         "Pending settlement finalized (auto-released after dispute window)."
@@ -12782,6 +13141,33 @@
           {
             "name": "shard_index",
             "type": "u8"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeClosedEvent",
+      "docs": [
+        "v0.11 L-3: emitted when an agent's stake account is closed and rent reclaimed."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "returned_lamports",
+            "type": "u64"
           },
           {
             "name": "timestamp",
@@ -13542,6 +13928,34 @@
           {
             "name": "new_version",
             "type": "u16"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UnstakeCancelledEvent",
+      "docs": [
+        "v0.11 L-2: emitted when a `deposit_stake` clears a previously requested",
+        "unstake (top-up = implicit cancel of the pending withdrawal)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "cancelled_amount",
+            "type": "u64"
           },
           {
             "name": "timestamp",

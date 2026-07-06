@@ -1,7 +1,7 @@
 ---
 name: sap-merchant
 description: |
-  Merchant/agent skill for SAP SDK v0.15.0.
+  Merchant/agent skill for SAP SDK v0.3.0.
   Use when: registering an agent, publishing tools with schema hashes,
   managing vault delegates, staking (init/deposit/unstake),
   settling escrows (v2), handling disputes, managing subscriptions,
@@ -14,10 +14,10 @@ triggers:
   - sap merchant sell
 ---
 
-# SAP SDK — Merchant / Agent Skill Guide (v0.15.0)
+# SAP SDK — Merchant / Agent Skill Guide (v0.3.0)
 
 > **Role**: Merchant (agent, seller, service provider)  
-> **Package**: `@oobe-protocol-labs/synapse-sap-sdk@0.15.0`  
+> **Package**: `@oobe-protocol-labs/synapse-sap-sdk@0.3.0`  
 > **Main Class**: `SapMerchant`  
 > **Program ID**: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`
 
@@ -161,24 +161,20 @@ const ix = await client.escrow.settleCallsV2({
   agent,
   agentStats,
   escrow,
-  settlementReceipt: new PublicKey('...'),
   escrowNonce: new BN(0),
   callsToSettle: new BN(10),
   serviceHash: Array.from(crypto.randomBytes(32)),
+  // remainingAccounts: co-signer or pending PDA plus treasury/ATA as required.
+  // Prefer client.escrowV2.settle() for automatic account derivation.
 });
 ```
 
-### Create Pending Settlement (separate step if needed)
+### Pending Settlement
 
 ```ts
-const ix = await client.dispute.createPendingSettlement({
-  signer, wallet: myWallet.publicKey, agent, escrow, pendingSettlement,
-  settlementIndex: new BN(settlementIndex),
-  callsToSettle: new BN(10),
-  amount: new BN(1_000_000),
-  serviceHash: Array.from(crypto.randomBytes(32)),
-  receiptMerkleRoot: Array.from(new Uint8Array(32)), // optional
-});
+// v0.3.0 creates PendingSettlement through settle_calls_v2.
+// Do not call createPendingSettlement directly; it is kept only as a
+// deprecated generated wrapper for IDL completeness.
 ```
 
 ### Finalize Settlement (after dispute window or instantly)

@@ -174,6 +174,33 @@ export class StakingModule extends BaseModule {
       .rpc();
   }
 
+  /**
+   * Close a legacy stake account after its agent PDA has already been closed.
+   *
+   * Normal v0.3.0 agent closure returns stake automatically via `agent.close()`.
+   * This helper exists for v0.18-era accounts where the agent was closed while
+   * the permanent collateral floor stayed in the StakePDA.
+   */
+  async closeStake(agentWallet: PublicKey): Promise<TransactionSignature> {
+    const [agentPda] = deriveAgent(agentWallet);
+    const [stakePda] = this.deriveStake(agentPda);
+
+    await this.requireAccountExists<AgentStakeData>(
+      "agentStake",
+      stakePda,
+      { predicted: "NoStakeAccount", hint: "No stake account to close" },
+    );
+
+    return this.methods
+      .closeStake()
+      .accounts({
+        wallet: this.walletPubkey,
+        agent: agentPda,
+        stake: stakePda,
+      })
+      .rpc();
+  }
+
   // ── Fetchers ─────────────────────────────────────────
 
   async fetch(agentPda: PublicKey): Promise<AgentStakeData> {

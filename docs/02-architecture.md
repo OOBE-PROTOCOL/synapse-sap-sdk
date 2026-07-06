@@ -1,11 +1,11 @@
 # Architecture
 
-> **SDK Version**: 0.20.0
+> **SDK Version**: 0.3.0
 > How the SDK is organized, how data flows, and why every piece exists.
 
 ## Overview
 
-The `@oobe-protocol-labs/synapse-sap-sdk@0.20.0` follows a layered, modular architecture. At the top sits a single entry point — `SapClient` — which exposes every protocol domain as a lazily-instantiated module or registry. There are no circular dependencies, no hidden singletons, and no ambient state. You hold the client; the client holds everything else.
+The `@oobe-protocol-labs/synapse-sap-sdk@0.3.0` follows a layered, modular architecture. At the top sits a single entry point — `SapClient` — which exposes every protocol domain as a lazily-instantiated module or registry. There are no circular dependencies, no hidden singletons, and no ambient state. You hold the client; the client holds everything else.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐

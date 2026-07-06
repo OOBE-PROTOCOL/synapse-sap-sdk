@@ -1,7 +1,7 @@
 ---
 name: sap-client
 description: |
-  Consumer/client skill for SAP SDK v0.15.0.
+  Consumer/client skill for SAP SDK v0.3.0.
   Use when: opening escrows, depositing/withdrawing funds,
   settling calls (v2), filing disputes, verifying settlements,
   discovering agents/tools, building x402 payment headers,
@@ -14,12 +14,12 @@ triggers:
   - sap settlement check
 ---
 
-# SAP SDK — Consumer / Client Skill Guide (v0.15.0)
+# SAP SDK — Consumer / Client Skill Guide (v0.3.0)
 
 > **Prerequisites**: See `sap-overview` for SDK setup, connection, and quickstart.
 
 > **Role**: Consumer (depositor, buyer, escrow creator)  
-> **Package**: `@oobe-protocol-labs/synapse-sap-sdk@0.15.0`  
+> **Package**: `@oobe-protocol-labs/synapse-sap-sdk@0.3.0`  
 > **Program ID**: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`  
 
 ---
@@ -146,10 +146,11 @@ const ix = await client.escrow.settleCallsV2({
   agent,
   agentStats,
   escrow,
-  settlementReceipt: new PublicKey('...'),
   escrowNonce: new BN(escrowNonce),
   callsToSettle: new BN(5),
   serviceHash: Array.from(new Uint8Array(32)), // sha256 of service identifier
+  // remainingAccounts: treasury/ATA plus co-signer or pending PDA as required.
+  // Prefer client.escrowV2.settle() for automatic account derivation.
 });
 ```
 
@@ -276,9 +277,9 @@ try {
 1. **Always use V2** — The program no longer has v1 escrow instructions.
    `createEscrowV2` is the ONLY create method.
 
-2. **SettlementReceipt account** — `settleCallsV2` requires a
-   `settlementReceipt` account derived via seeds (check protocol docs for the
-   exact derivation if you manage receipts manually).
+2. **PendingSettlement account** — DisputeWindow settlement passes the
+   `PendingSettlement` PDA as a remaining account to `settleCallsV2`. The
+   high-level `client.escrowV2.settle()` helper derives it automatically.
 
 3. **BN everywhere** — All numeric args in instructions expect `BN`, not
    `number` or `bigint`. Import `BN` from `@coral-xyz/anchor`.

@@ -5,7 +5,7 @@
  * Modular, free-choice design: Agents choose which records to expose.
  * No roles, no requirements, complete freedom.
  * 
- * @since v0.21.0
+ * @since v0.3.0
  * @packageDocumentation
  */
 
@@ -54,7 +54,7 @@ const rateLimitState = {
  * Modular record system: agents freely choose which records to expose.
  * All other records are optional and agent-specific.
  * 
- * @since v0.21.0
+ * @since v0.3.0
  */
 export class SnsModule {
   private connection: Connection;

@@ -1,65 +1,48 @@
 # x402 Payments
 
-> **SDK Version**: 0.20.0
-> **EscrowV2 Module**: v0.7.0+ (DisputeWindow auto-bundle: v0.13.0)
+> **SDK Version**: 0.3.0
+> **EscrowV2 Module**: v0.3.0 V2-only settlement
 
 > **Protocol version guide:**
 > | Feature | Use | Since |
 > |---------|-----|-------|
-> | Escrow creation & settlement | `client.escrowV2` (recommended) | SDK v0.7.0 |
-> | **DisputeWindow auto-bundle** | `client.escrowV2.settle()` (default) | SDK v0.13.0 |
+> | Escrow creation & settlement | `client.escrowV2` or `client.escrow` V2 alias | SDK v0.3.0 |
+> | **DisputeWindow pending PDA** | `client.escrowV2.settle()` derives and passes it automatically | SDK v0.3.0 |
 > | Receipt batch inscription | `client.receipt.inscribeReceiptBatch()` | SDK v0.8.0 |
 > | Dispute resolution | `client.receipt.autoResolveDispute()` | SDK v0.8.0 |
-> | V1 escrow (low-level) | `client.escrow` — **deprecated**, use `client.escrowV2` | SDK v0.1.0 |
+> | V1 escrow | Removed from public flows; migrate to V2 | SDK v0.3.0 |
 >
 > For the complete payment pipeline see the skill guides:
 > [`skills/client.md §9` (consumer)](./skills/client.md) · [`skills/merchant.md §11` (agent)](./skills/merchant.md)
 
 ---
 
-## EscrowV2 Module — v0.13.0 Breaking Changes
+## EscrowV2 Module — v0.3.0 Settlement Flow
 
-### DisputeWindow Auto-Bundle (v0.13.0)
+### DisputeWindow Pending PDA
 
-**Breaking Change**: When `settlementSecurity === DisputeWindow`, `client.escrowV2.settle()` now **auto-bundles** `settleCallsV2 + createPendingSettlement` into a single transaction.
+When `settlementSecurity === DisputeWindow`, `client.escrowV2.settle()` derives the expected `PendingSettlement` PDA and passes it to `settle_calls_v2` as a remaining account. The separate `create_pending_settlement` wrapper is deprecated in 0.3.0.
 
 **Why**: Pre-v0.13.0, callers had to manually call two instructions in sequence:
 ```typescript
-// ❌ OLD (v0.12.x) — ERROR PRONE
+// ❌ OLD — ERROR PRONE / DEPRECATED
 await client.escrowV2.settleCallsV2(...);        // Step 1
-await client.escrowV2.createPendingSettlement(...); // Step 2 (often forgotten!)
+// Step 2 used to create a pending settlement manually and was often forgotten.
 ```
 
 If Step 2 was forgotten or failed, it created an **orphan PendingSettlement** with `escrow.pending_amount = 0`, causing `finalizeSettlement()` to abort with `ArithmeticOverflow` (error 6075).
 
-**New Flow** (v0.13.0+):
+**New Flow** (v0.3.0):
 ```typescript
-// ✅ NEW (v0.13.0+) — SAFE
-await client.escrowV2.settle(agentWallet, nonce, {
-  callsToSettle: 10,
-  serviceHash: hash,
-});
-// Auto-bundles both IX in 1 TX — no foot-guns
-```
-
-**Opt-Out** (advanced users only):
-```typescript
-// Skip auto-bundle for custom receipt-merkle batching
-await client.escrowV2.settle(agentWallet, nonce, {
-  callsToSettle: 10,
-  serviceHash: hash,
-  skipAutoPending: true, // Don't bundle createPendingSettlement
-});
-```
-
-**Opt-In** (inscribe merkle root):
-```typescript
-// Bundle with receipt merkle root inscription
-await client.escrowV2.settle(agentWallet, nonce, {
-  callsToSettle: 10,
-  serviceHash: hash,
-  receiptMerkleRoot: [...], // Inscribed in bundled pending
-});
+// ✅ SAFE
+await client.escrowV2.settle(
+  depositorWallet,
+  nonce,
+  10,
+  serviceHash,
+);
+// The SDK fetches escrow state and includes treasury / USDC ATA / pending PDA
+// remaining accounts as required.
 ```
 
 ### nextSettlementIndex Helper (v0.12.8)
@@ -109,8 +92,8 @@ x402 turns every agent call into a verifiable financial transaction. No invoices
       │  1. Discover pricing (agent.pricing)      │
       │  ─────────────────────────────────────►   │
       │                                           │
-      │  2. Create escrow + deposit funds         │
-      │  ─── createEscrow (on-chain TX) ──────►   │
+      │  2. Create V2 escrow + deposit funds      │
+      │  ─── createEscrowV2 (on-chain TX) ────►   │
       │                                           │
       │  3. Call agent with x402 headers          │
       │  ─── X-Payment-Escrow, X-Payment-*─────►  │
@@ -119,7 +102,7 @@ x402 turns every agent call into a verifiable financial transaction. No invoices
       │  ◄──────── response payload ────────────  │
       │                                           │
       │  5. Agent settles on-chain                │
-      │       settleCalls (on-chain TX)           │
+      │       settleCallsV2 (on-chain TX)         │
       │  ◄── PaymentSettledEvent emitted ───────  │
       │                                           │
       │  6. Client verifies settlement TX         │
@@ -127,7 +110,7 @@ x402 turns every agent call into a verifiable financial transaction. No invoices
       └───────────────────────────────────────────┘
 ```
 
-The client side uses `client.x402` (high-level) or `client.escrow` (low-level). The agent side calls `settle` or `settleBatch` after serving requests.
+The client side uses `client.x402` (high-level) or `client.escrowV2` / `client.escrow` (V2 low-level alias). The agent side calls `settle` after serving requests; legacy V1 settlement and batch settlement are not public 0.3.0 flows.
 
 ---
 

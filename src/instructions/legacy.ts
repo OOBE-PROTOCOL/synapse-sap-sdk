@@ -1,5 +1,5 @@
 // ===============================================================
-//  Legacy Memory Module — IDL v0.18.0+
+//  Legacy Memory Module — IDL v0.3.0+
 //  Buffer, Digest, Memory, and Plugin instructions
 // ===============================================================
 
@@ -10,7 +10,7 @@ import { Program, BN } from '@coral-xyz/anchor';
  * LegacyMemoryModule provides methods for buffer, digest, memory,
  * and plugin operations on the Synapse Agent Protocol (SAP).
  * 
- * @deprecated v0.18.0 — Legacy memory system is deprecated.
+ * @deprecated v0.3.0 — Legacy memory system is deprecated.
  * Use the new Vault/Memory system (`VaultModule`, `inscribeMemory()`) for new deployments.
  * This module is kept for backward compatibility with existing legacy deployments.
  * 
@@ -25,7 +25,7 @@ export class LegacyMemoryModule {
   // ═══════════════════════════════════════════════════════════
 
   /**
-   * @deprecated v0.18.0 — Use `VaultModule.inscribeMemory()` instead.
+   * @deprecated v0.3.0 — Use `VaultModule.inscribeMemory()` instead.
    * Create a buffer for chunked data uploads.
    * @description Initializes a buffer PDA for paginated memory storage.
    * @param {Object} ctx - Context object containing required accounts and parameters
@@ -53,7 +53,7 @@ export class LegacyMemoryModule {
   }
 
   /**
-   * @deprecated v0.18.0 — Use `VaultModule.inscribeMemory()` instead.
+   * @deprecated v0.3.0 — Use `VaultModule.inscribeMemory()` instead.
    * Append data to an existing buffer.
    * @description Adds encrypted data chunk to buffer page.
    * @param {Object} ctx - Context object containing required accounts and parameters
@@ -77,7 +77,7 @@ export class LegacyMemoryModule {
   }
 
   /**
-   * @deprecated v0.18.0 — Use `VaultModule.closeMemoryEntry()` instead.
+   * @deprecated v0.3.0 — Use `VaultModule.closeMemoryEntry()` instead.
    * Close a buffer and reclaim rent.
    * @description Permanently closes a buffer PDA, transferring remaining rent to authority.
    * @param {Object} ctx - Context object containing required accounts and signers
@@ -104,7 +104,7 @@ export class LegacyMemoryModule {
   // ═══════════════════════════════════════════════════════════
 
   /**
-   * @deprecated v0.18.0 — Use `VaultModule` + `DigestModule` instead.
+   * @deprecated v0.3.0 — Use `VaultModule` + `DigestModule` instead.
    * Initialize a digest account.
    * @description Creates a digest PDA for proof-of-memory verification.
    * @param {Object} ctx - Context object containing required accounts and parameters
@@ -130,7 +130,7 @@ export class LegacyMemoryModule {
   }
 
   /**
-   * @deprecated v0.18.0 — Use `VaultModule.inscribeMemory()` instead.
+   * @deprecated v0.3.0 — Use `VaultModule.inscribeMemory()` instead.
    * Post data to digest for inscription.
    * @description Adds data chunk to digest merkle chain.
    * @param {Object} ctx - Context object containing required accounts and parameters
@@ -154,7 +154,7 @@ export class LegacyMemoryModule {
   }
 
   /**
-   * @deprecated v0.18.0 — Use `VaultModule` inscription flow instead.
+   * @deprecated v0.3.0 — Use `VaultModule` inscription flow instead.
    * Inscribe digest to transaction log.
    * @description Permanently inscribes merkle root and content hash to TX log.
    * @param {Object} ctx - Context object containing required accounts and parameters
@@ -179,7 +179,7 @@ export class LegacyMemoryModule {
   }
 
   /**
-   * @deprecated v0.18.0 — Not needed with new Vault system.
+   * @deprecated v0.3.0 — Not needed with new Vault system.
    * Update digest storage metadata.
    * @description Updates digest merkle root and chunk count.
    * @param {Object} ctx - Context object containing required accounts and parameters
@@ -204,7 +204,7 @@ export class LegacyMemoryModule {
   }
 
   /**
-   * @deprecated v0.18.0 — Use `VaultModule.closeMemoryEntry()` instead.
+   * @deprecated v0.3.0 — Use `VaultModule.closeMemoryEntry()` instead.
    * Close a digest account and reclaim rent.
    * @description Permanently closes a digest PDA, transferring remaining rent to authority.
    * @param {Object} ctx - Context object containing required accounts and signers
@@ -231,7 +231,7 @@ export class LegacyMemoryModule {
   // ═══════════════════════════════════════════════════════════
 
   /**
-   * @deprecated v0.18.0 — Use `VaultModule.inscribeMemory()` instead.
+   * @deprecated v0.3.0 — Use `VaultModule.inscribeMemory()` instead.
    * Store memory entry permanently.
    * @description Creates a memory entry PDA and inscribes proof to TX log.
    * @param {Object} ctx - Context object containing required accounts and parameters
@@ -264,7 +264,7 @@ export class LegacyMemoryModule {
   }
 
   /**
-   * @deprecated v0.18.0 — Use `VaultModule.inscribeMemory()` with chunked flow instead.
+   * @deprecated v0.3.0 — Use `VaultModule.inscribeMemory()` with chunked flow instead.
    * Append memory chunk to vault.
    * @description Adds encrypted data fragment to memory vault.
    * @param {Object} ctx - Context object containing required accounts and parameters
@@ -309,7 +309,7 @@ export class LegacyMemoryModule {
   }
 
   /**
-   * @deprecated v0.18.0 — Use `VaultModule.closeMemoryEntry()` instead.
+   * @deprecated v0.3.0 — Use `VaultModule.closeMemoryEntry()` instead.
    * Close a memory chunk and reclaim rent.
    * @description Permanently closes a memory chunk PDA, transferring remaining rent.
    * @param {Object} ctx - Context object containing required accounts and signers
@@ -334,7 +334,7 @@ export class LegacyMemoryModule {
   }
 
   /**
-   * @deprecated v0.18.0 — Use `VaultModule.closeMemoryEntry()` instead.
+   * @deprecated v0.3.0 — Use `VaultModule.closeMemoryEntry()` instead.
    * Close a memory entry and reclaim rent.
    * @description Permanently closes a memory entry PDA, transferring remaining rent.
    * @param {Object} ctx - Context object containing required accounts and signers
@@ -363,7 +363,7 @@ export class LegacyMemoryModule {
   // ═══════════════════════════════════════════════════════════
 
   /**
-   * @deprecated v0.18.0 — Plugin system is deprecated. Use direct tool publishing instead.
+   * @deprecated v0.3.0 — Plugin system is deprecated. Use direct tool publishing instead.
    * Register a plugin for an agent.
    * @description Creates a plugin reference PDA with metadata.
    * @param {Object} ctx - Context object containing required accounts and parameters
@@ -391,7 +391,7 @@ export class LegacyMemoryModule {
   }
 
   /**
-   * @deprecated v0.18.0 — Plugin system is deprecated.
+   * @deprecated v0.3.0 — Plugin system is deprecated.
    * Close a plugin reference and reclaim rent.
    * @description Permanently closes a plugin reference PDA, transferring remaining rent.
    * @param {Object} ctx - Context object containing required accounts and signers

@@ -1,7 +1,7 @@
 ---
 name: sap-advanced
 description: |
-  Advanced SAP SDK v0.18.0 workflows — Production patterns, error handling,
+  Advanced SAP SDK v0.3.0 workflows — Production patterns, error handling,
   revenue optimization, treasury tracking, multi-agent orchestration,
   batch operations, and enterprise integrations.
 triggers:
@@ -13,11 +13,11 @@ triggers:
   - sap enterprise
 ---
 
-# SAP SDK v0.18.0 — Advanced Workflows
+# SAP SDK v0.3.0 — Advanced Workflows
 
 > **Level:** Production/Enterprise  
-> **Package:** `@oobe-protocol-labs/synapse-sap-sdk@0.18.0`  
-> **CLI:** `synapse-sap-cli@0.18.0`  
+> **Package:** `@oobe-protocol-labs/synapse-sap-sdk@0.3.0`  
+> **CLI:** `synapse-sap-cli@0.3.0`  
 > **Treasury:** `J7PyZAGKvprCz4SQ5DKBLAHstJxgVqZcz6kguUoWpP7P`
 
 ---

@@ -1,14 +1,14 @@
 # Best Practices
 
-> **SDK Version**: 0.20.0
-> **Program Compatibility**: 0.18.0
+> **SDK Version**: 0.3.0
+> **Program Compatibility**: 0.3.0
 > Patterns, pitfalls, and production-ready conventions for the SAP SDK.
 
 This guide distills the lessons we've learned from building and operating agents on-chain. Follow these recommendations and you'll avoid the most common failure modes.
 
 ---
 
-## Production Defaults (v0.20.0)
+## Production Defaults (v0.3.0)
 
 ### EscrowV2 — DisputeWindow Mode
 
@@ -96,7 +96,7 @@ const conn = SapConnection.localnet();
 
 ---
 
-## Error Handling (v0.20.0)
+## Error Handling (v0.3.0)
 
 The SDK exposes a structured error hierarchy from the `errors/` module. Every SDK error extends the base `SapError` class, so you can catch broadly or match specific failure types.
 

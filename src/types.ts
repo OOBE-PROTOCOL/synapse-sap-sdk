@@ -1,6 +1,6 @@
 // ================================================================
 //  synapse-sap-sdk / src/types.ts
-//  Shared TypeScript types — 1:1 with on-chain state (v0.13)
+//  Shared TypeScript types — 1:1 with on-chain state (v0.3)
 // ================================================================
 
 import BN from "bn.js";
@@ -8,7 +8,7 @@ import { PublicKey } from "@solana/web3.js";
 
 // ── Escrow Layer ──
 export enum SettlementSecurity {
-  SelfReport    = 0,      // v0.7+ deprecated
+  SelfReport    = 0,      // deprecated for new escrows
   CoSigned      = 1,
   DisputeWindow = 2,
 }
@@ -18,50 +18,50 @@ export interface VolumeCurvePoint {
   pricePerCall: BN;
 }
 
-/** EscrowAccountV2 — matches on-chain struct after v0.13 hardening */
+/** EscrowAccountV2 — matches the on-chain Rust struct. */
 export interface EscrowAccountV2 {
+  bump: number;
+  version: number;
   agent: PublicKey;
   depositor: PublicKey;
-  tokenMint: PublicKey | null;
-  decimals: number;
+  agentWallet: PublicKey;
+  escrowNonce: BN;
   balance: BN;
   totalDeposited: BN;
   totalSettled: BN;
   totalCallsSettled: BN;
-  pendingAmount: BN;
-  pendingCalls: BN;
-  maxObligation: BN;
-  disputeBondTotal: BN;
-  pendingSettlementCount: number;
   pricePerCall: BN;
-  basePrice: BN;
   maxCalls: BN;
+  createdAt: BN;
+  lastSettledAt: BN;
+  expiresAt: BN;
   volumeCurve: VolumeCurvePoint[];
+  tokenMint: PublicKey | null;
+  tokenDecimals: number;
   settlementSecurity: SettlementSecurity;
+  disputeWindowSlots: BN;
+  settlementIndex: BN;
   coSigner: PublicKey | null;
   arbiter: PublicKey | null;
-  disputeWindowSlots: number;
-  finalized: boolean;
-  createdAt: BN;
-  expiresAt: BN;
-  lastSettledAt: BN;
-  settlementIndex: BN;
-  escrowNonce: number;
-  bump: number;
+  pendingAmount: BN;
+  pendingCalls: BN;
 }
 
 export interface PendingSettlement {
-  escrow: PublicKey;
-  depositor: PublicKey;
-  agent: PublicKey;
-  amount: BN;
-  calls: BN;
-  settlementIndex: BN;
-  filedSlot: BN;
-  releaseSlot: BN;
-  isDisputed: boolean;
-  finalized: boolean;
   bump: number;
+  escrow: PublicKey;
+  agent: PublicKey;
+  agentWallet: PublicKey;
+  depositor: PublicKey;
+  settlementIndex: BN;
+  callsToSettle: BN;
+  amount: BN;
+  serviceHash: number[];
+  createdAt: BN;
+  releaseSlot: BN;
+  isFinalized: boolean;
+  isDisputed: boolean;
+  outcome: DisputeOutcome;
 }
 
 export interface SettlementEvent {
@@ -125,23 +125,23 @@ export enum DisputeOutcome {
   Pending      = 0,
   DepositorWins = 1,
   AgentWins    = 2,
-  Refunded     = 3,
+  AutoReleased = 3,
 }
 
 export interface DisputeRecord {
+  bump: number;
+  pendingSettlement: PublicKey;
   escrow: PublicKey;
   depositor: PublicKey;
   agent: PublicKey;
-  settlementIndex: BN;
-  amount: BN;
-  bondAmount: BN;
-  receiptRoot: Uint8Array;
-  filedAt: BN;
-  proofDeadline: BN;
+  evidenceHash: number[];
+  agentEvidenceHash: number[];
+  arbiter: PublicKey;
   outcome: DisputeOutcome;
-  arbiter: PublicKey | null;
-  settledAt: BN;
-  bump: number;
+  createdAt: BN;
+  resolvedAt: BN;
+  resolutionHash: number[];
+  slashAmount: BN;
 }
 
 // ── Subscription Layer ──

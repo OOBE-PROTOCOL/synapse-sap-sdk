@@ -15,7 +15,7 @@
  * @see https://github.com/SolanaNameService/sns-sdk
  * @see https://bonfida.github.io/solana-name-service-guide
  * 
- * @since v0.21.0
+ * @since v0.3.0
  */
 
 import {

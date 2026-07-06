@@ -18,7 +18,7 @@ import { BN } from "@coral-xyz/anchor";
 import { findATA } from "./rpc-strategy";
 import { deriveAgent, deriveEscrow } from "../pda";
 import { SapError } from "../errors";
-import type { EscrowAccountData } from "../types";
+import type { EscrowAccountV2Data } from "../types";
 
 // ═══════════════════════════════════════════════════════════════════
 //  Types
@@ -49,7 +49,7 @@ export interface EscrowValidationResult {
   /** Whether the escrow is valid for settlement. */
   readonly valid: boolean;
   /** Escrow account data (if found). */
-  readonly escrow: EscrowAccountData | null;
+  readonly escrow: EscrowAccountV2Data | null;
   /** Escrow PDA address. */
   readonly escrowPda: PublicKey;
   /** Agent PDA address. */
@@ -140,7 +140,7 @@ export async function validateEscrowState(
   connection: Connection,
   agentWallet: PublicKey,
   depositorWallet: PublicKey,
-  fetchEscrow: (escrowPda: PublicKey) => Promise<EscrowAccountData | null>,
+  fetchEscrow: (escrowPda: PublicKey) => Promise<EscrowAccountV2Data | null>,
   opts?: { callsToSettle?: number },
 ): Promise<EscrowValidationResult> {
   const [agentPda] = deriveAgent(agentWallet);

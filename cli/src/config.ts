@@ -1,6 +1,6 @@
 /**
  * @module cli/config
- * @description CLI configuration management — v0.20.0 aligned.
+ * @description CLI configuration management — v0.3.0 aligned.
  *
  * Handles loading config from:
  *   1. Command-line flags (highest priority)
@@ -8,7 +8,7 @@
  *   3. Environment variables
  *   4. Sensible defaults
  *
- * SAP SDK v0.20.0 specific:
+ * SAP SDK v0.3.0 specific:
  *   - apiKey for RPC authentication
  *   - jupiterApiKey for DeFi operations
  *   - rpcHeaders for gated RPCs

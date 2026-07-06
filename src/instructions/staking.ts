@@ -1,5 +1,5 @@
 // ===============================================================
-//  Staking Module — IDL v0.25.0
+//  Staking Module — IDL v0.3.0
 //  8 instructions
 // ===============================================================
 
@@ -8,6 +8,20 @@ import { Program, BN } from '@coral-xyz/anchor';
 
 export class StakingModule {
   constructor(private program: Program) {}
+
+  /** close_stake (3 accounts, 0 args) */
+  async closeStake(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; stake: PublicKey; remainingAccounts?: any[] }): Promise<TransactionInstruction> {
+    return this.program
+      .methods.closeStake()
+      .accounts({
+        wallet: ctx.wallet,
+        agent: ctx.agent,
+        stake: ctx.stake,
+      })
+      .remainingAccounts(ctx.remainingAccounts ?? [])
+      .signers([ctx.signer])
+      .instruction();
+  }
 
   /** close_ledger (5 accounts, 0 args) */
   async closeLedger(ctx: { signer: Signer; wallet: PublicKey; session: PublicKey; vault: PublicKey; agent: PublicKey; ledger: PublicKey; remainingAccounts?: any[] }): Promise<TransactionInstruction> {

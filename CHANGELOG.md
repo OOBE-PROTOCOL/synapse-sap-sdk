@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-07-06
+
+### Changed
+- Escrow support is now V2-only in public SDK flows. `client.escrow`,
+  `x402.preparePayment()`, `x402.addFunds()`, `x402.withdrawFunds()`,
+  `x402.closeEscrow()`, and `x402.settle()` all target the canonical
+  `escrow_account_v2` path.
+- Kept compatibility shims for old import paths only where they now resolve to
+  V2 (`EscrowModule` and `deriveEscrow()` alias V2 nonce `0`); no SDK path
+  builds legacy escrow instructions anymore.
+- Client-side batch settlement now runs sequential V2 settlements instead of
+  calling the removed legacy `settle_batch` instruction.
+
+### Fixed
+- Program and SDK are aligned on version `0.3.0`.
+- Aligned all embedded IDL JSON paths with the Anchor-generated program IDL
+  (`settle_calls_v2` uses 5 accounts; `create_pending_settlement` uses 4 args).
+- `create_escrow_v2` now supports both native SOL escrows (`tokenMint = null`)
+  and USDC escrows, with rail-specific decimal and pricing-menu validation.
+- SPL/USDC escrow settlement, withdrawal, and dispute-resolution transfers now
+  validate token account mint and owner before moving funds.
+- Quality dispute bond accounting now pays the bond to the winning side and
+  decrements `dispute_bond_total` on resolution.
+- `EscrowV2Module.settle()` and `x402.settle()` now include the native treasury
+  account automatically for SOL V2 settlements.
+- `EscrowV2Module.settle()` and `x402.settle()` now derive and include the
+  treasury ATA automatically for SPL/USDC V2 settlement fees.
+- `agent.close()` now passes `pricingMenu` and `stake`, matching the v0.3.0
+  program IDL so closing an agent returns the AgentStake collateral when no
+  active escrow obligations remain.
+- Added `staking.closeStake()` as a recovery helper for legacy v0.18 accounts
+  whose agent PDA was already closed while the StakePDA remained funded.
+- Removed stale `settlementReceipt` / `receiptMerkleRoot` arguments from V2
+  settlement builders that do not exist in the canonical `0.3.0` IDL.
+
 ## [0.21.0] - 2026-06-25
 
 ###  Major Features

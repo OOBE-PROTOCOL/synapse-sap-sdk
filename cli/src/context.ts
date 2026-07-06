@@ -1,6 +1,6 @@
 /**
  * @module cli/context
- * @description CLI execution context — v0.20.0 aligned.
+ * @description CLI execution context — v0.3.0 aligned.
  */
 import * as fs from "fs";
 import * as path from "path";

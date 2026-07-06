@@ -26,7 +26,7 @@ import type {
   VaultDelegateData,
   SessionCheckpointData,
   ToolDescriptorData,
-  EscrowAccountData,
+  EscrowAccountV2Data,
   AgentAttestationData,
   MemoryLedgerData,
   LedgerPageData,
@@ -367,7 +367,7 @@ export function serializeCheckpoint(
 
 export function serializeEscrow(
   pda: string,
-  d: EscrowAccountData,
+  d: EscrowAccountV2Data,
   slot: number,
 ): Record<string, unknown> {
   return {

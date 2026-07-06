@@ -1,6 +1,6 @@
 /**
  * @module cli/commands/x402
- * @description x402 operations — v0.20.0 aligned.
+ * @description x402 operations — v0.3.0 aligned.
  */
 import { Command } from "commander";
 import { loadConfig } from "../config.js";

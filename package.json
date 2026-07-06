@@ -1,7 +1,7 @@
 {
   "name": "@oobe-protocol-labs/synapse-sap-sdk",
-  "version": "0.21.0",
-  "description": "Synapse Agent Protocol (SAP) SDK for Solana | v0.21.0 SNS Integration with Modular Record System",
+  "version": "0.3.0",
+  "description": "Synapse Agent Protocol (SAP) SDK for Solana | v0.3.0 aligned program and SDK",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
@@ -180,7 +180,7 @@
   ],
   "license": "Apache-2.0",
   "dependencies": {
-    "@bonfida/spl-name-service": "^3.0.9",
+    "@bonfida/spl-name-service": "^3.0.23",
     "@coral-xyz/anchor": "^0.30.1",
     "@metaplex-foundation/mpl-core": "^1.10.0",
     "@metaplex-foundation/umi": "^1.5.1",
@@ -193,10 +193,15 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.39",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
     "eslint": "^8.57.0",
     "prettier": "^3.3.0",
     "typescript": "^5.9.3",
-    "vitest": "^1.6.0"
+    "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "ws": "^8.21.0"
   },
   "engines": {
     "node": ">=18"

@@ -1,6 +1,6 @@
 // ================================================================
 //  synapse-sap-sdk / src/client.ts
-//  SapClient v0.25.0 — modular Anchor program wrapper
+//  SapClient v0.3.0 — modular Anchor program wrapper
 // ================================================================
 
 import {
@@ -77,10 +77,15 @@ export class SapClient {
   get tools()     { return this._tools     ??= new ToolsModule(this.program); }
   get vault()     { return this._vault     ??= new VaultModule(this.program); }
 
-  async fetchAccount<T = any>(name: string, address: PublicKey): Promise<T | null> {
-    try { // @ts-ignore
-    return await this.program.account[name].fetch(address) as T; }
-    catch { return null; }
+  async fetchAccount<T = unknown>(name: string, address: PublicKey): Promise<T | null> {
+    try {
+      const account = (
+        this.program.account as unknown as Record<string, { fetch(address: PublicKey): Promise<T> } | undefined>
+      )[name];
+      return account ? await account.fetch(address) : null;
+    } catch {
+      return null;
+    }
   }
 
   async buildTransaction(

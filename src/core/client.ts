@@ -42,7 +42,6 @@ import { FeedbackModule } from "../modules/feedback";
 import { IndexingModule } from "../modules/indexing";
 import { ToolsModule } from "../modules/tools";
 import { VaultModule } from "../modules/vault";
-import { EscrowModule } from "../modules/escrow";
 import { EscrowV2Module } from "../modules/escrow-v2";
 import { ReceiptModule } from "../modules/receipt";
 import { StakingModule } from "../modules/staking";
@@ -125,7 +124,7 @@ export class SapClient {
    * @description Underlying Solana RPC connection used by the provider.
    * @readonly
    * @category Core
-   * @since v0.20.0
+   * @since v0.3.0
    */
   readonly connection: Connection;
 
@@ -134,7 +133,7 @@ export class SapClient {
    * @description SAP program address targeted by this client.
    * @readonly
    * @category Core
-   * @since v0.20.0
+   * @since v0.3.0
    */
   readonly programId: PublicKey;
 
@@ -155,7 +154,7 @@ export class SapClient {
   #indexing?: IndexingModule;
   #tools?: ToolsModule;
   #vault?: VaultModule;
-  #escrow?: EscrowModule;
+  #escrow?: EscrowV2Module;
   #escrowV2?: EscrowV2Module;
   #receipt?: ReceiptModule;
   #staking?: StakingModule;
@@ -257,14 +256,14 @@ export class SapClient {
   /**
    * @name fromOptions
    * @description Create a client from RPC/connection options. This preserves
-   * the v0.19 `createSapClient(rpcUrl, wallet)` path while returning the
-   * full v0.20 client surface.
+   * the legacy `createSapClient(rpcUrl, wallet)` path while returning the
+   * full v0.3.0 client surface.
    *
    * @param opts - Connection, wallet, commitment, and program ID options.
    * @returns A fully-initialised `SapClient`.
    *
    * @category Core
-   * @since v0.20.0
+   * @since v0.3.0
    */
   static fromOptions(opts: SapClientOpts = {}): SapClient {
     const connection = opts.connection ?? new Connection(
@@ -406,15 +405,15 @@ export class SapClient {
 
   /**
    * @name escrow
-   * @description x402 escrow settlement: create escrow accounts, deposit
-   * funds, settle payments, and withdraw balances.
-   * @returns {EscrowModule} The lazily-instantiated `EscrowModule` singleton.
+   * @description V2 x402 escrow settlement: create escrow accounts, deposit
+   * funds, settle payments, withdraw balances, and dispute settlements.
+   * @returns {EscrowV2Module} The lazily-instantiated `EscrowV2Module` singleton.
    * @category Modules
    * @since v0.1.0
-   * @see {@link EscrowModule}
+   * @see {@link EscrowV2Module}
    */
-  get escrow(): EscrowModule {
-    return (this.#escrow ??= new EscrowModule(this.program));
+  get escrow(): EscrowV2Module {
+    return (this.#escrow ??= new EscrowV2Module(this.program));
   }
 
   /**

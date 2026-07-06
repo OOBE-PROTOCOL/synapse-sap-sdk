@@ -1,6 +1,6 @@
 /**
  * @module cli/commands/escrow
- * @description Escrow v2 lifecycle — v0.20.0 aligned.
+ * @description Escrow v2 lifecycle — v0.3.0 aligned.
  * Uses: client.escrow.createEscrowV2, depositEscrowV2, settleCallsV2, closeEscrowV2
  * Pdas: getAgentPDA, getEscrowV2PDA, getAgentStatsPDA, getAgentStakePDA, getGlobalPDA
  */
@@ -109,7 +109,6 @@ export function registerEscrowCommands(program: Command): void {
           agent: agentPda,
           agentStats,
           escrow: escrowPda,
-          settlementReceipt: escrowPda, // placeholder - use getPendingSettlementPDA in prod
           escrowNonce: new BN(0),
           callsToSettle: new BN(callsToSettle),
           serviceHash: Array.from(Buffer.from(opts.serviceData)),

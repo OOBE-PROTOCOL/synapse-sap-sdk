@@ -1,5 +1,5 @@
 // ===============================================================
-//  Misc Module — IDL v0.25.0
+//  Misc Module — IDL v0.3.0
 //  4 instructions
 // ===============================================================
 
@@ -57,18 +57,8 @@ export class MiscModule {
 
   /** inscribe_receipt_batch (5 accounts, 5 args) */
   async inscribeReceiptBatch(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; escrow: PublicKey; receiptBatch: PublicKey; batchIndex: number; merkleRoot: number[]; callCount: number; periodStart: BN; periodEnd: BN; remainingAccounts?: any[] }): Promise<TransactionInstruction> {
-    return this.program
-      .methods.inscribeReceiptBatch(ctx.batchIndex, ctx.merkleRoot, ctx.callCount, ctx.periodStart, ctx.periodEnd)
-      .accounts({
-        wallet: ctx.wallet,
-        agent: ctx.agent,
-        escrow: ctx.escrow,
-        receiptBatch: ctx.receiptBatch,
-        systemProgram: SystemProgram.programId,
-      })
-      .remainingAccounts(ctx.remainingAccounts ?? [])
-      .signers([ctx.signer])
-      .instruction();
+    void ctx;
+    throw new Error("inscribeReceiptBatch is not exposed by the SAP 0.3.0 IDL.");
   }
 
 }

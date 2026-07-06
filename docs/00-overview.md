@@ -1,7 +1,7 @@
 # @synapse-sap/sdk — Developer Documentation
 
-> **Version**: 0.20.0
-> **Program Compatibility**: 0.18.0
+> **Version**: 0.3.0
+> **Program Compatibility**: 0.3.0
 > **Program ID**: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`
 > **Anchor**: 0.32.1 · **TypeScript**: 5.7+ · **Solana Web3.js**: ≥1.90
 

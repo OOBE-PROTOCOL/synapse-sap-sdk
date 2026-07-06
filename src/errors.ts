@@ -108,6 +108,13 @@ export enum SapErrorCode {
   MaxReceiptProofExceeded = 6087,
   MaxMerkleDepthExceeded = 6088,
   StakeSlashLocksUnstake = 6089,
+  ReceiptProofAlreadySubmitted = 6170,
+  DuplicateReceiptProof = 6171,
+  MissingReceiptSignature = 6172,
+  AgentCapabilityMismatch = 6173,
+  AgentProtocolMismatch = 6174,
+  InvalidToolParameterCount = 6175,
+  ActiveEscrowCounterUnderflow = 6176,
 
   // ── Math ──
   ArithmeticOverflow = 6300,
@@ -204,6 +211,13 @@ const ERROR_MAP: Record<number, SapErrorInfo> = {
   [SapErrorCode.MaxReceiptProofExceeded]:   { code: SapErrorCode.MaxReceiptProofExceeded,   name: "MaxReceiptProofExceeded",   message: "Receipt proof exceeds 128 receipts.",                   recovery: "Submit proof in chunks of ≤128 receipts." },
   [SapErrorCode.MaxMerkleDepthExceeded]:    { code: SapErrorCode.MaxMerkleDepthExceeded,    name: "MaxMerkleDepthExceeded",    message: "Merkle proof depth exceeds 16.",                          recovery: "Verify merkle tree depth (≤16)." },
   [SapErrorCode.StakeSlashLocksUnstake]:    { code: SapErrorCode.StakeSlashLocksUnstake,    name: "StakeSlashLocksUnstake",    message: "Stake slash would lock unstake request.",                recovery: "The unstake was reduced proportionally — retry." },
+  [SapErrorCode.ReceiptProofAlreadySubmitted]: { code: SapErrorCode.ReceiptProofAlreadySubmitted, name: "ReceiptProofAlreadySubmitted", message: "Receipt proof was already submitted for this dispute.", recovery: "Resolve the dispute or open a new dispute; proof submission is one-shot." },
+  [SapErrorCode.DuplicateReceiptProof]:      { code: SapErrorCode.DuplicateReceiptProof,      name: "DuplicateReceiptProof",      message: "Receipt proof contains duplicate receipt hashes.",        recovery: "Submit each receipt hash only once." },
+  [SapErrorCode.MissingReceiptSignature]:    { code: SapErrorCode.MissingReceiptSignature,    name: "MissingReceiptSignature",    message: "Missing verified Ed25519 receipt signature.",             recovery: "Include depositor and agent Ed25519 pre-instructions for every receipt hash." },
+  [SapErrorCode.AgentCapabilityMismatch]:    { code: SapErrorCode.AgentCapabilityMismatch,    name: "AgentCapabilityMismatch",    message: "Agent does not declare this capability.",                 recovery: "Update the agent profile before adding it to the capability index." },
+  [SapErrorCode.AgentProtocolMismatch]:      { code: SapErrorCode.AgentProtocolMismatch,      name: "AgentProtocolMismatch",      message: "Agent does not declare this protocol.",                   recovery: "Update the agent profile before adding it to the protocol index." },
+  [SapErrorCode.InvalidToolParameterCount]:  { code: SapErrorCode.InvalidToolParameterCount,  name: "InvalidToolParameterCount",  message: "required_params exceeds params_count.",                   recovery: "Set required_params <= params_count." },
+  [SapErrorCode.ActiveEscrowCounterUnderflow]: { code: SapErrorCode.ActiveEscrowCounterUnderflow, name: "ActiveEscrowCounterUnderflow", message: "Agent active escrow counter is inconsistent.", recovery: "Do not close this escrow on mainnet; run a counter reconciliation/migration first." },
 };
 
 /** Decode an Anchor transaction error into structured info */

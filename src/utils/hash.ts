@@ -57,15 +57,15 @@ export const sha256 = (input: string | Buffer | Uint8Array): Uint8Array => {
 export const hashToArray = (hash: Uint8Array): number[] => Array.from(hash);
 
 /**
- * Compute the deterministic batch root used by `settle_batch` (v0.10.0).
+ * Compute a deterministic client-side batch root for settlement receipts.
  *
  * The on-chain program enforces:
  *   `batch_root == sha256(s_0 || s_1 || ... || s_{N-1})`
  * where each `s_i` is a 32-byte service hash, in the same order as the
- * `settlements: Settlement[]` array passed to the instruction.
+ * client-side settlement entries.
  *
- * Use this helper to derive the seed for the {@link deriveSettlementReceipt}
- * PDA when batching settlements.
+ * Use this helper when callers need a stable aggregate hash for an off-chain
+ * batch receipt. On-chain escrow settlement uses the V2 single-settlement path.
  *
  * @name computeBatchRoot
  * @param serviceHashes - Array of 32-byte service hashes (Buffer/Uint8Array/number[]).
@@ -79,7 +79,7 @@ export const hashToArray = (hash: Uint8Array): number[] => Array.from(hash);
  * import { computeBatchRoot, hashToArray } from "@synapse-sap/sdk/utils";
  *
  * const root = computeBatchRoot([h1, h2, h3]);
- * await client.escrow.settleBatch(depositor, settlements, root);
+ * await client.escrow.settle(depositor, calls, serviceHash);
  * ```
  */
 export const computeBatchRoot = (
@@ -110,4 +110,3 @@ export const computeBatchRoot = (
   }
   return new Uint8Array(hash.digest());
 };
-

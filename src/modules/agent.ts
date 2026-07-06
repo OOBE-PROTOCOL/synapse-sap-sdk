@@ -12,7 +12,15 @@
 
 import { SystemProgram, type PublicKey, type TransactionSignature } from "@solana/web3.js";
 import { BaseModule } from "./base";
-import { deriveAgent, deriveAgentStats, deriveGlobalRegistry } from "../pda";
+import {
+  deriveAgent,
+  deriveAgentStats,
+  deriveGlobalRegistry,
+  derivePricingMenu,
+  deriveStake,
+  deriveVault,
+} from "../pda";
+import { TREASURY_WALLET } from "../constants/treasury";
 import type {
   AgentAccountData,
   AgentStatsData,
@@ -105,6 +113,7 @@ export class AgentModule extends BaseModule {
         globalRegistry: globalPda,
         systemProgram: SystemProgram.programId,
       })
+      .remainingAccounts([{ pubkey: TREASURY_WALLET, isSigner: false, isWritable: true }])
       .rpc();
   }
 
@@ -190,6 +199,9 @@ export class AgentModule extends BaseModule {
   async close(): Promise<TransactionSignature> {
     const [agentPda] = this.deriveAgent();
     const [statsPda] = this.deriveStats(agentPda);
+    const [vaultPda] = deriveVault(agentPda);
+    const [pricingPda] = derivePricingMenu(agentPda);
+    const [stakePda] = deriveStake(agentPda);
     const [globalPda] = deriveGlobalRegistry();
 
     return this.methods
@@ -198,9 +210,12 @@ export class AgentModule extends BaseModule {
         wallet: this.walletPubkey,
         agent: agentPda,
         agentStats: statsPda,
+        vaultCheck: vaultPda,
+        pricingMenu: pricingPda,
+        stake: stakePda,
         globalRegistry: globalPda,
-        systemProgram: SystemProgram.programId,
       })
+      .remainingAccounts([{ pubkey: TREASURY_WALLET, isSigner: false, isWritable: true }])
       .rpc();
   }
 

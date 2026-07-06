@@ -1,4 +1,4 @@
-// Auto-generated from IDL v0.25.0
+// Auto-generated from IDL v0.3.0
 
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
@@ -532,7 +532,6 @@ export interface PendingSettlement {
   calls_to_settle: BN;
   amount: BN;
   service_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  receipt_merkle_root: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
   created_at: BN;
   release_slot: BN;
   is_finalized: boolean;

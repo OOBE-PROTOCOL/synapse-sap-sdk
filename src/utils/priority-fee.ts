@@ -19,7 +19,7 @@
  *
  * // Append to any Anchor method builder:
  * await program.methods
- *   .settleCalls(calls, hash)
+ *   .settleCallsV2(escrowNonce, calls, hash)
  *   .accounts({ ... })
  *   .preInstructions(buildPriorityFeeIxs({ priorityFeeMicroLamports: 5000 }))
  *   .rpc({ skipPreflight: true });
@@ -45,22 +45,22 @@ export const DEFAULT_SETTLE_PRIORITY_FEE = 5_000;
 
 /**
  * Default compute unit limit for settlement transactions.
- * `settle_calls` uses ~60k CU; 100k provides a safe margin.
+ * `settle_calls_v2` uses ~60k CU; 100k provides a safe margin.
  *
  * @since v0.6.2
  */
 export const DEFAULT_SETTLE_COMPUTE_UNITS = 100_000;
 
 /**
- * Default compute unit limit for batch settlement transactions.
- * `settle_batch` with 10 entries uses ~200k CU; 300k provides margin.
+ * Default compute unit limit for client-side batch settlement transactions.
+ * Ten sequential V2 settlements generally fit with this per-transaction margin.
  *
  * @since v0.6.2
  */
 export const DEFAULT_BATCH_SETTLE_COMPUTE_UNITS = 300_000;
 
 /**
- * Per-settlement CU cost observed for `settle_batch` (sha256 of the
+ * Per-settlement CU cost observed for V2 settlement (sha256 of the
  * service hash, dedup scan, volume-curve math, account writes).
  *
  * @since v0.11.0
@@ -69,7 +69,7 @@ export const DEFAULT_BATCH_SETTLE_COMPUTE_UNITS = 300_000;
 const BATCH_SETTLE_CU_PER_ENTRY = 25_000;
 
 /**
- * Fixed CU overhead for a `settle_batch` transaction independent of
+ * Fixed CU overhead for a V2 settlement transaction independent of
  * the entry count (signature verify, account loads, transfer, event).
  *
  * @since v0.11.0
@@ -89,7 +89,7 @@ const BATCH_SETTLE_CU_MAX = 1_200_000;
 
 /**
  * @name computeBatchSettleCu
- * @description Compute the CU limit needed by `settle_batch` for a
+ * @description Compute the CU limit needed by client-side batch settlement for a
  * given entry count. Returned value is safe to pass to
  * `ComputeBudgetProgram.setComputeUnitLimit`.
  *
@@ -259,7 +259,7 @@ export const FAST_BATCH_SETTLE_OPTIONS: Readonly<SettleOptions> = Object.freeze(
  * });
  *
  * await program.methods
- *   .settleCalls(calls, hash)
+ *   .settleCallsV2(escrowNonce, calls, hash)
  *   .accounts({ ... })
  *   .preInstructions(ixs)
  *   .rpc({ skipPreflight: true });

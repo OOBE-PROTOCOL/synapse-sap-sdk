@@ -67,28 +67,29 @@ import {
   SystemProgram,
   type PublicKey,
   type TransactionSignature,
+  type AccountMeta,
 } from "@solana/web3.js";
+import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { type AnchorProvider, BN } from "@coral-xyz/anchor";
 import type { SapProgram } from "../modules/base";
 import {
   deriveAgent,
   deriveAgentStats,
-  deriveEscrow,
   deriveEscrowV2,
+  derivePricingMenu,
+  deriveStake,
 } from "../pda";
 import { sha256, hashToArray } from "../utils";
 import { SapNetwork } from "../constants/network";
 import type { SapNetworkId } from "../constants/network";
+import { TREASURY_WALLET } from "../constants/treasury";
 import type {
-  EscrowAccountData,
   EscrowAccountV2Data,
   AgentAccountData,
   VolumeCurveBreakpoint,
-  Settlement,
 } from "../types";
 import {
   buildPriorityFeeIxs,
-  computeBatchSettleCu,
   buildRpcOptions,
 } from "../utils/priority-fee";
 import type { SettleOptions } from "../utils/priority-fee";
@@ -185,6 +186,14 @@ export interface PreparePaymentOptions {
   readonly tokenMint?: PublicKey | null;
   /** Token decimals (default: 9 for SOL). */
   readonly tokenDecimals?: number;
+  /** Settlement security for the V2 escrow: 1=CoSigned, 2=DisputeWindow. */
+  readonly settlementSecurity?: 1 | 2;
+  /** Dispute window slots for DisputeWindow escrows. */
+  readonly disputeWindowSlots?: number | string | BN;
+  /** Required co-signer for CoSigned escrows. */
+  readonly coSigner?: PublicKey | null;
+  /** Deprecated arbiter field, kept for IDL compatibility. */
+  readonly arbiter?: PublicKey | null;
   /**
    * Network identifier written into the `X-Payment-Network` header.
    *
@@ -293,8 +302,10 @@ export interface SettlementResult {
  * @since v0.1.0
  */
 export interface BatchSettlementResult {
-  /** Transaction signature. */
+  /** Last transaction signature. */
   readonly txSignature: TransactionSignature;
+  /** All transaction signatures emitted by the V2 sequential batch. */
+  readonly txSignatures?: TransactionSignature[];
   /** Total calls settled. */
   readonly totalCalls: number;
   /** Total amount transferred. */
@@ -485,15 +496,13 @@ export class X402Registry {
   /**
    * @name preparePayment
    * @description Prepare an x402 payment flow — creates and funds an escrow.
-   * Derives the escrow PDA, sends the `createEscrow` instruction, and returns
+   * Derives the V2 escrow PDA, sends the `createEscrowV2` instruction, and returns
    * a {@link PaymentContext} for building x402 headers.
    *
    * @param agentWallet - The agent’s wallet public key.
    * @param opts - Payment options (price, max calls, deposit, etc.).
    * @returns A {@link PaymentContext} with escrow details and transaction signature.
    * @since v0.1.0
-   * @deprecated Since v0.7.0 — Creates a V1 escrow. Use `client.escrowV2.create()` for
-   * V2 escrows with dispute windows, co-signing, and settlement security.
    *
    * @example
    * ```ts
@@ -509,12 +518,25 @@ export class X402Registry {
     opts: PreparePaymentOptions,
   ): Promise<PaymentContext> {
     const [agentPda] = deriveAgent(agentWallet);
-    const [escrowPda] = deriveEscrow(agentPda, this.wallet);
+    const [escrowPda] = deriveEscrowV2(agentPda, this.wallet, 0);
+    const [agentStake] = deriveStake(agentPda);
+    const [agentStats] = deriveAgentStats(agentPda);
+    const [pricingMenu] = derivePricingMenu(agentPda);
 
     const pricePerCall = new BN(opts.pricePerCall.toString());
     const maxCalls = new BN((opts.maxCalls ?? 0).toString());
     const initialDeposit = new BN(opts.deposit.toString());
     const expiresAt = new BN((opts.expiresAt ?? 0).toString());
+    const tokenMint = opts.tokenMint ?? null;
+    const tokenDecimals = opts.tokenDecimals ?? (tokenMint ? 6 : 9);
+    const settlementSecurity = opts.settlementSecurity ?? 2;
+    const disputeWindowSlots = new BN((opts.disputeWindowSlots ?? 2_160).toString());
+    if (settlementSecurity === 1 && !opts.coSigner) {
+      throw new Error("x402.preparePayment: settlementSecurity=1 requires coSigner");
+    }
+    if (settlementSecurity === 2 && disputeWindowSlots.lte(new BN(0))) {
+      throw new Error("x402.preparePayment: DisputeWindow requires disputeWindowSlots > 0");
+    }
 
     const volumeCurve: VolumeCurveBreakpoint[] = (opts.volumeCurve ?? []).map(
       (v) => ({
@@ -522,23 +544,48 @@ export class X402Registry {
         pricePerCall: new BN(v.pricePerCall.toString()),
       }),
     );
+    const remainingAccounts =
+      tokenMint == null
+        ? []
+        : [
+            {
+              pubkey: getAssociatedTokenAddressSync(tokenMint, this.wallet),
+              isSigner: false,
+              isWritable: true,
+            },
+            {
+              pubkey: getAssociatedTokenAddressSync(tokenMint, escrowPda, true),
+              isSigner: false,
+              isWritable: true,
+            },
+            { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+          ];
 
     const txSignature = await this.methods
-      .createEscrow(
+      .createEscrowV2(
+        new BN(0),
         pricePerCall,
         maxCalls,
         initialDeposit,
         expiresAt,
         volumeCurve,
-        opts.tokenMint ?? null,
-        opts.tokenDecimals ?? 9,
+        tokenMint,
+        tokenDecimals,
+        settlementSecurity,
+        disputeWindowSlots,
+        opts.coSigner ?? null,
+        opts.arbiter ?? null,
       )
       .accounts({
         depositor: this.wallet,
         agent: agentPda,
+        agentStake,
+        agentStats,
+        pricingMenu,
         escrow: escrowPda,
         systemProgram: SystemProgram.programId,
       })
+      .remainingAccounts(remainingAccounts)
       .rpc();
 
     return {
@@ -561,22 +608,40 @@ export class X402Registry {
    * @param amount - Amount to deposit in smallest token unit.
    * @returns The transaction signature.
    * @since v0.1.0
-   * @deprecated Since v0.7.0 — Operates on V1 escrows only. Use `client.escrowV2.deposit()` instead.
    */
   async addFunds(
     agentWallet: PublicKey,
     amount: number | string | BN,
   ): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(agentWallet);
-    const [escrowPda] = deriveEscrow(agentPda, this.wallet);
+    const [escrowPda] = deriveEscrowV2(agentPda, this.wallet, 0);
+    const escrow = await this.fetchNullable<EscrowAccountV2Data>("escrowAccountV2", escrowPda);
+    if (!escrow) throw new Error("No V2 escrow found for this agent + depositor pair");
+    const remainingAccounts =
+      escrow.tokenMint == null
+        ? []
+        : [
+            {
+              pubkey: getAssociatedTokenAddressSync(escrow.tokenMint, this.wallet),
+              isSigner: false,
+              isWritable: true,
+            },
+            {
+              pubkey: getAssociatedTokenAddressSync(escrow.tokenMint, escrowPda, true),
+              isSigner: false,
+              isWritable: true,
+            },
+            { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+          ];
 
     return this.methods
-      .depositEscrow(new BN(amount.toString()))
+      .depositEscrowV2(new BN(0), new BN(amount.toString()))
       .accounts({
         depositor: this.wallet,
         escrow: escrowPda,
         systemProgram: SystemProgram.programId,
       })
+      .remainingAccounts(remainingAccounts)
       .rpc();
   }
 
@@ -588,22 +653,39 @@ export class X402Registry {
    * @param amount - Amount to withdraw in smallest token unit.
    * @returns The transaction signature.
    * @since v0.1.0
-   * @deprecated Since v0.7.0 — Operates on V1 escrows only. Use `client.escrowV2.withdraw()` instead.
    */
   async withdrawFunds(
     agentWallet: PublicKey,
     amount: number | string | BN,
   ): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(agentWallet);
-    const [escrowPda] = deriveEscrow(agentPda, this.wallet);
+    const [escrowPda] = deriveEscrowV2(agentPda, this.wallet, 0);
+    const escrow = await this.fetchNullable<EscrowAccountV2Data>("escrowAccountV2", escrowPda);
+    if (!escrow) throw new Error("No V2 escrow found for this agent + depositor pair");
+    const remainingAccounts =
+      escrow.tokenMint == null
+        ? []
+        : [
+            {
+              pubkey: getAssociatedTokenAddressSync(escrow.tokenMint, escrowPda, true),
+              isSigner: false,
+              isWritable: true,
+            },
+            {
+              pubkey: getAssociatedTokenAddressSync(escrow.tokenMint, this.wallet),
+              isSigner: false,
+              isWritable: true,
+            },
+            { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+          ];
 
     return this.methods
-      .withdrawEscrow(new BN(amount.toString()))
+      .withdrawEscrowV2(new BN(amount.toString()))
       .accounts({
         depositor: this.wallet,
         escrow: escrowPda,
-        systemProgram: SystemProgram.programId,
       })
+      .remainingAccounts(remainingAccounts)
       .rpc();
   }
 
@@ -615,17 +697,18 @@ export class X402Registry {
    * @param agentWallet - Agent wallet of the escrow.
    * @returns The transaction signature.
    * @since v0.1.0
-   * @deprecated Since v0.7.0 — Operates on V1 escrows only. Use `client.escrowV2.close()` instead.
    */
   async closeEscrow(agentWallet: PublicKey): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(agentWallet);
-    const [escrowPda] = deriveEscrow(agentPda, this.wallet);
+    const [escrowPda] = deriveEscrowV2(agentPda, this.wallet, 0);
+    const [agentStats] = deriveAgentStats(agentPda);
 
     return this.methods
-      .closeEscrow()
+      .closeEscrowV2()
       .accounts({
         depositor: this.wallet,
         escrow: escrowPda,
+        agentStats,
       })
       .rpc();
   }
@@ -762,29 +845,38 @@ export class X402Registry {
     const preIxs = buildPriorityFeeIxs(opts);
     const rpcOpts = buildRpcOptions(opts);
 
-    let builder;
-    if (resolved.version === 2) {
-      // V2: settleCallsV2 requires escrow_nonce (default 0)
-      builder = this.methods
-        .settleCallsV2(new BN(0), new BN(callsToSettle), serviceHash)
-        .accounts({
-          wallet: this.wallet,
-          agent: agentPda,
-          agentStats: statsPda,
-          escrow: escrowPda,
-          systemProgram: SystemProgram.programId,
-        });
-    } else {
-      builder = this.methods
-        .settleCalls(new BN(callsToSettle), serviceHash)
-        .accounts({
-          wallet: this.wallet,
-          agent: agentPda,
-          agentStats: statsPda,
-          escrow: escrowPda,
-          systemProgram: SystemProgram.programId,
-        });
-    }
+    const remainingAccounts: AccountMeta[] =
+      escrow.tokenMint == null
+        ? [{ pubkey: TREASURY_WALLET, isSigner: false, isWritable: true }]
+        : [
+            {
+              pubkey: getAssociatedTokenAddressSync(escrow.tokenMint, escrowPda, true),
+              isSigner: false,
+              isWritable: true,
+            },
+            {
+              pubkey: getAssociatedTokenAddressSync(escrow.tokenMint, this.wallet),
+              isSigner: false,
+              isWritable: true,
+            },
+            { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+            {
+              pubkey: getAssociatedTokenAddressSync(escrow.tokenMint, TREASURY_WALLET, true),
+              isSigner: false,
+              isWritable: true,
+            },
+          ];
+
+    let builder = this.methods
+      .settleCallsV2(new BN(0), new BN(callsToSettle), serviceHash)
+      .accounts({
+        wallet: this.wallet,
+        agent: agentPda,
+        agentStats: statsPda,
+        escrow: escrowPda,
+        systemProgram: SystemProgram.programId,
+      })
+      .remainingAccounts(remainingAccounts);
 
     if (preIxs.length > 0) {
       builder = builder.preInstructions(preIxs);
@@ -802,9 +894,8 @@ export class X402Registry {
 
   /**
    * @name settleBatch
-   * @description Batch settle — process up to 10 settlements in one TX.
-   * Must be called by the agent owner wallet. More gas-efficient than
-   * individual settlements.
+   * @description Client-side V2 batch settle. Must be called by the agent owner
+   * wallet. Each entry is settled through the canonical V2 instruction.
    *
    * Optionally accepts {@link SettleOptions} to configure priority fees,
    * compute budget, and RPC behavior for faster confirmation.
@@ -830,26 +921,15 @@ export class X402Registry {
     }>,
     opts?: SettleOptions,
   ): Promise<BatchSettlementResult> {
-    const settlements: Settlement[] = entries.map((e) => ({
-      callsToSettle: new BN(e.calls),
-      serviceHash: hashToArray(
-        sha256(typeof e.serviceData === "string" ? e.serviceData : Buffer.from(e.serviceData)),
-      ),
-    }));
-
     const totalCalls = entries.reduce((sum, e) => sum + e.calls, 0);
 
     const [agentPda] = deriveAgent(this.wallet);
-    const [statsPda] = deriveAgentStats(agentPda);
-
-    // Auto-detect escrow version
     const resolved = await this.resolveEscrow(agentPda, depositorWallet);
     if (!resolved) {
       throw new Error("No escrow found for this agent + depositor pair");
     }
 
     const escrow = resolved.escrow;
-    const escrowPda = resolved.escrowPda;
     const estimate = this.calculateCost(
       escrow.pricePerCall,
       escrow.volumeCurve,
@@ -857,34 +937,21 @@ export class X402Registry {
       totalCalls,
     );
 
-    // Auto-size CU to the batch length when the caller didn't pin one.
-    // Default Solana cap (200k) is tight past ~8 entries; a CU limit
-    // costs nothing extra (only caps the maximum charge).
-    const effectiveOpts: SettleOptions = {
-      ...opts,
-      computeUnits: opts?.computeUnits ?? computeBatchSettleCu(settlements.length),
-    };
-    const preIxs = buildPriorityFeeIxs(effectiveOpts);
-    const rpcOpts = buildRpcOptions(effectiveOpts);
-
-    let builder = this.methods
-      .settleBatch(settlements)
-      .accountsPartial({
-        wallet: this.wallet,
-        agent: agentPda,
-        agentStats: statsPda,
-        escrow: escrowPda,
-        systemProgram: SystemProgram.programId,
-      });
-
-    if (preIxs.length > 0) {
-      builder = builder.preInstructions(preIxs);
+    const txSignatures: TransactionSignature[] = [];
+    for (const entry of entries) {
+      const result = await this.settle(
+        depositorWallet,
+        entry.calls,
+        entry.serviceData,
+        opts,
+      );
+      txSignatures.push(result.txSignature);
     }
-
-    const txSignature = await builder.rpc(rpcOpts);
+    const txSignature = txSignatures[txSignatures.length - 1];
 
     return {
       txSignature,
+      txSignatures,
       totalCalls,
       totalAmount: estimate.totalCost,
       settlementCount: entries.length,
@@ -955,15 +1022,9 @@ export class X402Registry {
     const dep = depositor ?? this.wallet;
     const conn = this.program.provider.connection;
 
-    // Check V2 first (nonce=0)
     const [v2Pda] = deriveEscrowV2(agentPda, dep, 0);
     const v2Info = await conn.getAccountInfo(v2Pda);
-    if (v2Info !== null) return true;
-
-    // Fall back to V1
-    const [v1Pda] = deriveEscrow(agentPda, dep);
-    const v1Info = await conn.getAccountInfo(v1Pda);
-    return v1Info !== null;
+    return v2Info !== null;
   }
 
   /**
@@ -972,13 +1033,13 @@ export class X402Registry {
    *
    * @param agentWallet - Agent wallet of the escrow.
    * @param depositor - Depositor wallet (defaults to caller).
-   * @returns The raw {@link EscrowAccountData}, or `null` if not found.
+   * @returns The raw {@link EscrowAccountV2Data}, or `null` if not found.
    * @since v0.1.0
    */
   async fetchEscrow(
     agentWallet: PublicKey,
     depositor?: PublicKey,
-  ): Promise<EscrowAccountData | EscrowAccountV2Data | null> {
+  ): Promise<EscrowAccountV2Data | null> {
     const [agentPda] = deriveAgent(agentWallet);
     const dep = depositor ?? this.wallet;
     const resolved = await this.resolveEscrow(agentPda, dep);
@@ -1015,7 +1076,7 @@ export class X402Registry {
 
   /**
    * @name resolveEscrow
-   * @description Try to find an escrow: V2 (nonce=0) first, then V1 fallback.
+   * @description Try to find a V2 escrow at nonce=0.
    * Returns the escrow data, PDA, and version indicator.
    * @private
    */
@@ -1023,25 +1084,16 @@ export class X402Registry {
     agentPda: PublicKey,
     depositor: PublicKey,
   ): Promise<{
-    escrow: EscrowAccountData | EscrowAccountV2Data;
+    escrow: EscrowAccountV2Data;
     escrowPda: PublicKey;
-    version: 1 | 2;
+    version: 2;
   } | null> {
-    // Try V2 first (nonce=0 is the default)
     const [v2Pda] = deriveEscrowV2(agentPda, depositor, 0);
     const v2 = await this.fetchNullable<EscrowAccountV2Data>(
       "escrowAccountV2",
       v2Pda,
     );
     if (v2) return { escrow: v2, escrowPda: v2Pda, version: 2 };
-
-    // Fall back to V1
-    const [v1Pda] = deriveEscrow(agentPda, depositor);
-    const v1 = await this.fetchNullable<EscrowAccountData>(
-      "escrowAccount",
-      v1Pda,
-    );
-    if (v1) return { escrow: v1, escrowPda: v1Pda, version: 1 };
 
     return null;
   }

@@ -470,52 +470,10 @@ export interface ToolDescriptorData {
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * @interface EscrowAccountData
- * @description x402 pre-funded micropayment escrow PDA.
- *
- * An escrow is created by a consumer (depositor) for a specific agent.
- * Calls are settled against the escrow balance either per-call or in
- * batches, with optional volume-curve discounts.
- *
- * @category Types
- * @since v0.1.0
- * @deprecated Since v0.7.0 — Use {@link EscrowAccountV2Data} for V2 escrows with
- * settlement security, dispute windows, and co-signing.
- * @see {@link VolumeCurveBreakpoint} for discount curve details.
+ * @deprecated Since v0.3.0 — Escrow V1 is removed from active SDK/program
+ * flows. This compatibility name resolves to {@link EscrowAccountV2Data}.
  */
-export interface EscrowAccountData {
-  readonly bump: number;
-  /** Agent PDA this escrow is for. */
-  readonly agent: PublicKey;
-  /** Consumer wallet that funded the escrow. */
-  readonly depositor: PublicKey;
-  /** Agent's wallet that receives settlements. */
-  readonly agentWallet: PublicKey;
-  /** Current remaining balance (in token base units). */
-  readonly balance: BN;
-  /** Cumulative amount deposited. */
-  readonly totalDeposited: BN;
-  /** Cumulative amount settled to the agent. */
-  readonly totalSettled: BN;
-  /** Cumulative calls settled. */
-  readonly totalCallsSettled: BN;
-  /** Base price per call. */
-  readonly pricePerCall: BN;
-  /** Maximum number of calls this escrow funds. */
-  readonly maxCalls: BN;
-  /** Unix timestamp of escrow creation. */
-  readonly createdAt: BN;
-  /** Unix timestamp of the last settlement. */
-  readonly lastSettledAt: BN;
-  /** Unix timestamp when the escrow expires. */
-  readonly expiresAt: BN;
-  /** Volume discount breakpoints. */
-  readonly volumeCurve: VolumeCurveBreakpoint[];
-  /** Optional SPL token mint (null for native SOL). */
-  readonly tokenMint: PublicKey | null;
-  /** Decimal places for the token. */
-  readonly tokenDecimals: number;
-}
+export type EscrowAccountData = EscrowAccountV2Data;
 
 // ═══════════════════════════════════════════════════════════════════
 //  Attestation
@@ -656,8 +614,6 @@ export interface EscrowAccountV2Data {
   readonly arbiter: PublicKey | null;
   readonly pendingAmount: BN;
   readonly pendingCalls: BN;
-  /** @since v0.7.0 — Number of receipt batches inscribed against this escrow */
-  readonly receiptBatchCount: number;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -685,8 +641,6 @@ export interface PendingSettlementData {
   readonly isFinalized: boolean;
   readonly isDisputed: boolean;
   readonly outcome: DisputeOutcomeKind;
-  /** @since v0.7.0 — Merkle root of receipts backing this settlement */
-  readonly receiptMerkleRoot: number[]; // [u8; 32]
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -714,18 +668,6 @@ export interface DisputeRecordData {
   readonly resolvedAt: BN;
   readonly resolutionHash: number[]; // [u8; 32]
   readonly slashAmount: BN;
-  /** @since v0.7.0 — Category of dispute (NonDelivery=0, PartialDelivery=1, Overcharge=2, Quality=3) */
-  readonly disputeType: number;
-  /** @since v0.7.0 — How the dispute was resolved (Pending/Auto/Governance) */
-  readonly resolutionLayer: ResolutionLayerKind;
-  /** @since v0.7.0 — Bond deposited by the disputer (lamports) */
-  readonly disputeBond: BN;
-  /** @since v0.7.0 — Number of calls the agent proved via merkle proofs */
-  readonly provenCalls: BN;
-  /** @since v0.7.0 — Number of calls the agent originally claimed */
-  readonly claimedCalls: BN;
-  /** @since v0.7.0 — Unix timestamp by which agent must submit proof */
-  readonly proofDeadline: BN;
 }
 
 // ═══════════════════════════════════════════════════════════════════

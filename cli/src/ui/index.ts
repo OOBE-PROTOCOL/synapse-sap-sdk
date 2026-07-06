@@ -1,7 +1,7 @@
 /**
  * @module cli/ui
  * @description Professional UI components — ASCII banners, animations, menus
- * @since v0.18.0
+ * @since v0.3.0
  */
 
 import chalk from 'chalk';
@@ -29,7 +29,7 @@ ${chalk.cyan.bold(`
  ╚══════╝   ╚═╝   ╚══════╝   ╚═╝   ╚══════╝╚═╝     ╚═╝
 `)}
 ${chalk.gray('─'.repeat(60))}
-${chalk.yellow.bold('v0.18.0 Revenue Edition')} ${chalk.gray('|')} ${chalk.green.bold('PRODUCTION READY')}
+${chalk.yellow.bold('v0.3.0 Commerce Edition')} ${chalk.gray('|')} ${chalk.green.bold('MAINNET READY')}
 ${chalk.gray('─'.repeat(60))}
 ${chalk.dim('Treasury:')} ${chalk.cyan('J7PyZAGKvprCz4SQ5DKBLAHstJxgVqZcz6kguUoWpP7P')}
 ${chalk.dim('Program:')} ${chalk.cyan('SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ')}

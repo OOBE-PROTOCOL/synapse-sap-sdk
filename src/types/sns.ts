@@ -2,7 +2,7 @@
  * @module types/sns
  * @description SNS (Solana Name Service) integration types — Modular, free-choice design
  * @category Types
- * @since v0.21.0
+ * @since v0.3.0
  */
 
 import { PublicKey, Signer, Commitment } from '@solana/web3.js';
@@ -13,7 +13,7 @@ import { PublicKey, Signer, Commitment } from '@solana/web3.js';
  * Agents choose freely which records to expose.
  * No roles, no requirements, complete freedom.
  * 
- * @since v0.21.0
+ * @since v0.3.0
  */
 export interface SnsRecordMap {
   // Core (always present)
@@ -54,7 +54,7 @@ export interface SnsRecordMap {
  * Agents can expose SAP-specific data in TXT record.
  * Completely optional and extensible.
  * 
- * @since v0.21.0
+ * @since v0.3.0
  */
 export interface SapStructuredData {
   /** SAP SDK version */
@@ -82,7 +82,7 @@ export interface SapStructuredData {
 /**
  * Social Profiles — Optional social media presence
  * 
- * @since v0.21.0
+ * @since v0.3.0
  */
 export interface SocialProfiles {
   twitter?: string;
@@ -94,7 +94,7 @@ export interface SocialProfiles {
 /**
  * Metadata URLs — Optional metadata locations
  * 
- * @since v0.21.0
+ * @since v0.3.0
  */
 export interface MetadataUrls {
   endpoint?: string;
@@ -107,7 +107,7 @@ export interface MetadataUrls {
 /**
  * Contact Info — Optional contact methods
  * 
- * @since v0.21.0
+ * @since v0.3.0
  */
 export interface ContactInfo {
   email?: string;
@@ -116,7 +116,7 @@ export interface ContactInfo {
 /**
  * Multi-Chain Addresses — Optional cross-chain identity
  * 
- * @since v0.21.0
+ * @since v0.3.0
  */
 export interface MultiChainAddresses {
   eth?: string;
@@ -130,7 +130,7 @@ export interface MultiChainAddresses {
 /**
  * DNS Records — Optional DNS configuration
  * 
- * @since v0.21.0
+ * @since v0.3.0
  */
 export interface DnsRecords {
   a?: string;
@@ -144,7 +144,7 @@ export interface DnsRecords {
  * All options except core (wallet, agentPda) are optional.
  * Agents choose freely what to expose.
  * 
- * @since v0.21.0
+ * @since v0.3.0
  */
 export interface SnsRecordBuilderOptions {
   // Core (always required)
@@ -185,7 +185,7 @@ export interface SnsRecordBuilderOptions {
 /**
  * SNS Registration Parameters
  * 
- * @since v0.21.0
+ * @since v0.3.0
  */
 export interface SnsRegistrationParams {
   /** Agent wallet public key */
@@ -209,7 +209,7 @@ export interface SnsRegistrationParams {
 /**
  * SNS Registration Result
  * 
- * @since v0.21.0
+ * @since v0.3.0
  */
 export interface SnsRegistrationResult {
   /** Full domain with .sol suffix */
@@ -231,7 +231,7 @@ export interface SnsRegistrationResult {
 /**
  * SNS Resolution Result
  * 
- * @since v0.21.0
+ * @since v0.3.0
  */
 export interface SnsResolutionResult {
   /** Domain name */
@@ -256,7 +256,7 @@ export interface SnsResolutionResult {
 /**
  * SNS Fetch Options — Modular fetching
  * 
- * @since v0.21.0
+ * @since v0.3.0
  */
 export interface SnsFetchOptions {
   /** Include core records (SOL, Pic) */
@@ -274,7 +274,7 @@ export interface SnsFetchOptions {
 /**
  * Fetched SNS Records
  * 
- * @since v0.21.0
+ * @since v0.3.0
  */
 export interface FetchedSnsRecords {
   /** Core identity */
@@ -295,6 +295,6 @@ export interface FetchedSnsRecords {
 /**
  * Re-export Record enum from Bonfida SDK for convenience
  * 
- * @since v0.21.0
+ * @since v0.3.0
  */
 export { Record } from '@bonfida/spl-name-service';

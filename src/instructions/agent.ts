@@ -1,17 +1,24 @@
 // ===============================================================
-//  Agent Module — IDL v0.25.0
+//  Agent Module — IDL v0.3.0
 //  5 instructions
 // ===============================================================
 
 import { PublicKey, Signer, TransactionInstruction, SystemProgram } from '@solana/web3.js';
 import { Program, BN } from '@coral-xyz/anchor';
 import { Capability, PricingTier } from '../idlTypes';
+import { TREASURY_WALLET } from '../constants/treasury';
+
+function withTreasury(remainingAccounts: any[] = []): any[] {
+  return remainingAccounts.some((account) => account.pubkey?.equals?.(TREASURY_WALLET))
+    ? remainingAccounts
+    : [{ pubkey: TREASURY_WALLET, isSigner: false, isWritable: true }, ...remainingAccounts];
+}
 
 export class AgentModule {
   constructor(private program: Program) {}
 
-  /** close_agent (6 accounts, 0 args) */
-  async closeAgent(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; agentStats: PublicKey; vaultCheck: PublicKey; pricingMenu: PublicKey; globalRegistry: PublicKey; remainingAccounts?: any[] }): Promise<TransactionInstruction> {
+  /** close_agent (7 accounts, 0 args) */
+  async closeAgent(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; agentStats: PublicKey; vaultCheck: PublicKey; pricingMenu: PublicKey; stake: PublicKey; globalRegistry: PublicKey; remainingAccounts?: any[] }): Promise<TransactionInstruction> {
     return this.program
       .methods.closeAgent()
       .accounts({
@@ -20,9 +27,10 @@ export class AgentModule {
         agentStats: ctx.agentStats,
         vaultCheck: ctx.vaultCheck,
         pricingMenu: ctx.pricingMenu,
+        stake: ctx.stake,
         globalRegistry: ctx.globalRegistry,
       })
-      .remainingAccounts(ctx.remainingAccounts ?? [])
+      .remainingAccounts(withTreasury(ctx.remainingAccounts))
       .signers([ctx.signer])
       .instruction();
   }
@@ -68,19 +76,18 @@ export class AgentModule {
         globalRegistry: ctx.globalRegistry,
         systemProgram: SystemProgram.programId,
       })
-      .remainingAccounts(ctx.remainingAccounts ?? [])
+      .remainingAccounts(withTreasury(ctx.remainingAccounts))
       .signers([ctx.signer])
       .instruction();
   }
 
-  /** update_agent (4 accounts, 8 args) */
-  async updateAgent(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; pricingMenu: PublicKey; name: (string | null); description: (string | null); capabilities: (Capability[] | null); pricing: (PricingTier[] | null); protocols: (string[] | null); agentId: (string | null); agentUri: (string | null); x402Endpoint: (string | null); remainingAccounts?: any[] }): Promise<TransactionInstruction> {
+  /** update_agent (3 accounts, 8 args) */
+  async updateAgent(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; name: (string | null); description: (string | null); capabilities: (Capability[] | null); pricing: (PricingTier[] | null); protocols: (string[] | null); agentId: (string | null); agentUri: (string | null); x402Endpoint: (string | null); remainingAccounts?: any[] }): Promise<TransactionInstruction> {
     return this.program
       .methods.updateAgent(ctx.name, ctx.description, ctx.capabilities, ctx.pricing, ctx.protocols, ctx.agentId, ctx.agentUri, ctx.x402Endpoint)
       .accounts({
         wallet: ctx.wallet,
         agent: ctx.agent,
-        pricingMenu: ctx.pricingMenu,
         systemProgram: SystemProgram.programId,
       })
       .remainingAccounts(ctx.remainingAccounts ?? [])

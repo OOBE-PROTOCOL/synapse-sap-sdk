@@ -1,4 +1,4 @@
-// Barrel exports — instruction modules v0.25.0
+// Barrel exports — instruction modules v0.3.0
 
 export { AgentModule } from './agent';
 export { AttestationModule } from './attestation';

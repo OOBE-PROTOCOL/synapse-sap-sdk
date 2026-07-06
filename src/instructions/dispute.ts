@@ -1,6 +1,6 @@
 // ===============================================================
-//  Dispute Module — IDL v0.25.0
-//  7 instructions
+//  Dispute Module — IDL v0.3.0
+//  6 instructions
 // ===============================================================
 
 import { PublicKey, Signer, TransactionInstruction, SystemProgram } from '@solana/web3.js';
@@ -9,19 +9,18 @@ import { Program, BN } from '@coral-xyz/anchor';
 export class DisputeModule {
   constructor(private program: Program) {}
 
-  /** auto_resolve_dispute (8 accounts, 0 args) */
-  async autoResolveDispute(ctx: { signer: Signer; payer: PublicKey; depositor: PublicKey; agentWallet: PublicKey; escrow: PublicKey; pendingSettlement: PublicKey; dispute: PublicKey; agentStats: PublicKey; agentStake: PublicKey; remainingAccounts?: any[] }): Promise<TransactionInstruction> {
+  /** resolve_dispute (7 accounts, 1 arg) */
+  async resolveDispute(ctx: { signer: Signer; arbiter: PublicKey; depositor: PublicKey; agentWallet: PublicKey; escrow: PublicKey; pendingSettlement: PublicKey; dispute: PublicKey; agentStats: PublicKey; outcome: number; remainingAccounts?: any[] }): Promise<TransactionInstruction> {
     return this.program
-      .methods.autoResolveDispute()
+      .methods.resolveDispute(ctx.outcome)
       .accounts({
-        payer: ctx.payer,
+        arbiter: ctx.arbiter,
         depositor: ctx.depositor,
         agentWallet: ctx.agentWallet,
         escrow: ctx.escrow,
         pendingSettlement: ctx.pendingSettlement,
         dispute: ctx.dispute,
         agentStats: ctx.agentStats,
-        agentStake: ctx.agentStake,
       })
       .remainingAccounts(ctx.remainingAccounts ?? [])
       .signers([ctx.signer])
@@ -54,26 +53,16 @@ export class DisputeModule {
       .instruction();
   }
 
-  /** create_pending_settlement (5 accounts, 5 args) */
-  async createPendingSettlement(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; escrow: PublicKey; pendingSettlement: PublicKey; settlementIndex: BN; callsToSettle: BN; amount: BN; serviceHash: number[]; receiptMerkleRoot: number[]; remainingAccounts?: any[] }): Promise<TransactionInstruction> {
-    return this.program
-      .methods.createPendingSettlement(ctx.settlementIndex, ctx.callsToSettle, ctx.amount, ctx.serviceHash, ctx.receiptMerkleRoot)
-      .accounts({
-        wallet: ctx.wallet,
-        agent: ctx.agent,
-        escrow: ctx.escrow,
-        pendingSettlement: ctx.pendingSettlement,
-        systemProgram: SystemProgram.programId,
-      })
-      .remainingAccounts(ctx.remainingAccounts ?? [])
-      .signers([ctx.signer])
-      .instruction();
+  /** create_pending_settlement (5 accounts, 4 args) */
+  async createPendingSettlement(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; escrow: PublicKey; pendingSettlement: PublicKey; settlementIndex: BN; callsToSettle: BN; amount: BN; serviceHash: number[]; remainingAccounts?: any[] }): Promise<TransactionInstruction> {
+    void ctx;
+    throw new Error("createPendingSettlement is deprecated in SAP 0.3.0; pass the pending PDA to settleCallsV2 remainingAccounts.");
   }
 
   /** file_dispute (5 accounts, 2 args) */
-  async fileDispute(ctx: { signer: Signer; depositor: PublicKey; escrow: PublicKey; pendingSettlement: PublicKey; dispute: PublicKey; evidenceHash: number[]; disputeType: number; remainingAccounts?: any[] }): Promise<TransactionInstruction> {
+  async fileDispute(ctx: { signer: Signer; depositor: PublicKey; escrow: PublicKey; pendingSettlement: PublicKey; dispute: PublicKey; evidenceHash: number[]; remainingAccounts?: any[] }): Promise<TransactionInstruction> {
     return this.program
-      .methods.fileDispute(ctx.evidenceHash, ctx.disputeType)
+      .methods.fileDispute(ctx.evidenceHash)
       .accounts({
         depositor: ctx.depositor,
         escrow: ctx.escrow,
@@ -93,23 +82,6 @@ export class DisputeModule {
       .accounts({
         wallet: ctx.wallet,
         agent: ctx.agent,
-        dispute: ctx.dispute,
-      })
-      .remainingAccounts(ctx.remainingAccounts ?? [])
-      .signers([ctx.signer])
-      .instruction();
-  }
-
-  /** submit_receipt_proof (6 accounts, 2 args) */
-  async submitReceiptProof(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; escrow: PublicKey; receiptBatch: PublicKey; pendingSettlement: PublicKey; dispute: PublicKey; receiptHashes: number[][]; merkleProofs: number[][][]; remainingAccounts?: any[] }): Promise<TransactionInstruction> {
-    return this.program
-      .methods.submitReceiptProof(ctx.receiptHashes, ctx.merkleProofs)
-      .accounts({
-        wallet: ctx.wallet,
-        agent: ctx.agent,
-        escrow: ctx.escrow,
-        receiptBatch: ctx.receiptBatch,
-        pendingSettlement: ctx.pendingSettlement,
         dispute: ctx.dispute,
       })
       .remainingAccounts(ctx.remainingAccounts ?? [])

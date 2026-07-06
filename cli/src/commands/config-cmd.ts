@@ -18,6 +18,8 @@ const EDITABLE_KEYS = [
   "defaultProfile",
   "jsonOutput",
   "silent",
+  "mcpEnabled",
+  "mcpAgentName",
 ] as const;
 
 export function registerConfigCommands(program: Command): void {
@@ -170,5 +172,39 @@ Examples:
     .action(() => {
       const configPath = program.opts().config || path.join(process.env.HOME || "~", ".synapse-sap", "config.json");
       log.info(configPath);
+    });
+
+  // ── config mcp-init ──────────────────────────────
+  cfg
+    .command("mcp-init")
+    .description("Initialize SAP MCP Server configuration")
+    .option("--agent <name>", "Agent name (default: sap-agent)")
+    .option("--cluster <cluster>", "Cluster (mainnet-beta|devnet|localnet)", "devnet")
+    .option("--rpc <url>", "RPC URL")
+    .option("--program-id <pid>", "SAP Program ID", "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ")
+    .option("--reset", "Reset existing config")
+    .action(async (opts) => {
+      const { registerWizardCommands } = await import("./wizard.js");
+      // Reuse wizard's MCP config creation logic with provided options
+      const wizardOpts = {
+        agent: opts.agent,
+        devnet: opts.cluster === "devnet",
+        mainnet: opts.cluster === "mainnet-beta",
+        localnet: opts.cluster === "localnet",
+        rpc: opts.rpc,
+        reset: opts.reset,
+      };
+      
+      // Call wizard action programmatically
+      const wizardCmd = program.commands.find(c => c.name() === "wizard");
+      if (wizardCmd) {
+        await wizardCmd.parseAsync([
+          "wizard",
+          opts.agent ? `--agent=${opts.agent}` : "",
+          `--${opts.cluster}`,
+          opts.rpc ? `--rpc=${opts.rpc}` : "",
+          opts.reset ? "--reset" : "",
+        ].filter(Boolean));
+      }
     });
 }

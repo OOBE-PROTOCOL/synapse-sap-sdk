@@ -157,6 +157,24 @@ export const deriveAgentStats = (
 ): PdaResult =>
   findPda([toSeedBuf(SEEDS.STATS), agentPda.toBuffer()], programId);
 
+/**
+ * Derive the **AgentPricingMenu** PDA.
+ *
+ * Seeds: `["sap_pricing", agent_pda]`
+ *
+ * @name derivePricingMenu
+ * @param agentPda  - The agent's PDA.
+ * @param programId - Override program ID.
+ * @returns {PdaResult} `[pda, bump]` tuple.
+ * @category PDA
+ * @since v0.3.0
+ */
+export const derivePricingMenu = (
+  agentPda: PublicKey,
+  programId = SAP_PROGRAM_ID,
+): PdaResult =>
+  findPda([toSeedBuf(SEEDS.PRICING), agentPda.toBuffer()], programId);
+
 // ═════════════════════════════════════════════
 //  Feedback
 // ═════════════════════════════════════════════
@@ -425,30 +443,27 @@ export const deriveTool = (
 // ═════════════════════════════════════════════
 
 /**
- * Derive the **Escrow** PDA for an agent–depositor pair.
+ * Derive the canonical **EscrowV2** PDA for an agent–depositor pair at nonce 0.
  *
- * Seeds: `["sap_escrow", agent_pda, depositor_wallet]`
+ * Seeds: `["sap_escrow_v2", agent_pda, depositor_wallet, 0_u64_le]`
  *
  * @name deriveEscrow
- * @description Computes the escrow PDA holding deposited funds for service payments.
+ * @description Computes the canonical V2 escrow PDA holding deposited funds for service payments.
  * @param agentPda  - The service-providing agent’s PDA.
  * @param depositor - The depositor’s wallet `PublicKey`.
  * @param programId - Override program ID (defaults to {@link SAP_PROGRAM_ID}).
  * @returns {PdaResult} `[pda, bump]` tuple.
  * @category PDA
  * @since v0.1.0
- * @deprecated Since v0.7.0 — Use {@link deriveEscrowV2} for V2 escrows with nonce support.
- * @see EscrowAccount
+ * @deprecated Since v0.3.0 — This is a V2 nonce-0 compatibility alias. Prefer {@link deriveEscrowV2}.
+ * @see EscrowAccountV2
  */
 export const deriveEscrow = (
   agentPda: PublicKey,
   depositor: PublicKey,
   programId = SAP_PROGRAM_ID,
 ): PdaResult =>
-  findPda(
-    [toSeedBuf(SEEDS.ESCROW), agentPda.toBuffer(), depositor.toBuffer()],
-    programId,
-  );
+  deriveEscrowV2(agentPda, depositor, 0, programId);
 
 // ═════════════════════════════════════════════
 //  Attestation

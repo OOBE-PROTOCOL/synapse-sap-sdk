@@ -1,7 +1,7 @@
 ---
 name: sap-gaming
 description: |
-  Gaming and GameFi integration patterns for SAP SDK v0.18.0.
+  Gaming and GameFi integration patterns for SAP SDK v0.3.0.
   Use when: play-to-earn mechanics, in-game item escrows, tournament payments,
   guild treasury management, NFT item rentals via SAP.
 triggers:
@@ -12,10 +12,10 @@ triggers:
   - sap tournament
 ---
 
-# SAP SDK v0.18.0 — Gaming Integration Patterns
+# SAP SDK v0.3.0 — Gaming Integration Patterns
 
 > **Level:** Advanced/Gaming  
-> **Package:** `@oobe-protocol-labs/synapse-sap-sdk@0.18.0`
+> **Package:** `@oobe-protocol-labs/synapse-sap-sdk@0.3.0`
 
 ---
 
@@ -34,13 +34,11 @@ class GameFiAgent {
         const [playerAgentPda] = Pdas.getAgentPDA(player);
         const [escrowPda] = Pdas.getEscrowV2PDA(playerAgentPda, 0);
         
-        return this.sapClient.escrowV2.settleCallsV2(
+        return this.sapClient.escrowV2.settle(
           player,
           0,
           new BN(1),
-          {
-            receiptMerkleRoot: this.calculateMerkleRoot(scores),
-          }
+          this.calculateServiceHash(scores),
         );
       })
     );

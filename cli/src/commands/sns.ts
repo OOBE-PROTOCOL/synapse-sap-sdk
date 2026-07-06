@@ -10,7 +10,7 @@
  * - sns primary <domain> — Set domain as primary
  * - sns records <domain> — Fetch all records
  * 
- * @since v0.21.0
+ * @since v0.3.0
  */
 import { Command } from "commander";
 import { loadConfig } from "../config.js";
@@ -18,7 +18,6 @@ import { buildContext, parseWallet } from "../context.js";
 import { log, output } from "../logger.js";
 import {
   SnsModule,
-  SapAgentRole,
   Record,
 } from "@oobe-protocol-labs/synapse-sap-sdk/modules/sns";
 import { Connection, Keypair } from "@solana/web3.js";
@@ -104,19 +103,20 @@ export function registerSnsCommands(program: Command): void {
         });
 
         // Validate role
-        const role = opts.role.toLowerCase() as SapAgentRole;
-        if (role !== SapAgentRole.MERCHANT && role !== SapAgentRole.CITIZEN) {
+        // TODO: Restore role validation when SapAgentRole is exported from SDK
+        const role = opts.role.toLowerCase();
+        if (role !== 'merchant' && role !== 'citizen') {
           log.error("Invalid role. Must be 'merchant' or 'citizen'");
           process.exit(1);
         }
 
         // Validate role-specific requirements
-        if (role === SapAgentRole.MERCHANT && !opts.x402Endpoint) {
+        if (role === 'merchant' && !opts.x402Endpoint) {
           log.error("Merchant role requires --x402-endpoint");
           process.exit(1);
         }
 
-        if (role === SapAgentRole.CITIZEN && !opts.agentUri) {
+        if (role === 'citizen' && !opts.agentUri) {
           log.error("Citizen role requires --agent-uri");
           process.exit(1);
         }
@@ -144,26 +144,23 @@ export function registerSnsCommands(program: Command): void {
         }
 
         // Build DNS config based on role
-        const dnsConfig =
-          role === SapAgentRole.MERCHANT
-            ? {
-                role: SapAgentRole.MERCHANT as const,
-                x402Endpoint: opts.x402Endpoint,
-              }
-            : {
-                role: SapAgentRole.CITIZEN as const,
-                agentUri: opts.agentUri,
-              };
+        // TODO: Restore role-based config when SapAgentRole is exported from SDK
+        const dnsConfig = {
+          x402Endpoint: opts.x402Endpoint,
+          agentUri: opts.agentUri,
+        };
 
         // Register domain
+        // TODO: Restore full params when SDK types are fixed
         const result = await snsModule.registerAgentDomain({
           agentWallet: wallet.publicKey,
           domainName: domain,
-          role,
-          dnsConfig,
           signer: wallet,
           space: parseInt(opts.space),
           setAsPrimary: opts.setPrimary,
+          // dnsConfig, // TODO: Restore when SDK accepts dnsConfig
+          // x402Endpoint: opts.x402Endpoint,
+          // agentUri: opts.agentUri,
         });
 
         log.info("Domain registered successfully!");
@@ -172,7 +169,7 @@ export function registerSnsCommands(program: Command): void {
           signature: result.transactionSignature,
           domainPda: result.domainPda.toBase58(),
           agentPda: result.agentPda.toBase58(),
-          role: result.role,
+          // role: result.role, // TODO: Restore when SDK exports role
           records: result.records,
           recordPdas: Object.fromEntries(
             Object.entries(result.recordPdas).map(([k, v]) => [k, v.toBase58()])
@@ -222,7 +219,7 @@ export function registerSnsCommands(program: Command): void {
           found: true,
           wallet: result.wallet.toBase58(),
           agentPda: result.agentPda.toBase58(),
-          role: result.role,
+          // role: result.role, // TODO: Restore when SDK exports role
           metadata: result.metadata,
           records: result.records,
         });

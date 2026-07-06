@@ -65,7 +65,7 @@
 
 ```bash
 # Install SDK
-npm install @synapse-sap/sdk@0.21.0
+npm install @synapse-sap/sdk@0.3.0
 
 # Install CLI (optional)
 npm install -g @oobe-protocol-labs/synapse-sap-cli
@@ -222,7 +222,7 @@ const options: SnsRecordBuilderOptions = {
   
   // Actual data (optional, agent decides)
   sapData: {
-    version: "0.21.0",
+    version: "0.3.0",
     capabilities: ["jupiter:swap", "kamino:lend"],
     protocols: ["jupiter", "kamino"],
     pricing: {

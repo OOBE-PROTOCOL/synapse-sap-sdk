@@ -374,12 +374,12 @@ export class SapPostgres {
 
   /**
    * @name syncEscrows
-   * @description Sync all EscrowAccount PDAs to PostgreSQL.
+   * @description Sync all EscrowAccountV2 PDAs to PostgreSQL.
    * @since v0.1.0
    */
   async syncEscrows(): Promise<number> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const accounts = await (this.client.program.account as any).escrowAccount.all();
+    const accounts = await (this.client.program.account as any).escrowAccountV2.all();
     const slot = await this.client.program.provider.connection.getSlot();
     const rows = accounts.map(
       (a: { publicKey: PublicKey; account: unknown }) =>

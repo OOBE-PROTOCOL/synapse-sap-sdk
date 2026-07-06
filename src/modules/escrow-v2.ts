@@ -16,6 +16,7 @@ import {
   type AccountMeta,
   type Signer,
 } from "@solana/web3.js";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { BN } from "@coral-xyz/anchor";
 import { BaseModule } from "./base";
 import {
@@ -24,8 +25,8 @@ import {
   deriveEscrowV2,
   derivePendingSettlement as derivePendingPda,
   deriveDispute as deriveDisputePda,
+  derivePricingMenu,
   deriveStake,
-  deriveSettlementReceipt,
 } from "../pda";
 import type {
   EscrowAccountV2Data,
@@ -38,9 +39,9 @@ import {
   buildRpcOptions,
 } from "../utils/priority-fee";
 import type { SettleOptions } from "../utils/priority-fee";
-import { isAcceptedPaymentToken, computeRequiredStakeLamports } from "../constants/payments";
+import { isAcceptedPaymentToken } from "../constants/payments";
+import { TREASURY_WALLET } from "../constants/treasury";
 import { throwPredicted } from "../utils/anchor-errors";
-import { calculateSettleAmount } from "../utils/volume-curve";
 
 /**
  * @name EscrowV2Module
@@ -138,55 +139,9 @@ export class EscrowV2Module extends BaseModule {
 
     const [agentPda] = deriveAgent(agentWallet);
     const [escrowPda] = this.deriveEscrow(agentPda, undefined, args.escrowNonce);
-    const [stakePda] = deriveStake(agentPda);
-    // v0.11 H-1 preflight: surface an actionable error if the agent's stake
-    // does not cover the slashable share of the new escrow. Saves a failed
-    // tx fee and gives the caller a clear top-up amount.
-    try {
-      const stakeAccount = await this.fetchAccountNullable<{ stakedAmount: BN }>("agentStake", stakePda);
-      if (stakeAccount) {
-        const escrowLamports = BigInt(this.bn(args.initialDeposit).toString());
-        const required = computeRequiredStakeLamports(escrowLamports);
-        const have = BigInt(stakeAccount.stakedAmount.toString());
-        if (have < required) {
-          throw new Error(
-            `createEscrowV2: agent stake ${have} lamports < required ${required} ` +
-            `lamports for escrow of ${escrowLamports} lamports. Top up via stakingModule.deposit.`,
-          );
-        }
-      }
-      // If no stake account exists at all, on-chain will reject with
-      // AccountNotInitialized — we let that bubble up unchanged.
-    } catch (err) {
-      // Preflight is advisory; rethrow only the explicit coverage error.
-      if (err instanceof Error && err.message.startsWith("createEscrowV2: agent stake")) {
-        throw err;
-      }
-    }
-    // v0.11 H-1 preflight: surface an actionable error if the agent's stake
-    // does not cover the slashable share of the new escrow. Saves a failed
-    // tx fee and gives the caller a clear top-up amount.
-    try {
-      const stakeAccount = await this.fetchAccountNullable<{ stakedAmount: BN }>("agentStake", stakePda);
-      if (stakeAccount) {
-        const escrowLamports = BigInt(this.bn(args.initialDeposit).toString());
-        const required = computeRequiredStakeLamports(escrowLamports);
-        const have = BigInt(stakeAccount.stakedAmount.toString());
-        if (have < required) {
-          throw new Error(
-            `createEscrowV2: agent stake ${have} lamports < required ${required} ` +
-            `lamports for escrow of ${escrowLamports} lamports. Top up via stakingModule.deposit.`,
-          );
-        }
-      }
-      // If no stake account exists at all, on-chain will reject with
-      // AccountNotInitialized — we let that bubble up unchanged.
-    } catch (err) {
-      // Preflight is advisory; rethrow only the explicit coverage error.
-      if (err instanceof Error && err.message.startsWith("createEscrowV2: agent stake")) {
-        throw err;
-      }
-    }
+    const [agentStake] = deriveStake(agentPda);
+    const [agentStats] = deriveAgentStats(agentPda);
+    const [pricingMenu] = derivePricingMenu(agentPda);
 
     return this.methods
       .createEscrowV2(
@@ -206,7 +161,9 @@ export class EscrowV2Module extends BaseModule {
       .accounts({
         depositor: this.walletPubkey,
         agent: agentPda,
-        agentStake: stakePda,
+        agentStake,
+        agentStats,
+        pricingMenu,
         escrow: escrowPda,
         systemProgram: SystemProgram.programId,
       })
@@ -253,28 +210,21 @@ export class EscrowV2Module extends BaseModule {
   /**
    * Settle a batch of calls against a V2 escrow.
    *
-   * **v0.13.0 — Auto-bundle DisputeWindow:** when the escrow's
-   * `settlementSecurity` is `DisputeWindow`, this method now bundles
-   * **`settleCallsV2` + `createPendingSettlement`** into the SAME
-   * transaction. This eliminates the foot-gun where a caller would call
-   * `createPendingSettlement` directly without a preceding `settleCallsV2`,
-   * leaving `escrow.pending_amount = 0` and causing `finalizeSettlement`
-   * to abort with `ArithmeticOverflow` (6075).
+   * **v0.3.0 — Atomic DisputeWindow:** when the escrow's
+   * `settlementSecurity` is `DisputeWindow`, `settleCallsV2` creates the
+   * `PendingSettlement` PDA inside the same on-chain instruction. The SDK
+   * passes that PDA as a remaining account; the old standalone
+   * `createPendingSettlement` flow is deprecated.
    *
    * Flow per security mode:
    * - **CoSigned** — single IX (`settleCallsV2`) with co-signer in
    *   remaining accounts; funds move immediately.
-   * - **DisputeWindow** — two IXs in one tx:
-   *   1. `settleCallsV2` — bumps `pending_amount` and `settlement_index`
-   *   2. `createPendingSettlement(idx)` — locks the dispute tracker PDA
+   * - **DisputeWindow** — one IX (`settleCallsV2`) that reserves funds
+   *   and initializes the dispute tracker PDA atomically.
    *
    *   After this tx confirms, wait `escrow.disputeWindowSlots` slots and
    *   call {@link finalizeSettlement} with the index returned via
    *   `SettlementPendingEvent` or readable from `escrow.settlement_index - 1`.
-   *
-   * Pass `opts.skipAutoPending = true` to opt out of the auto-bundle (e.g.
-   * if you want to drive `createPendingSettlement` separately for advanced
-   * flows like batched off-chain receipt aggregation).
    *
    * @param depositorWallet - Depositor of the escrow being settled.
    * @param nonce - Escrow nonce (default 0 for the canonical escrow).
@@ -285,7 +235,7 @@ export class EscrowV2Module extends BaseModule {
    * @param coSigner - Required for CoSigned escrows.
    * @returns The transaction signature.
    * @since v0.7.0 — initial release
-   * @since v0.13.0 — auto-bundles `createPendingSettlement` for DisputeWindow
+   * @since v0.3.0 — creates PendingSettlement atomically on-chain for DisputeWindow
    */
   async settle(
     depositorWallet: PublicKey,
@@ -293,47 +243,18 @@ export class EscrowV2Module extends BaseModule {
     callsToSettle: BN | number | bigint,
     serviceHash: number[],
     splAccounts: AccountMeta[] = [],
-    opts?: SettleOptions & {
-      /**
-       * v0.13.0 — Opt out of the DisputeWindow auto-bundle. When `true`,
-       * `settle()` only emits `settleCallsV2` and the caller is responsible
-       * for sending `createPendingSettlement` afterwards (legacy 2-tx flow).
-       * Default: `false` (auto-bundle is on).
-       */
-      skipAutoPending?: boolean;
-      /**
-       * v0.13.0 — `receiptMerkleRoot` to inscribe in the auto-bundled
-       * `createPendingSettlement`. Defaults to 32 zero bytes (no receipt
-       * batch). Ignored when `skipAutoPending = true`.
-       */
-      receiptMerkleRoot?: number[];
-    },
+    opts?: SettleOptions,
     coSigner?: Signer,
   ): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(this.walletPubkey);
     const [escrowPda] = this.deriveEscrow(agentPda, depositorWallet, nonce);
     const [statsPda] = deriveAgentStats(agentPda);
-    const [receiptPda] = deriveSettlementReceipt(escrowPda, serviceHash);
 
     const preIxs = buildPriorityFeeIxs(opts);
     const rpcOpts = buildRpcOptions(opts);
 
-    // CoSigned escrows require the co-signer to appear in
-    // remaining_accounts with `is_signer = true` AND to actually sign
-    // the transaction (Anchor on-chain checks `acc.is_signer`).
-    // We dedupe so callers can also pass it manually via splAccounts.
-    const remaining: AccountMeta[] = coSigner
-      ? [
-          ...splAccounts.filter((a) => !a.pubkey.equals(coSigner.publicKey)),
-          { pubkey: coSigner.publicKey, isSigner: true, isWritable: false },
-        ]
-      : splAccounts;
-
-    // ── v0.13.0 preflight: fetch escrow once to drive both branches ──
-    // We need it to (a) detect DisputeWindow vs CoSigned, (b) read the
-    // current `settlement_index` to feed `createPendingSettlement`, and
-    // (c) compute `amount` via the volume curve so the bundled IX matches
-    // what `settle_calls_v2` will compute on-chain.
+    // Fetch escrow once to detect DisputeWindow and derive the pending PDA
+    // that the on-chain settle instruction initializes atomically.
     const escrowAcc = await this.fetchAccountNullable<EscrowAccountV2Data>(
       "escrowAccountV2",
       escrowPda,
@@ -351,6 +272,60 @@ export class EscrowV2Module extends BaseModule {
       escrowAcc.settlementSecurity !== null &&
       "disputeWindow" in (escrowAcc.settlementSecurity as Record<string, unknown>);
 
+    const isSplEscrow = escrowAcc.tokenMint != null;
+    const nativeTreasury: AccountMeta[] = isSplEscrow
+      ? []
+      : splAccounts.some((a) => a.pubkey.equals(TREASURY_WALLET))
+        ? []
+        : [{ pubkey: TREASURY_WALLET, isSigner: false, isWritable: true }];
+    const splTreasury: AccountMeta[] =
+      isSplEscrow && escrowAcc.tokenMint
+        ? (() => {
+            const treasuryToken = getAssociatedTokenAddressSync(
+              escrowAcc.tokenMint,
+              TREASURY_WALLET,
+              true,
+            );
+            return splAccounts.some((a) => a.pubkey.equals(treasuryToken))
+              ? []
+              : [{ pubkey: treasuryToken, isSigner: false, isWritable: true }];
+          })()
+        : [];
+
+    // CoSigned escrows require the co-signer to appear in
+    // remaining_accounts with `is_signer = true` AND to actually sign
+    // the transaction (Anchor on-chain checks `acc.is_signer`).
+    // We dedupe so callers can also pass it manually via splAccounts.
+    let disputePendingMeta: AccountMeta[] = [];
+    if (isDisputeWindow) {
+      const settlementIndex = escrowAcc.settlementIndex;
+      const [pendingPda] = this.derivePendingSettlement(escrowPda, settlementIndex);
+
+      const existing = await this.provider.connection.getAccountInfo(pendingPda);
+      if (existing) {
+        throw new Error(
+          `escrowV2.settle: pending PDA ${pendingPda.toBase58()} already exists ` +
+            `for settlementIndex=${settlementIndex.toString()}. Finalize or quarantine ` +
+            `that index before settling the next DisputeWindow batch.`,
+        );
+      }
+
+      disputePendingMeta = [{ pubkey: pendingPda, isSigner: false, isWritable: true }];
+    }
+
+    const remainingWithoutSigner = [
+      ...nativeTreasury,
+      ...splAccounts,
+      ...splTreasury,
+      ...disputePendingMeta,
+    ].filter((a) => !coSigner || !a.pubkey.equals(coSigner.publicKey));
+    const remaining: AccountMeta[] = coSigner
+      ? [
+          ...remainingWithoutSigner,
+          { pubkey: coSigner.publicKey, isSigner: true, isWritable: false },
+        ]
+      : remainingWithoutSigner;
+
     let builder = this.methods
       .settleCallsV2(this.bn(nonce), this.bn(callsToSettle), serviceHash)
       .accountsPartial({
@@ -358,7 +333,6 @@ export class EscrowV2Module extends BaseModule {
         agent: agentPda,
         agentStats: statsPda,
         escrow: escrowPda,
-        settlementReceipt: receiptPda,
         systemProgram: SystemProgram.programId,
       })
       .remainingAccounts(remaining);
@@ -371,71 +345,6 @@ export class EscrowV2Module extends BaseModule {
       builder = builder.preInstructions(preIxs);
     }
 
-    // ── v0.13.0: auto-bundle createPendingSettlement on DisputeWindow ──
-    // The on-chain `settle_calls_v2_handler` (DisputeWindow branch) only
-    // bumps `escrow.pending_amount` and `escrow.settlement_index` — it
-    // does NOT create the PendingSettlement PDA. Without the followup
-    // `createPendingSettlement` IX in the SAME tx, a buggy caller can
-    // (a) call `createPendingSettlement` later with a stale index, or
-    // (b) skip `settleCallsV2` entirely on a fresh escrow → orphan PDA
-    // whose `amount > escrow.pending_amount` → finalize aborts forever
-    // with `ArithmeticOverflow` (6075). Bundling is the only way to
-    // make that race impossible.
-    const skipAutoPending = opts?.skipAutoPending === true;
-    if (isDisputeWindow && !skipAutoPending) {
-      // PRE-increment settlement_index — settle_calls_v2 will bump it
-      // to (current + 1) AFTER our IX runs, but the PDA seed used by
-      // create_pending_settlement is the PRE-increment value (matches
-      // `SettlementPendingEvent.settlement_index`).
-      const settlementIndex = escrowAcc.settlementIndex;
-
-      // Mirror the on-chain volume-curve math so `pending.amount`
-      // matches what `escrow.pending_amount` was bumped by.
-      const totalCallsBefore = escrowAcc.totalCallsSettled.add(escrowAcc.pendingCalls);
-      const amount = calculateSettleAmount(
-        escrowAcc.pricePerCall,
-        escrowAcc.volumeCurve,
-        totalCallsBefore,
-        this.bn(callsToSettle),
-      );
-
-      const [pendingPda] = this.derivePendingSettlement(escrowPda, settlementIndex);
-
-      // Defensive: if a stale pending PDA exists at this index (orphan
-      // from an aborted prior run), refuse to send — otherwise the IX
-      // will fail with `Allocate: account already in use` (custom 0x0).
-      const existing = await this.provider.connection.getAccountInfo(pendingPda);
-      if (existing) {
-        throw new Error(
-          `escrowV2.settle (auto-bundle): pending PDA ${pendingPda.toBase58()} ` +
-            `already exists for settlementIndex=${settlementIndex.toString()}. ` +
-            `An earlier run created it but did not finalize. Either finalize ` +
-            `that index first or skip it permanently. (Pass skipAutoPending=true ` +
-            `to bypass this guard and emit only settleCallsV2.)`,
-        );
-      }
-
-      const receiptMerkleRoot = opts?.receiptMerkleRoot ?? new Array(32).fill(0);
-      const pendingIx = await this.methods
-        .createPendingSettlement(
-          settlementIndex,
-          this.bn(callsToSettle),
-          amount,
-          serviceHash,
-          receiptMerkleRoot,
-        )
-        .accounts({
-          wallet: this.walletPubkey,
-          agent: agentPda,
-          escrow: escrowPda,
-          pendingSettlement: pendingPda,
-          systemProgram: SystemProgram.programId,
-        })
-        .instruction();
-
-      builder = builder.postInstructions([pendingIx]);
-    }
-
     return builder.rpc(rpcOpts);
   }
 
@@ -444,12 +353,10 @@ export class EscrowV2Module extends BaseModule {
    *
    * In DisputeWindow mode (`settlementSecurity = 2`), every successful
    * `settleCallsV2` increments this value. The PRE-increment value is the
-   * one to pass to {@link createPendingSettlement} for that batch.
+   * pending PDA index that `settle()` passes to the program as a remaining
+   * account.
    *
-   * @returns the current `settlementIndex` as `bigint` (next index to use
-   *   for `createPendingSettlement` if you have NOT yet called `settle` for
-   *   it; if you HAVE just settled, subtract 1 — but prefer the event
-   *   `SettlementPendingEvent.settlement_index` over arithmetic).
+   * @returns the next pending settlement index as `bigint`.
    * @since v0.12.8
    */
   async nextSettlementIndex(
@@ -472,22 +379,8 @@ export class EscrowV2Module extends BaseModule {
   }
 
   /**
-   * Create the PendingSettlement PDA for a DisputeWindow batch.
-   *
-   * **v0.13.0 NOTE:** in almost all cases you should call
-   * {@link settle} instead — it auto-bundles `settleCallsV2 +
-   * createPendingSettlement` in a single transaction so the two
-   * cannot drift out of sync. Use this method standalone ONLY when
-   * you intentionally pass `skipAutoPending: true` to `settle()`
-   * (e.g. batched receipt-merkle aggregation across multiple
-   * `settleCallsV2` runs).
-   *
-   * Calling this without a preceding `settleCallsV2` (which bumps
-   * `escrow.pending_amount`) creates an orphan PDA whose
-   * `pending.amount > escrow.pending_amount` — `finalizeSettlement`
-   * will then abort with `ArithmeticOverflow` (6075) forever.
-   *
-   * @since v0.7.0
+   * @deprecated Since SAP 0.3.0. `settleCallsV2` creates the
+   * PendingSettlement PDA atomically; call {@link settle}.
    */
   async createPendingSettlement(
     agentWallet: PublicKey,
@@ -497,47 +390,18 @@ export class EscrowV2Module extends BaseModule {
     callsToSettle: BN | number | bigint,
     amount: BN | number | bigint,
     serviceHash: number[],
-    receiptMerkleRoot: number[] = new Array(32).fill(0),
   ): Promise<TransactionSignature> {
-    const [agentPda] = deriveAgent(agentWallet);
-    const [escrowPda] = this.deriveEscrow(agentPda, depositorWallet, nonce);
-    const [pendingPda] = this.derivePendingSettlement(escrowPda, settlementIndex);
-
-    // v0.12.8: preflight against the "Allocate: account already in use"
-    // SystemProgram error (custom 0x0). The pending_settlement PDA is
-    // seeded on `escrow + settlement_index`, so reusing the same index
-    // (e.g. always 0, or a stale retry value) collides with an existing
-    // account. Fail fast with an actionable message instead of burning a
-    // failed tx fee on simulation.
-    const existing = await this.provider.connection.getAccountInfo(pendingPda);
-    if (existing) {
-      const idx = this.bn(settlementIndex).toString();
-      throw new Error(
-        `createPendingSettlement: pending PDA ${pendingPda.toBase58()} ` +
-          `already exists for settlementIndex=${idx}. ` +
-          `Use EscrowV2Module.nextSettlementIndex() to read the current ` +
-          `escrow.settlement_index, or capture SettlementPendingEvent.settlement_index ` +
-          `from the preceding settleCallsV2 tx. Reusing a settlementIndex ` +
-          `causes SystemProgram Allocate (custom 0x0) failures.`,
-      );
-    }
-
-    return this.methods
-      .createPendingSettlement(
-        this.bn(settlementIndex),
-        this.bn(callsToSettle),
-        this.bn(amount),
-        serviceHash,
-        receiptMerkleRoot,
-      )
-      .accounts({
-        wallet: this.walletPubkey,
-        agent: agentPda,
-        escrow: escrowPda,
-        pendingSettlement: pendingPda,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc();
+    void agentWallet;
+    void depositorWallet;
+    void nonce;
+    void settlementIndex;
+    void callsToSettle;
+    void amount;
+    void serviceHash;
+    throw new Error(
+      "createPendingSettlement is deprecated in SAP 0.3.0. " +
+        "Call escrowV2.settle(); settleCallsV2 now initializes the PendingSettlement PDA atomically.",
+    );
   }
 
   async finalizeSettlement(
@@ -681,7 +545,6 @@ export class EscrowV2Module extends BaseModule {
     nonce: BN | number | bigint,
     settlementIndex: BN | number | bigint,
     evidenceHash: number[],
-    disputeType: number = 0,
   ): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(agentWallet);
     const [escrowPda] = this.deriveEscrow(agentPda, undefined, nonce);
@@ -689,7 +552,7 @@ export class EscrowV2Module extends BaseModule {
     const [disputePda] = this.deriveDispute(pendingPda);
 
     return this.methods
-      .fileDispute(evidenceHash, disputeType)
+      .fileDispute(evidenceHash)
       .accounts({
         depositor: this.walletPubkey,
         escrow: escrowPda,
@@ -700,18 +563,31 @@ export class EscrowV2Module extends BaseModule {
       .rpc();
   }
 
-  /**
-   * @deprecated Since v0.7.0 — Arbiter-based resolution removed.
-   * Use {@link ReceiptModule.submitReceiptProof} + {@link ReceiptModule.autoResolveDispute} instead.
-   */
   async resolveDispute(
-    _depositorWallet: PublicKey,
-    _agentWallet: PublicKey,
-    _nonce: BN | number | bigint,
-    _settlementIndex: BN | number | bigint,
-    _outcome: number,
+    depositorWallet: PublicKey,
+    agentWallet: PublicKey,
+    nonce: BN | number | bigint,
+    settlementIndex: BN | number | bigint,
+    outcome: number,
   ): Promise<TransactionSignature> {
-    throw new Error("resolveDispute removed in v0.7.0 — use ReceiptModule.autoResolveDispute");
+    const [agentPda] = deriveAgent(agentWallet);
+    const [escrowPda] = this.deriveEscrow(agentPda, depositorWallet, nonce);
+    const [pendingPda] = this.derivePendingSettlement(escrowPda, settlementIndex);
+    const [disputePda] = this.deriveDispute(pendingPda);
+    const [statsPda] = deriveAgentStats(agentPda);
+
+    return this.methods
+      .resolveDispute(outcome)
+      .accounts({
+        arbiter: this.walletPubkey,
+        depositor: depositorWallet,
+        agentWallet,
+        escrow: escrowPda,
+        pendingSettlement: pendingPda,
+        dispute: disputePda,
+        agentStats: statsPda,
+      })
+      .rpc();
   }
 
   async closeDispute(

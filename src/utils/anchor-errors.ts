@@ -159,6 +159,13 @@ export const SAP_ERRORS: Readonly<Record<number, SapErrorEntry>> = Object.freeze
   6144: { code: 6144, name: "StakeBelowCoverage", msg: "stake under coverage" },
   6145: { code: 6145, name: "StakeNotClosable", msg: "stake not closable" },
   6146: { code: 6146, name: "AgentStakeAccountMissing", msg: "agent stake account missing" },
+  6170: { code: 6170, name: "ReceiptProofAlreadySubmitted", msg: "receipt proof already submitted for this dispute" },
+  6171: { code: 6171, name: "DuplicateReceiptProof", msg: "duplicate receipt proof" },
+  6172: { code: 6172, name: "MissingReceiptSignature", msg: "missing verified receipt signature" },
+  6173: { code: 6173, name: "AgentCapabilityMismatch", msg: "agent does not declare this capability" },
+  6174: { code: 6174, name: "AgentProtocolMismatch", msg: "agent does not declare this protocol" },
+  6175: { code: 6175, name: "InvalidToolParameterCount", msg: "required params exceeds params count" },
+  6176: { code: 6176, name: "ActiveEscrowCounterUnderflow", msg: "active escrow counter underflow" },
 });
 export const SAP_ERROR_BY_NAME: Readonly<Record<string, number>> = Object.freeze({
   NameTooLong: 6000,
@@ -308,6 +315,13 @@ export const SAP_ERROR_BY_NAME: Readonly<Record<string, number>> = Object.freeze
   StakeBelowCoverage: 6144,
   StakeNotClosable: 6145,
   AgentStakeAccountMissing: 6146,
+  ReceiptProofAlreadySubmitted: 6170,
+  DuplicateReceiptProof: 6171,
+  MissingReceiptSignature: 6172,
+  AgentCapabilityMismatch: 6173,
+  AgentProtocolMismatch: 6174,
+  InvalidToolParameterCount: 6175,
+  ActiveEscrowCounterUnderflow: 6176,
 });
 
 /**
@@ -344,6 +358,13 @@ const FRIENDLY_OVERRIDES: Readonly<Record<string, string>> = Object.freeze({
   InvalidCoSigner: "Co-signer pubkey does not match the on-chain `escrow.co_signer`.",
   InvalidSettlementSecurity: "Settlement security mode mismatch with on-chain escrow config.",
   SettlementReplay: "Settlement receipt PDA already exists for this serviceHash/batchRoot. Replay blocked.",
+  ReceiptProofAlreadySubmitted: "Receipt proof submission is one-shot per dispute. Resolve the current dispute instead of replaying proofs.",
+  DuplicateReceiptProof: "Receipt proof contains duplicate receipt hashes. Submit each receipt once.",
+  MissingReceiptSignature: "Receipt proof must include verified Ed25519 pre-instructions from both depositor and agent wallet.",
+  AgentCapabilityMismatch: "Agent does not declare this capability. Update the agent profile before indexing.",
+  AgentProtocolMismatch: "Agent does not declare this protocol. Update the agent profile before indexing.",
+  InvalidToolParameterCount: "Tool descriptor is invalid: required_params must be <= params_count.",
+  ActiveEscrowCounterUnderflow: "AgentStats.active_escrows is inconsistent. Reconcile counters before closing this escrow.",
   DuplicateServiceHash: "Two settlements in the same batch share the same serviceHash. Make each call unique.",
   BatchTooLarge: "Batch settle exceeds 10 entries. Split across multiple transactions.",
   BatchEmpty: "Batch settle requires at least 1 settlement.",

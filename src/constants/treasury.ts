@@ -9,7 +9,7 @@
  * - Featured listings (1 SOL)
  * 
  * @category Constants
- * @since v0.18.0
+ * @since v0.3.0
  */
 
 import { PublicKey } from "@solana/web3.js";
@@ -18,7 +18,8 @@ import { PublicKey } from "@solana/web3.js";
  * Treasury wallet public key
  * 
  * This is the canonical treasury wallet that receives all protocol fees.
- * Fees are optional - if treasury account is not passed, no fees are collected.
+ * Fee-paying instructions must pass this account as a writable, non-signer
+ * remaining account. The on-chain program rejects any other treasury.
  * 
  * @example
  * ```ts

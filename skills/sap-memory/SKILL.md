@@ -1,7 +1,7 @@
 ---
 name: sap-memory
 description: |
-  On-chain memory subsystem for SAP SDK v0.15.0.
+  On-chain memory subsystem for SAP SDK v0.3.0.
   Use when: init vault, open session, inscribe encrypted memory,
   delegated inscription, epoch pagination, ledger init/write/seal,
   nonce rotation, delegate management.
@@ -15,9 +15,9 @@ triggers:
   - sap memory prove
 ---
 
-# SAP SDK — Memory Systems Reference (v0.15.0)
+# SAP SDK — Memory Systems Reference (v0.3.0)
 
-> **Package**: `@oobe-protocol-labs/synapse-sap-sdk@0.15.0`  
+> **Package**: `@oobe-protocol-labs/synapse-sap-sdk@0.3.0`  
 > **Program ID**: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`  
 > **Encryption**: AES-256-GCM (client-side)  
 > **Storage**: Transaction logs (zero rent) + EpochPage PDAs  

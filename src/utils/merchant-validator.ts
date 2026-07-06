@@ -29,7 +29,7 @@ import type {
   EscrowValidationResult,
 } from "./escrow-validation";
 import { SapValidationError } from "../errors/index";
-import type { EscrowAccountData } from "../types";
+import type { EscrowAccountV2Data } from "../types";
 
 // ═══════════════════════════════════════════════════════════════════
 //  Types
@@ -245,7 +245,7 @@ export class SapMerchantValidator {
   private readonly connection: Connection;
   private readonly fetchEscrow: (
     escrowPda: PublicKey,
-  ) => Promise<EscrowAccountData | null>;
+  ) => Promise<EscrowAccountV2Data | null>;
 
   /**
    * @param connection  - Solana RPC connection.
@@ -256,7 +256,7 @@ export class SapMerchantValidator {
     connection: Connection,
     fetchEscrow: (
       escrowPda: PublicKey,
-    ) => Promise<EscrowAccountData | null>,
+    ) => Promise<EscrowAccountV2Data | null>,
   ) {
     this.connection = connection;
     this.fetchEscrow = fetchEscrow;

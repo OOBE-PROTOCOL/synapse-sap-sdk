@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-07-06
+
+### Changed
+
+- Aligned CLI package version with SDK `0.3.0`.
+- Updated the CLI SDK dependency range to `^0.3.0`.
+- Updated command banners, help text, README references, and skill metadata to
+  the SAP `0.3.0` commerce release.
+
+### Fixed
+
+- Removed stale V2 settlement receipt arguments from CLI escrow settlement
+  builders.
+- Kept CLI settlement flows aligned with the canonical V2 IDL:
+  `settle_calls_v2` uses 5 base accounts and `create_pending_settlement` uses
+  4 arguments.
+
+### Validation
+
+- Verified CLI build with `npm --prefix cli run build`.
+
 ## [0.20.0] - 2026-06-08
 
 ### Changed

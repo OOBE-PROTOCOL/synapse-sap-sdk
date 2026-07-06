@@ -35,6 +35,7 @@ export const SEEDS = {
   AGENT: "sap_agent",
   AGENT_STATS: "sap_stats",
   AGENT_STAKE: "sap_stake",
+  PRICING: "sap_pricing",
   FEEDBACK: "sap_feedback",
   CAPABILITY_INDEX: "sap_cap_idx",
   CAPABILITY_IDX: "sap_cap_idx",

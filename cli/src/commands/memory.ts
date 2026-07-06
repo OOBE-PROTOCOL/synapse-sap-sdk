@@ -1,6 +1,6 @@
 /**
  * @module cli/commands/memory
- * @description Memory vault & session — v0.20.0 aligned.
+ * @description Memory vault & session — v0.3.0 aligned.
  * Uses: client.vault.initVault, client.session.openSession, client.vault.inscribeMemory
  * Pdas: getAgentPDA, getVaultPDA, getSessionLedgerPDA, getEpochPagePDA, getGlobalPDA
  */

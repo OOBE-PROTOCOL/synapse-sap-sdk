@@ -31,73 +31,64 @@ function readOptionPubkey(buf: Buffer, off: number): PublicKey | null {
   if (buf.readUInt8(off) === 0) return null;
   return new PublicKey(buf.subarray(off + 1, off + 33));
 }
+function readOptionPubkeyWithOffset(buf: Buffer, off: number): [PublicKey | null, number] {
+  if (buf.readUInt8(off) === 0) return [null, off + 1];
+  return [new PublicKey(buf.subarray(off + 1, off + 33)), off + 33];
+}
 function readString(buf: Buffer, off: number): string {
   const len = buf.readUInt32LE(off);
   return buf.toString("utf8", off + 4, off + 4 + len);
 }
 function readBool(buf: Buffer, off: number): boolean  { return buf.readUInt8(off) === 1; }
 
-// ── EscrowAccountV2 Parser (v0.25 schema) ──
+// ── EscrowAccountV2 Parser (Anchor/Borsh schema) ──
 const ESCROW_V2_DISCRIM = Buffer.from([83,65,80,95,101,115,99,114,111,119,95,118,50]);
 export function parseEscrowAccountV2(data: Buffer): EscrowAccountV2 {
   let o = DISCRIMINATOR_SIZE;
-  const agent             = readPubkeyStrict(data, o); o += PUBKEY_SIZE;
-  const depositor         = readPubkeyStrict(data, o); o += PUBKEY_SIZE;
-  o += 8; // bump (u8 padded)
-  const tokenMint         = readOptionPubkey(data, o); o += OPTION_SIZE;
-  const decimals          = readU8(data, o); o += U8_SIZE;
-  o += 7; // padding
-  const balance           = readU64(data, o); o += U64_SIZE;
-  const totalDeposited    = readU64(data, o); o += U64_SIZE;
-  const totalSettled      = readU64(data, o); o += U64_SIZE;
+  const bump = readU8(data, o); o += U8_SIZE;
+  const version = readU8(data, o); o += U8_SIZE;
+  const agent = readPubkeyStrict(data, o); o += PUBKEY_SIZE;
+  const depositor = readPubkeyStrict(data, o); o += PUBKEY_SIZE;
+  const agentWallet = readPubkeyStrict(data, o); o += PUBKEY_SIZE;
+  const escrowNonce = readU64(data, o); o += U64_SIZE;
+  const balance = readU64(data, o); o += U64_SIZE;
+  const totalDeposited = readU64(data, o); o += U64_SIZE;
+  const totalSettled = readU64(data, o); o += U64_SIZE;
   const totalCallsSettled = readU64(data, o); o += U64_SIZE;
-  const pendingAmount     = readU64(data, o); o += U64_SIZE;
-  const pendingCalls      = readU64(data, o); o += U64_SIZE;
-  // v0.25 fields
-  const maxObligation     = readU64(data, o); o += U64_SIZE;
-  const disputeBondTotal  = readU64(data, o); o += U64_SIZE;
-  const pendingSettlementCount = readU32(data, o); o += U32_SIZE;
-  o += 4; // padding
-  const pricePerCall      = readU64(data, o); o += U64_SIZE;
-  const basePrice         = readU64(data, o); o += U64_SIZE;
-  const maxCalls          = readU64(data, o); o += U64_SIZE;
-  // volume curve: u32 count, then points
-  const volCount          = readU32(data, o); o += U32_SIZE;
+  const pricePerCall = readU64(data, o); o += U64_SIZE;
+  const maxCalls = readU64(data, o); o += U64_SIZE;
+  const createdAt = readI64(data, o); o += I64_SIZE;
+  const lastSettledAt = readI64(data, o); o += I64_SIZE;
+  const expiresAt = readI64(data, o); o += I64_SIZE;
+
+  const volCount = readU32(data, o); o += U32_SIZE;
   const volumeCurve: any[] = [];
   for (let i = 0; i < volCount; i++) {
-    const afterCalls = readU32(data, o); o += U32_SIZE + U32_SIZE;
+    const afterCalls = readU32(data, o); o += U32_SIZE;
     const pricePerCall = readU64(data, o); o += U64_SIZE;
     volumeCurve.push({ afterCalls, pricePerCall });
   }
+
+  const [tokenMint, tokenMintOffset] = readOptionPubkeyWithOffset(data, o);
+  o = tokenMintOffset;
+  const tokenDecimals = readU8(data, o); o += U8_SIZE;
   const settlementSecurity = readU8(data, o) as SettlementSecurity; o += U8_SIZE;
-  o += U8_SIZE; // settlement_type
-  const coSigner            = readOptionPubkey(data, o); o += OPTION_SIZE;
-  const arbiter             = readOptionPubkey(data, o); o += OPTION_SIZE;
-  const disputeWindowSlots  = readU32(data, o); o += U32_SIZE;
-  const finalized           = readBool(data, o); o += BOOL_SIZE;
-  o += 6; // padding to 8
-  const createdAt = readI64(data, o); o += I64_SIZE;
-  const expiresAt = readI64(data, o); o += I64_SIZE;
-  const lastSettledAt = readI64(data, o); o += I64_SIZE;
+  const disputeWindowSlots = readU64(data, o); o += U64_SIZE;
   const settlementIndex = readU64(data, o); o += U64_SIZE;
-  const escrowNonce = readU32(data, o); o += U32_SIZE;
-  o += 4; // padding
-  // reserved
+  const [coSigner, coSignerOffset] = readOptionPubkeyWithOffset(data, o);
+  o = coSignerOffset;
+  const [arbiter, arbiterOffset] = readOptionPubkeyWithOffset(data, o);
+  o = arbiterOffset;
+  const pendingAmount = readU64(data, o); o += U64_SIZE;
+  const pendingCalls = readU64(data, o); o += U64_SIZE;
 
   return {
-    agent, depositor,
-    tokenMint, decimals,
+    bump, version, agent, depositor, agentWallet, escrowNonce,
     balance, totalDeposited, totalSettled, totalCallsSettled,
+    pricePerCall, maxCalls, createdAt, lastSettledAt, expiresAt,
+    volumeCurve, tokenMint, tokenDecimals, settlementSecurity,
+    disputeWindowSlots, settlementIndex, coSigner, arbiter,
     pendingAmount, pendingCalls,
-    maxObligation, disputeBondTotal, pendingSettlementCount,
-    pricePerCall, basePrice, maxCalls,
-    volumeCurve,
-    settlementSecurity,
-    coSigner, arbiter, disputeWindowSlots,
-    finalized,
-    createdAt, expiresAt, lastSettledAt,
-    settlementIndex, escrowNonce,
-    bump: 0,
   };
 }
 
@@ -113,21 +104,23 @@ export async function fetchEscrowAccountV2(
 // ── PendingSettlement Parser ──
 export function parsePendingSettlement(data: Buffer): PendingSettlement {
   let o = DISCRIMINATOR_SIZE;
-  const escrow = readPubkeyStrict(data, o); o += PUBKEY_SIZE;
-  const depositor = readPubkeyStrict(data, o); o += PUBKEY_SIZE;
-  const agent = readPubkeyStrict(data, o); o += PUBKEY_SIZE;
-  const amount = readU64(data, o); o += U64_SIZE;
-  const calls = readU64(data, o); o += U64_SIZE;
-  const settlementIndex = readU64(data, o); o += U64_SIZE;
-  const filedSlot = readU64(data, o); o += U64_SIZE;
-  const releaseSlot = readU64(data, o); o += U64_SIZE;
-  const isDisputed = readBool(data, o); o += BOOL_SIZE;
-  const finalized = readBool(data, o); o += BOOL_SIZE;
-  o += 6; // padding
-  o += U64_SIZE; // created_at
   const bump = readU8(data, o); o += U8_SIZE;
-  return { escrow, depositor, agent, amount, calls, settlementIndex,
-    filedSlot, releaseSlot, isDisputed, finalized, bump };
+  const escrow = readPubkeyStrict(data, o); o += PUBKEY_SIZE;
+  const agent = readPubkeyStrict(data, o); o += PUBKEY_SIZE;
+  const agentWallet = readPubkeyStrict(data, o); o += PUBKEY_SIZE;
+  const depositor = readPubkeyStrict(data, o); o += PUBKEY_SIZE;
+  const settlementIndex = readU64(data, o); o += U64_SIZE;
+  const callsToSettle = readU64(data, o); o += U64_SIZE;
+  const amount = readU64(data, o); o += U64_SIZE;
+  const serviceHash = Array.from(data.subarray(o, o + 32)); o += 32;
+  const createdAt = readI64(data, o); o += I64_SIZE;
+  const releaseSlot = readU64(data, o); o += U64_SIZE;
+  const isFinalized = readBool(data, o); o += BOOL_SIZE;
+  const isDisputed = readBool(data, o); o += BOOL_SIZE;
+  const outcome = readU8(data, o) as DisputeOutcome; o += U8_SIZE;
+  return { bump, escrow, agent, agentWallet, depositor, settlementIndex,
+    callsToSettle, amount, serviceHash, createdAt, releaseSlot, isFinalized,
+    isDisputed, outcome };
 }
 
 // ── AgentAccount Parser ──
@@ -171,22 +164,22 @@ export function parseAgentStake(data: Buffer): AgentStake {
 // ── DisputeRecord Parser ──
 export function parseDisputeRecord(data: Buffer): DisputeRecord {
   let o = DISCRIMINATOR_SIZE;
+  const bump = readU8(data, o); o += U8_SIZE;
+  const pendingSettlement = readPubkeyStrict(data, o); o += PUBKEY_SIZE;
   const escrow = readPubkeyStrict(data, o); o += PUBKEY_SIZE;
   const depositor = readPubkeyStrict(data, o); o += PUBKEY_SIZE;
   const agent = readPubkeyStrict(data, o); o += PUBKEY_SIZE;
-  o += U8_SIZE; // bump
-  o += U32_SIZE; // padding
-  const settlementIndex = readU64(data, o); o += U64_SIZE;
-  const amount = readU64(data, o); o += U64_SIZE;
-  const bondAmount = readU64(data, o); o += U64_SIZE;
-  const receiptRoot = data.subarray(o, o + 32); o += 32;
-  const filedAt = readI64(data, o); o += I64_SIZE;
-  const proofDeadline = readI64(data, o); o += I64_SIZE;
+  const evidenceHash = Array.from(data.subarray(o, o + 32)); o += 32;
+  const agentEvidenceHash = Array.from(data.subarray(o, o + 32)); o += 32;
+  const arbiter = readPubkeyStrict(data, o); o += PUBKEY_SIZE;
   const outcome = readU8(data, o) as DisputeOutcome; o += U8_SIZE;
-  const arbiter = readOptionPubkey(data, o); o += OPTION_SIZE;
-  const settledAt = readI64(data, o); o += I64_SIZE;
-  return { escrow, depositor, agent, settlementIndex, amount, bondAmount,
-    receiptRoot, filedAt, proofDeadline, outcome, arbiter, settledAt, bump: 0 };
+  const createdAt = readI64(data, o); o += I64_SIZE;
+  const resolvedAt = readI64(data, o); o += I64_SIZE;
+  const resolutionHash = Array.from(data.subarray(o, o + 32)); o += 32;
+  const slashAmount = readU64(data, o); o += U64_SIZE;
+  return { bump, pendingSettlement, escrow, depositor, agent, evidenceHash,
+    agentEvidenceHash, arbiter, outcome, createdAt, resolvedAt, resolutionHash,
+    slashAmount };
 }
 
 // ── Subscription Parser ──

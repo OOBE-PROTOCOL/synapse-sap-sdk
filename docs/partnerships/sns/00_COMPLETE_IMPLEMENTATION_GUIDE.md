@@ -1,6 +1,6 @@
 # SNS Integration on SAP — Complete Implementation Guide
 
-**Version:** v0.21.0  
+**Version:** v0.3.0  
 **Last Updated:** 2026-06-25  
 **Status:** ✅ Production Ready  
 **Author:** Synapse Agent Protocol Team
@@ -40,7 +40,7 @@ This document provides **complete technical documentation** for the SNS (Solana 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    SAP SDK v0.21.0                          │
+│                    SAP SDK v0.3.0                          │
 │                                                             │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
 │  │  SnsModule   │──│ sns-adapter  │──│ sns-lifecycle    │  │
@@ -149,7 +149,7 @@ User Registration Request
 
 ```json
 {
-  "@synapse-sap/sdk": "^0.21.0",
+  "@synapse-sap/sdk": "^0.3.0",
   "@bonfida/spl-name-service": "3.0.9",
   "@solana/web3.js": "^1.98.4",
   "@solana/spl-token": "0.4.6",
@@ -161,7 +161,7 @@ User Registration Request
 
 ```bash
 # Install SDK
-npm install @synapse-sap/sdk@0.21.0
+npm install @synapse-sap/sdk@0.3.0
 
 # Install CLI (if not already installed)
 npm install -g @oobe-protocol-labs/synapse-sap-cli
@@ -1128,7 +1128,7 @@ Synapse Agent Protocol Team
 
 ## 16. Changelog
 
-### v0.21.0 (2026-06-25)
+### v0.3.0 (2026-06-25)
 
 **Added:**
 - ✅ Optional SNS domain registration during agent setup

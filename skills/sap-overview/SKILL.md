@@ -1,24 +1,24 @@
 ---
 name: sap-overview
 description: |
-  Master reference for the Synapse SAP SDK v0.15.0 on Solana.
+  Master reference for the Synapse SAP SDK v0.3.0 on Solana.
   Covers: 13 instruction modules, 6 registries, typed account parsers,
   PDA derivations, constants, errors, events, and utilities.
   Use for any code generation or agentic orchestration against
-  @oobe-protocol-labs/synapse-sap-sdk@0.15.0.
+  @oobe-protocol-labs/synapse-sap-sdk@0.3.0.
 triggers:
   - synapse sap sdk
-  - sap v0.14
+  - sap v0.3
   - synapse-agent-sap
   - oobe protocol sdk
 ---
 
-# SAP SDK v0.15.0 — Agent Skill Reference
+# SAP SDK v0.3.0 — Agent Skill Reference
 
 > **Package**: `@oobe-protocol-labs/synapse-sap-sdk`  
-> **Version**: `0.15.0`  
+> **Version**: `0.3.0`  
 > **Program ID**: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`  
-> **IDL**: `v0.25.0` aligned  
+> **IDL**: `v0.3.0` aligned  
 > **Runtime**: Node.js ≥ 18, TypeScript ≥ 5.0  
 
 This skill is the canonical reference for agentic code generation interacting
@@ -166,7 +166,12 @@ await client.escrow.createEscrowV2({
 
 await client.escrow.depositEscrowV2({ signer, depositor, escrow, escrowNonce, amount });
 await client.escrow.withdrawEscrowV2({ signer, depositor, escrow, amount });
-await client.escrow.settleCallsV2({ signer, wallet, agent, agentStats, escrow, settlementReceipt, escrowNonce, callsToSettle, serviceHash });
+await client.escrow.settleCallsV2({
+  signer, wallet, agent, agentStats, escrow,
+  escrowNonce, callsToSettle, serviceHash,
+  // remainingAccounts: co-signer or pending PDA plus treasury/ATA as required.
+  // Prefer client.escrowV2.settle() for automatic account derivation.
+});
 await client.escrow.finalizeSettlement({ signer, payer, agentWallet, escrow, pendingSettlement, agentStats });
 await client.escrow.closeEscrowV2({ signer, depositor, escrow, agentStats });
 ```
@@ -174,7 +179,8 @@ await client.escrow.closeEscrowV2({ signer, depositor, escrow, agentStats });
 ### DisputeModule
 
 ```ts
-await client.dispute.createPendingSettlement({ signer, wallet, agent, escrow, pendingSettlement, settlementIndex, callsToSettle, amount, serviceHash, receiptMerkleRoot });
+// Deprecated in v0.3.0: PendingSettlement is created by settle_calls_v2.
+// Do not call createPendingSettlement in new integrations.
 await client.dispute.fileDispute({ signer, depositor, escrow, pendingSettlement, dispute, evidenceHash, disputeType });
 await client.dispute.submitAgentEvidence({ signer, wallet, agent, dispute, evidenceHash });
 await client.dispute.submitReceiptProof({ signer, wallet, agent, escrow, receiptBatch, pendingSettlement, dispute, receiptHashes, merkleProofs });
@@ -190,7 +196,7 @@ await client.staking.initStake({ signer, wallet, agent, stake, initialDeposit })
 await client.staking.depositStake({ signer, wallet, agent, stake, amount });
 await client.staking.requestUnstake({ signer, wallet, agent, stake, amount });
 await client.staking.completeUnstake({ signer, wallet, agent, stake });
-// Ledger ops (also under StakingModule in v0.15.0):
+// Ledger ops (also under StakingModule in v0.3.0):
 await client.staking.initLedger({ signer, wallet, agent, vault, session, ledger });
 await client.staking.writeLedger({ signer, wallet, session, vault, agent, ledger, data, contentHash });
 await client.staking.sealLedger({ signer, wallet, session, vault, agent, ledger, page });

@@ -41,7 +41,7 @@ import type {
   GiveFeedbackArgs,
   UpdateFeedbackArgs,
   CreateAttestationArgs,
-  CreateEscrowArgs,
+  CreateEscrowV2Args,
   Settlement,
   InscribeMemoryArgs,
   InscribeToolSchemaArgs,
@@ -706,7 +706,8 @@ async function executeAttestation(client: SapClient, name: string, input: any) {
 async function executeEscrow(client: SapClient, name: string, input: any) {
   switch (name) {
     case "createEscrow": {
-      const args: CreateEscrowArgs = {
+      const args: CreateEscrowV2Args = {
+        escrowNonce: new BN(input.escrowNonce ?? 0),
         pricePerCall: new BN(input.pricePerCall),
         maxCalls: new BN(input.maxCalls),
         initialDeposit: new BN(input.initialDeposit),
@@ -719,7 +720,11 @@ async function executeEscrow(client: SapClient, name: string, input: any) {
           }),
         ),
         tokenMint: toPubkey(input.tokenMint) ?? null,
-        tokenDecimals: input.tokenDecimals ?? 9,
+        tokenDecimals: input.tokenDecimals ?? (input.tokenMint ? 6 : 9),
+        settlementSecurity: input.settlementSecurity ?? 2,
+        disputeWindowSlots: new BN(input.disputeWindowSlots ?? 2_160),
+        coSigner: toPubkey(input.coSigner) ?? null,
+        arbiter: toPubkey(input.arbiter) ?? null,
       };
       const tx = await client.escrow.create(
         new PublicKey(input.agentWallet),
@@ -731,6 +736,7 @@ async function executeEscrow(client: SapClient, name: string, input: any) {
     case "depositEscrow": {
       const tx = await client.escrow.deposit(
         new PublicKey(input.agentWallet),
+        new BN(input.escrowNonce ?? 0),
         new BN(input.amount),
       );
       return { txSignature: tx };
@@ -747,6 +753,7 @@ async function executeEscrow(client: SapClient, name: string, input: any) {
         : undefined;
       const tx = await client.escrow.settle(
         new PublicKey(input.depositorWallet),
+        new BN(input.escrowNonce ?? 0),
         new BN(input.callsToSettle),
         input.serviceHash,
         [],
@@ -758,6 +765,7 @@ async function executeEscrow(client: SapClient, name: string, input: any) {
     case "withdrawEscrow": {
       const tx = await client.escrow.withdraw(
         new PublicKey(input.agentWallet),
+        new BN(input.escrowNonce ?? 0),
         new BN(input.amount),
       );
       return { txSignature: tx };
@@ -779,21 +787,24 @@ async function executeEscrow(client: SapClient, name: string, input: any) {
             skipPreflight: input.skipPreflight ?? undefined,
           }
         : undefined;
-      const tx = await client.escrow.settleBatch(
-        new PublicKey(input.depositorWallet),
-        settlements,
-        // batchRoot omitted \u2192 SDK auto-derives sha256(s_0 || ... || s_N)
-        undefined,
-        [],
-        batchOpts,
-      );
-      return { txSignature: tx };
+      const txSignatures = [];
+      for (const settlement of settlements) {
+        txSignatures.push(await client.escrow.settle(
+          new PublicKey(input.depositorWallet),
+          new BN(input.escrowNonce ?? 0),
+          settlement.callsToSettle,
+          settlement.serviceHash,
+          [],
+          batchOpts,
+        ));
+      }
+      return { txSignatures };
     }
 
     case "fetchEscrow": {
       const [agentPda] = deriveAgent(new PublicKey(input.agentWallet));
       const depositor = toPubkey(input.depositor);
-      const data = await client.escrow.fetch(agentPda, depositor);
+      const data = await client.escrow.fetch(agentPda, depositor, new BN(input.escrowNonce ?? 0));
       return serializeAccount(data as unknown as Record<string, unknown>);
     }
 

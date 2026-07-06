@@ -1,10 +1,17 @@
 // ===============================================================
-//  Indexing Module — IDL v0.25.0
+//  Indexing Module — IDL v0.3.0
 //  15 instructions
 // ===============================================================
 
 import { PublicKey, Signer, TransactionInstruction, SystemProgram } from '@solana/web3.js';
 import { Program, BN } from '@coral-xyz/anchor';
+import { TREASURY_WALLET } from '../constants/treasury';
+
+function withTreasury(remainingAccounts: any[] = []): any[] {
+  return remainingAccounts.some((account) => account.pubkey?.equals?.(TREASURY_WALLET))
+    ? remainingAccounts
+    : [{ pubkey: TREASURY_WALLET, isSigner: false, isWritable: true }, ...remainingAccounts];
+}
 
 export class IndexingModule {
   constructor(private program: Program) {}
@@ -32,7 +39,7 @@ export class IndexingModule {
         global: ctx.global,
         indexPage: ctx.indexPage,
       })
-      .remainingAccounts(ctx.remainingAccounts ?? [])
+      .remainingAccounts(withTreasury(ctx.remainingAccounts))
       .signers([ctx.signer])
       .instruction();
   }
