@@ -14,7 +14,7 @@
  * import { SapClient }     from "@synapse-sap/sdk";
  * import { Pool }          from "pg";
  *
- * const pool = new Pool({ connectionString: "postgresql-example" });
+ * const pool = new Pool({ connectionString: process.env.DATABASE_URL });
  * const sap  = SapClient.from(provider);
  * const pg   = new SapPostgres(pool, sap);
  * const sync = new SapSyncEngine(pg, sap);

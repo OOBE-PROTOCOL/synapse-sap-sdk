@@ -22,7 +22,7 @@
 export interface SapPostgresConfig {
   /**
    * PostgreSQL connection string.
-   * @example "postgresql-example"
+   * @example process.env.DATABASE_URL
    */
   readonly connectionString: string;
 

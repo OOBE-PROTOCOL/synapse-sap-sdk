@@ -15,7 +15,7 @@
  * import { SapPostgres } from "@synapse-sap/sdk/postgres";
  * import { Pool } from "pg";
  *
- * const pool = new Pool({ connectionString: "postgresql-example" });
+ * const pool = new Pool({ connectionString: process.env.DATABASE_URL });
  * const pg = new SapPostgres(pool, sapClient);
  *
  * // Run schema migration
