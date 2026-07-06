@@ -210,7 +210,7 @@ export class EscrowV2Module extends BaseModule {
   /**
    * Settle a batch of calls against a V2 escrow.
    *
-   * **v0.3.0 — Atomic DisputeWindow:** when the escrow's
+   * **v1.0.0 — Atomic DisputeWindow:** when the escrow's
    * `settlementSecurity` is `DisputeWindow`, `settleCallsV2` creates the
    * `PendingSettlement` PDA inside the same on-chain instruction. The SDK
    * passes that PDA as a remaining account; the old standalone
@@ -235,7 +235,7 @@ export class EscrowV2Module extends BaseModule {
    * @param coSigner - Required for CoSigned escrows.
    * @returns The transaction signature.
    * @since v0.7.0 — initial release
-   * @since v0.3.0 — creates PendingSettlement atomically on-chain for DisputeWindow
+   * @since v1.0.0 — creates PendingSettlement atomically on-chain for DisputeWindow
    */
   async settle(
     depositorWallet: PublicKey,
@@ -379,7 +379,7 @@ export class EscrowV2Module extends BaseModule {
   }
 
   /**
-   * @deprecated Since SAP 0.3.0. `settleCallsV2` creates the
+   * @deprecated Since SAP 1.0.0. `settleCallsV2` creates the
    * PendingSettlement PDA atomically; call {@link settle}.
    */
   async createPendingSettlement(
@@ -399,7 +399,7 @@ export class EscrowV2Module extends BaseModule {
     void amount;
     void serviceHash;
     throw new Error(
-      "createPendingSettlement is deprecated in SAP 0.3.0. " +
+      "createPendingSettlement is deprecated in SAP 1.0.0. " +
         "Call escrowV2.settle(); settleCallsV2 now initializes the PendingSettlement PDA atomically.",
     );
   }

@@ -1,7 +1,7 @@
 # SNS Skill — Solana Name Service Integration for SAP
 
 > **Version:** 1.0.0  
-> **SDK:** `@synapse-sap/sdk@0.3.0+`  
+> **SDK:** `@synapse-sap/sdk@1.0.0+`  
 > **SNS SDK:** `@bonfida/spl-name-service@3.0.9`  
 > **Principle:** Free choice, strong typing, modularity
 
@@ -25,7 +25,7 @@
 
 ```bash
 # Install SDK
-npm install @synapse-sap/sdk@0.3.0
+npm install @synapse-sap/sdk@1.0.0
 
 # Install CLI (optional)
 npm install -g @oobe-protocol-labs/synapse-sap-cli
@@ -161,7 +161,7 @@ const options: SnsRecordBuilderOptions = {
   
   // Actual data (optional)
   sapData: {                  // SAP structured data
-    version: "0.3.0",
+    version: "1.0.0",
     capabilities: ["jupiter:swap", "kamino:lend"],
     protocols: ["jupiter", "kamino"],
     pricing: {

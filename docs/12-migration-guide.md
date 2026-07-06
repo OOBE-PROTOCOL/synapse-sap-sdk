@@ -1,14 +1,14 @@
-# Migration Guide — v0.12.x to v0.3.0
+# Migration Guide — v0.12.x to v1.0.0
 
-> **SDK Version**: 0.3.0
-> **Program Compatibility**: 0.3.0
+> **SDK Version**: 1.0.0
+> **Program Compatibility**: 1.0.0
 > **Last Updated**: June 8, 2026
 
 ---
 
 ## Breaking Changes
 
-### v0.3.0 — DisputeWindow Via `settle_calls_v2`
+### v1.0.0 — DisputeWindow Via `settle_calls_v2`
 
 **What Changed**: `client.escrowV2.settle()` now derives the `PendingSettlement` PDA and passes it directly to `settle_calls_v2`. The generated `createPendingSettlement` wrapper is deprecated and should not be called in new integrations.
 
@@ -22,7 +22,7 @@ await client.escrowV2.settleCallsV2(agentWallet, nonce, {
 // Then callers attempted to create a pending settlement in a second
 // instruction, which is now deprecated and intentionally omitted.
 
-// ✅ AFTER (v0.3.0)
+// ✅ AFTER (v1.0.0)
 await client.escrowV2.settle(
   depositorWallet,
   nonce,
@@ -125,7 +125,7 @@ const escrow = await client.escrowV2.create(agentWallet, {
 
 ## Production Checklist
 
-### Recommended Defaults (v0.3.0)
+### Recommended Defaults (v1.0.0)
 
 ```typescript
 const escrow = await client.escrowV2.create(agentWallet, {
@@ -167,13 +167,13 @@ const escrow = await client.escrowV2.create(agentWallet, {
 | Forgetting `createPendingSettlement` (pre-v0.13.0) | `ArithmeticOverflow` (6075) | Upgrade to v0.13.0+ (auto-bundle) |
 | `disputeWindowSlots < 2_160` for security=2 | `InvalidSettlementSecurity` | Use >= 2_160 for mainnet |
 | Using `SelfReport` mode | `SelfReportDeprecated` error | Use `DisputeWindow` instead |
-| Node ESM `await import()` | Directory re-export breaks on old SDKs | Upgrade to v0.3.0 and use public imports such as `@oobe-protocol-labs/synapse-sap-sdk/registries` |
+| Node ESM `await import()` | Directory re-export breaks on old SDKs | Upgrade to v1.0.0 and use public imports such as `@oobe-protocol-labs/synapse-sap-sdk/registries` |
 
 ---
 
 ## Code Examples
 
-### Complete Payment Flow (v0.3.0)
+### Complete Payment Flow (v1.0.0)
 
 ```typescript
 import { SapClient } from "@synapse-sap/sdk";
@@ -220,7 +220,7 @@ const finalizeSig = await client.escrowV2.finalizeSettlement(
 console.log("Payment complete:", finalizeSig);
 ```
 
-### Dispute Flow (v0.3.0)
+### Dispute Flow (v1.0.0)
 
 ```typescript
 // Consumer-side: File dispute

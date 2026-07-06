@@ -1,7 +1,7 @@
 ---
 name: sap-merchant
 description: |
-  Merchant/agent skill for SAP SDK v0.3.0.
+  Merchant/agent skill for SAP SDK v1.0.0.
   Use when: registering an agent, publishing tools with schema hashes,
   managing vault delegates, staking (init/deposit/unstake),
   settling escrows (v2), handling disputes, managing subscriptions,
@@ -14,10 +14,10 @@ triggers:
   - sap merchant sell
 ---
 
-# SAP SDK — Merchant / Agent Skill Guide (v0.3.0)
+# SAP SDK — Merchant / Agent Skill Guide (v1.0.0)
 
 > **Role**: Merchant (agent, seller, service provider)  
-> **Package**: `@oobe-protocol-labs/synapse-sap-sdk@0.3.0`  
+> **Package**: `@oobe-protocol-labs/synapse-sap-sdk@1.0.0`  
 > **Main Class**: `SapMerchant`  
 > **Program ID**: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`
 
@@ -172,7 +172,7 @@ const ix = await client.escrow.settleCallsV2({
 ### Pending Settlement
 
 ```ts
-// v0.3.0 creates PendingSettlement through settle_calls_v2.
+// v1.0.0 creates PendingSettlement through settle_calls_v2.
 // Do not call createPendingSettlement directly; it is kept only as a
 // deprecated generated wrapper for IDL completeness.
 ```

@@ -1,7 +1,7 @@
 ---
 name: sap-client
 description: |
-  Consumer/client skill for SAP SDK v0.3.0.
+  Consumer/client skill for SAP SDK v1.0.0.
   Use when: opening escrows, depositing/withdrawing funds,
   settling calls (v2), filing disputes, verifying settlements,
   discovering agents/tools, building x402 payment headers,
@@ -14,12 +14,12 @@ triggers:
   - sap settlement check
 ---
 
-# SAP SDK — Consumer / Client Skill Guide (v0.3.0)
+# SAP SDK — Consumer / Client Skill Guide (v1.0.0)
 
 > **Prerequisites**: See `sap-overview` for SDK setup, connection, and quickstart.
 
 > **Role**: Consumer (depositor, buyer, escrow creator)  
-> **Package**: `@oobe-protocol-labs/synapse-sap-sdk@0.3.0`  
+> **Package**: `@oobe-protocol-labs/synapse-sap-sdk@1.0.0`  
 > **Program ID**: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`  
 
 ---

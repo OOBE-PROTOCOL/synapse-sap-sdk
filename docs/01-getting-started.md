@@ -1,6 +1,6 @@
 # Getting Started
 
-> **SDK Version**: 0.3.0
+> **SDK Version**: 1.0.0
 > Time to first transaction: ~5 minutes.
 
 ## Installation

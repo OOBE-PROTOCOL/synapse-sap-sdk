@@ -7,14 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.3.0] - 2026-07-06
+## [1.0.0] - 2026-07-06
 
 ### Changed
 
-- Aligned CLI package version with SDK `0.3.0`.
-- Updated the CLI SDK dependency range to `^0.3.0`.
+- Aligned CLI package version with SDK `1.0.0`.
+- Updated the CLI SDK dependency range to `^1.0.0`.
 - Updated command banners, help text, README references, and skill metadata to
-  the SAP `0.3.0` commerce release.
+  the SAP `1.0.0` commerce release.
 
 ### Fixed
 

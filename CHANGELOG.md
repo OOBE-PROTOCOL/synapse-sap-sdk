@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.3.0] - 2026-07-06
+## [1.0.0] - 2026-07-06
 
 ### Changed
 - Escrow support is now V2-only in public SDK flows. `client.escrow`,
@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   calling the removed legacy `settle_batch` instruction.
 
 ### Fixed
-- Program and SDK are aligned on version `0.3.0`.
+- Program and SDK are aligned on version `1.0.0`.
 - Aligned all embedded IDL JSON paths with the Anchor-generated program IDL
   (`settle_calls_v2` uses 5 accounts; `create_pending_settlement` uses 4 args).
 - `create_escrow_v2` now supports both native SOL escrows (`tokenMint = null`)
@@ -34,13 +34,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   account automatically for SOL V2 settlements.
 - `EscrowV2Module.settle()` and `x402.settle()` now derive and include the
   treasury ATA automatically for SPL/USDC V2 settlement fees.
-- `agent.close()` now passes `pricingMenu` and `stake`, matching the v0.3.0
+- `agent.close()` now passes `pricingMenu` and `stake`, matching the v1.0.0
   program IDL so closing an agent returns the AgentStake collateral when no
   active escrow obligations remain.
 - Added `staking.closeStake()` as a recovery helper for legacy v0.18 accounts
   whose agent PDA was already closed while the StakePDA remained funded.
 - Removed stale `settlementReceipt` / `receiptMerkleRoot` arguments from V2
-  settlement builders that do not exist in the canonical `0.3.0` IDL.
+  settlement builders that do not exist in the canonical `1.0.0` IDL.
 
 ## [0.21.0] - 2026-06-25
 

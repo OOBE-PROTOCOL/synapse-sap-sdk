@@ -1,27 +1,27 @@
 # x402 Payments
 
-> **SDK Version**: 0.3.0
-> **EscrowV2 Module**: v0.3.0 V2-only settlement
+> **SDK Version**: 1.0.0
+> **EscrowV2 Module**: v1.0.0 V2-only settlement
 
 > **Protocol version guide:**
 > | Feature | Use | Since |
 > |---------|-----|-------|
-> | Escrow creation & settlement | `client.escrowV2` or `client.escrow` V2 alias | SDK v0.3.0 |
-> | **DisputeWindow pending PDA** | `client.escrowV2.settle()` derives and passes it automatically | SDK v0.3.0 |
+> | Escrow creation & settlement | `client.escrowV2` or `client.escrow` V2 alias | SDK v1.0.0 |
+> | **DisputeWindow pending PDA** | `client.escrowV2.settle()` derives and passes it automatically | SDK v1.0.0 |
 > | Receipt batch inscription | `client.receipt.inscribeReceiptBatch()` | SDK v0.8.0 |
 > | Dispute resolution | `client.receipt.autoResolveDispute()` | SDK v0.8.0 |
-> | V1 escrow | Removed from public flows; migrate to V2 | SDK v0.3.0 |
+> | V1 escrow | Removed from public flows; migrate to V2 | SDK v1.0.0 |
 >
 > For the complete payment pipeline see the skill guides:
 > [`skills/client.md §9` (consumer)](./skills/client.md) · [`skills/merchant.md §11` (agent)](./skills/merchant.md)
 
 ---
 
-## EscrowV2 Module — v0.3.0 Settlement Flow
+## EscrowV2 Module — v1.0.0 Settlement Flow
 
 ### DisputeWindow Pending PDA
 
-When `settlementSecurity === DisputeWindow`, `client.escrowV2.settle()` derives the expected `PendingSettlement` PDA and passes it to `settle_calls_v2` as a remaining account. The separate `create_pending_settlement` wrapper is deprecated in 0.3.0.
+When `settlementSecurity === DisputeWindow`, `client.escrowV2.settle()` derives the expected `PendingSettlement` PDA and passes it to `settle_calls_v2` as a remaining account. The separate `create_pending_settlement` wrapper is deprecated in 1.0.0.
 
 **Why**: Pre-v0.13.0, callers had to manually call two instructions in sequence:
 ```typescript
@@ -32,7 +32,7 @@ await client.escrowV2.settleCallsV2(...);        // Step 1
 
 If Step 2 was forgotten or failed, it created an **orphan PendingSettlement** with `escrow.pending_amount = 0`, causing `finalizeSettlement()` to abort with `ArithmeticOverflow` (error 6075).
 
-**New Flow** (v0.3.0):
+**New Flow** (v1.0.0):
 ```typescript
 // ✅ SAFE
 await client.escrowV2.settle(
@@ -110,7 +110,7 @@ x402 turns every agent call into a verifiable financial transaction. No invoices
       └───────────────────────────────────────────┘
 ```
 
-The client side uses `client.x402` (high-level) or `client.escrowV2` / `client.escrow` (V2 low-level alias). The agent side calls `settle` after serving requests; legacy V1 settlement and batch settlement are not public 0.3.0 flows.
+The client side uses `client.x402` (high-level) or `client.escrowV2` / `client.escrow` (V2 low-level alias). The agent side calls `settle` after serving requests; legacy V1 settlement and batch settlement are not public 1.0.0 flows.
 
 ---
 

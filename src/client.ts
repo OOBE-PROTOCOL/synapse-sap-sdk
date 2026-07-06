@@ -1,6 +1,6 @@
 // ================================================================
 //  synapse-sap-sdk / src/client.ts
-//  SapClient v0.3.0 — modular Anchor program wrapper
+//  SapClient v1.0.0 — modular Anchor program wrapper
 // ================================================================
 
 import {

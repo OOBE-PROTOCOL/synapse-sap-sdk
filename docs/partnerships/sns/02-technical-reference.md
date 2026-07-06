@@ -381,7 +381,7 @@ const records = buildSnsRecords({
   
   // SAP data (if you want to expose)
   sapData: {
-    version: "0.3.0",
+    version: "1.0.0",
     capabilities: ["jupiter:swap", "kamino:lend"],
     protocols: ["jupiter", "kamino"],
     pricing: {

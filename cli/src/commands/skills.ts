@@ -11,7 +11,7 @@ import * as os from "os";
 import { log, output } from "../logger.js";
 
 const SKILLS_REPO = "OOBE-PROTOCOL/synapse-sap-sdk";
-const SKILLS_TAG = "v0.3.0-skills";
+const SKILLS_TAG = "v1.0.0-skills";
 const RAW_BASE = `https://raw.githubusercontent.com/${SKILLS_REPO}/${SKILLS_TAG}/skills`;
 
 const DEFAULT_SKILLS = [

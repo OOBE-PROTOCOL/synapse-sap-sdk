@@ -1,5 +1,5 @@
 // ===============================================================
-//  Legacy Memory Types — IDL v0.3.0+
+//  Legacy Memory Types — IDL v1.0.0+
 //  Buffer, Digest, MemoryChunk, MemoryEntry, Plugin types
 // ===============================================================
 

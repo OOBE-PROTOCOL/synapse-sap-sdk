@@ -1,7 +1,7 @@
 ---
 name: sap-nft
 description: |
-  NFT and digital collectibles integration for SAP SDK v0.3.0.
+  NFT and digital collectibles integration for SAP SDK v1.0.0.
   Use when: minting NFTs for agents, Metaplex Core integration,
   NFT-gated access, collectible tool access, NFT royalties with SAP escrows.
 triggers:
@@ -11,10 +11,10 @@ triggers:
   - sap nft gated
 ---
 
-# SAP SDK v0.3.0 — NFT Integration Patterns
+# SAP SDK v1.0.0 — NFT Integration Patterns
 
 > **Level:** Advanced/NFT  
-> **Package:** `@oobe-protocol-labs/synapse-sap-sdk@0.3.0`  
+> **Package:** `@oobe-protocol-labs/synapse-sap-sdk@1.0.0`  
 > **Metaplex Core:** `@metaplex-foundation/mpl-core >= 1.9.0`
 
 ---

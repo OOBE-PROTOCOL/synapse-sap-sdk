@@ -294,7 +294,7 @@ Examples:
     .action(async (opts) => {
       log.info("╔════════════════════════════════════════════════╗");
       log.info("║  SAP MCP Server Configuration Wizard          ║");
-      log.info("║  v0.3.0                                      ║");
+      log.info("║  v1.0.0                                      ║");
       log.info("╚════════════════════════════════════════════════╝");
       
       // Check for existing config

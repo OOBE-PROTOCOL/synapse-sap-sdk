@@ -1,6 +1,6 @@
 /**
  * @module cli/commands/analytics
- * @description Revenue analytics and treasury tracking — v0.3.0 PRO
+ * @description Revenue analytics and treasury tracking — v1.0.0 PRO
  */
 
 import { Command } from "commander";

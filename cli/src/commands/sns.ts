@@ -10,7 +10,7 @@
  * - sns primary <domain> — Set domain as primary
  * - sns records <domain> — Fetch all records
  * 
- * @since v0.3.0
+ * @since v1.0.0
  */
 import { Command } from "commander";
 import { loadConfig } from "../config.js";

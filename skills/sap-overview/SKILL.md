@@ -1,11 +1,11 @@
 ---
 name: sap-overview
 description: |
-  Master reference for the Synapse SAP SDK v0.3.0 on Solana.
+  Master reference for the Synapse SAP SDK v1.0.0 on Solana.
   Covers: 13 instruction modules, 6 registries, typed account parsers,
   PDA derivations, constants, errors, events, and utilities.
   Use for any code generation or agentic orchestration against
-  @oobe-protocol-labs/synapse-sap-sdk@0.3.0.
+  @oobe-protocol-labs/synapse-sap-sdk@1.0.0.
 triggers:
   - synapse sap sdk
   - sap v0.3
@@ -13,12 +13,12 @@ triggers:
   - oobe protocol sdk
 ---
 
-# SAP SDK v0.3.0 — Agent Skill Reference
+# SAP SDK v1.0.0 — Agent Skill Reference
 
 > **Package**: `@oobe-protocol-labs/synapse-sap-sdk`  
-> **Version**: `0.3.0`  
+> **Version**: `1.0.0`  
 > **Program ID**: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`  
-> **IDL**: `v0.3.0` aligned  
+> **IDL**: `v1.0.0` aligned  
 > **Runtime**: Node.js ≥ 18, TypeScript ≥ 5.0  
 
 This skill is the canonical reference for agentic code generation interacting
@@ -179,7 +179,7 @@ await client.escrow.closeEscrowV2({ signer, depositor, escrow, agentStats });
 ### DisputeModule
 
 ```ts
-// Deprecated in v0.3.0: PendingSettlement is created by settle_calls_v2.
+// Deprecated in v1.0.0: PendingSettlement is created by settle_calls_v2.
 // Do not call createPendingSettlement in new integrations.
 await client.dispute.fileDispute({ signer, depositor, escrow, pendingSettlement, dispute, evidenceHash, disputeType });
 await client.dispute.submitAgentEvidence({ signer, wallet, agent, dispute, evidenceHash });
@@ -196,7 +196,7 @@ await client.staking.initStake({ signer, wallet, agent, stake, initialDeposit })
 await client.staking.depositStake({ signer, wallet, agent, stake, amount });
 await client.staking.requestUnstake({ signer, wallet, agent, stake, amount });
 await client.staking.completeUnstake({ signer, wallet, agent, stake });
-// Ledger ops (also under StakingModule in v0.3.0):
+// Ledger ops (also under StakingModule in v1.0.0):
 await client.staking.initLedger({ signer, wallet, agent, vault, session, ledger });
 await client.staking.writeLedger({ signer, wallet, session, vault, agent, ledger, data, contentHash });
 await client.staking.sealLedger({ signer, wallet, session, vault, agent, ledger, page });

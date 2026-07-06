@@ -1,7 +1,7 @@
 ---
 name: sap-defi
 description: |
-  DeFi integration patterns for SAP SDK v0.3.0.
+  DeFi integration patterns for SAP SDK v1.0.0.
   Use when: integrating with Jupiter, Raydium, Orca, Marinade,
   building DeFi agent workflows, yield optimization, liquidity management,
   automated market making with SAP escrows.
@@ -14,10 +14,10 @@ triggers:
   - sap amm
 ---
 
-# SAP SDK v0.3.0 — DeFi Integration Patterns
+# SAP SDK v1.0.0 — DeFi Integration Patterns
 
 > **Level:** Advanced/DeFi  
-> **Package:** `@oobe-protocol-labs/synapse-sap-sdk@0.3.0`  
+> **Package:** `@oobe-protocol-labs/synapse-sap-sdk@1.0.0`  
 > **Treasury:** `J7PyZAGKvprCz4SQ5DKBLAHstJxgVqZcz6kguUoWpP7P`
 
 ---

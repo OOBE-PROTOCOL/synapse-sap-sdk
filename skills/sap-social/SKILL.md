@@ -1,7 +1,7 @@
 ---
 name: sap-social
 description: |
-  Social media and content creator patterns for SAP SDK v0.3.0.
+  Social media and content creator patterns for SAP SDK v1.0.0.
   Use when: creator monetization, subscription content, tipping systems,
   social token gating, influencer affiliate programs.
 triggers:
@@ -12,10 +12,10 @@ triggers:
   - sap influencer
 ---
 
-# SAP SDK v0.3.0 — Social Media Integration
+# SAP SDK v1.0.0 — Social Media Integration
 
 > **Level:** Advanced/Social  
-> **Package:** `@oobe-protocol-labs/synapse-sap-sdk@0.3.0`
+> **Package:** `@oobe-protocol-labs/synapse-sap-sdk@1.0.0`
 
 ---
 

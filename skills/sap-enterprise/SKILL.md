@@ -1,7 +1,7 @@
 ---
 name: sap-enterprise
 description: |
-  Enterprise integration patterns for SAP SDK v0.3.0.
+  Enterprise integration patterns for SAP SDK v1.0.0.
   Use when: B2B service escrows, SLA enforcement, multi-sig approvals,
   enterprise governance, compliance reporting, audit trails.
 triggers:
@@ -12,10 +12,10 @@ triggers:
   - sap audit
 ---
 
-# SAP SDK v0.3.0 — Enterprise Integration Patterns
+# SAP SDK v1.0.0 — Enterprise Integration Patterns
 
 > **Level:** Enterprise/B2B  
-> **Package:** `@oobe-protocol-labs/synapse-sap-sdk@0.3.0`
+> **Package:** `@oobe-protocol-labs/synapse-sap-sdk@1.0.0`
 
 ---
 

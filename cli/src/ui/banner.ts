@@ -1,7 +1,7 @@
 /**
  * @module cli/ui/banner
  * @description Animated ASCII banner for SAP-CLI
- * @since v0.3.0 PRO
+ * @since v1.0.0 PRO
  */
 
 import chalk from 'chalk';
@@ -91,7 +91,7 @@ export async function showAnimatedBanner(
     scheme = 'rainbow',
     speed = 300,
     loops = 2,
-    subtitle = 'v0.3.0 Commerce Edition',
+    subtitle = 'v1.0.0 Commerce Edition',
   } = options;
 
   const colors = COLOR_SCHEMES[scheme];
@@ -147,7 +147,7 @@ ${chalk.hex('#06B6D4').bold(`
 : :: :: : :   : :  :   : :   :   : :  
 `)}
 ${chalk.gray('─'.repeat(60))}
-${chalk.yellow.bold('v0.3.0 Commerce Edition')} ${chalk.gray('|')} ${chalk.green.bold('MAINNET READY')}
+${chalk.yellow.bold('v1.0.0 Commerce Edition')} ${chalk.gray('|')} ${chalk.green.bold('MAINNET READY')}
 ${chalk.gray('─'.repeat(60))}
 ${chalk.dim('Treasury:')} ${chalk.hex('#9333EA')('J7PyZAGKvprCz4SQ5DKBLAHstJxgVqZcz6kguUoWpP7P')}
 ${chalk.dim('Program:')} ${chalk.hex('#06B6D4')('SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ')}

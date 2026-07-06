@@ -1,6 +1,6 @@
 /**
  * @module cli/commands/agent
- * @description Agent lifecycle — v0.3.0 aligned.
+ * @description Agent lifecycle — v1.0.0 aligned.
  * Uses: client.agent.registerAgent(), client.agent.updateAgent(), deactivateAgent(), reactivateAgent()
  * Pdas: getAgentPDA(wallet), getAgentStatsPDA(wallet), getGlobalPDA()
  */

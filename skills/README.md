@@ -1,7 +1,7 @@
-# SAP SDK v0.3.0 — Skills Directory
+# SAP SDK v1.0.0 — Skills Directory
 
 > **Complete collection of specialized skills for Synapse Agent Protocol**  
-> **Version:** 0.3.0  
+> **Version:** 1.0.0  
 > **Treasury:** `J7PyZAGKvprCz4SQ5DKBLAHstJxgVqZcz6kguUoWpP7P`
 
 ---
@@ -33,7 +33,7 @@
 
 ---
 
-## 🌐 SNS Integration Skills (NEW v0.3.0)
+## 🌐 SNS Integration Skills (NEW v1.0.0)
 
 ### 6. **sap-sns** — SNS Domain Registration (Optional)
 - **Use when:** Registering `.sol` domains for SAP agents with automatic identity linkage
@@ -198,7 +198,7 @@
 All skills are included in the SDK:
 
 ```bash
-npm install @oobe-protocol-labs/synapse-sap-sdk@0.3.0
+npm install @oobe-protocol-labs/synapse-sap-sdk@1.0.0
 ```
 
 Skills are located in:

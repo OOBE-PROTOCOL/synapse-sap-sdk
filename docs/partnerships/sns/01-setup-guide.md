@@ -19,7 +19,7 @@ The SNS integration requires the following packages:
 
 ```json
 {
-  "@oobe-protocol-labs/synapse-sap-sdk": "^0.3.0",
+  "@oobe-protocol-labs/synapse-sap-sdk": "^1.0.0",
   "@bonfida/spl-name-service": "^3.0.9",
   "@solana/web3.js": "^1.98.4",
   "@solana/spl-token": "^0.4.14"

@@ -167,7 +167,7 @@ export const deriveAgentStats = (
  * @param programId - Override program ID.
  * @returns {PdaResult} `[pda, bump]` tuple.
  * @category PDA
- * @since v0.3.0
+ * @since v1.0.0
  */
 export const derivePricingMenu = (
   agentPda: PublicKey,
@@ -455,7 +455,7 @@ export const deriveTool = (
  * @returns {PdaResult} `[pda, bump]` tuple.
  * @category PDA
  * @since v0.1.0
- * @deprecated Since v0.3.0 — This is a V2 nonce-0 compatibility alias. Prefer {@link deriveEscrowV2}.
+ * @deprecated Since v1.0.0 — This is a V2 nonce-0 compatibility alias. Prefer {@link deriveEscrowV2}.
  * @see EscrowAccountV2
  */
 export const deriveEscrow = (

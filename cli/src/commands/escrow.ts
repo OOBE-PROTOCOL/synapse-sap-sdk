@@ -1,6 +1,6 @@
 /**
  * @module cli/commands/escrow
- * @description Escrow v2 lifecycle — v0.3.0 aligned.
+ * @description Escrow v2 lifecycle — v1.0.0 aligned.
  * Uses: client.escrow.createEscrowV2, depositEscrowV2, settleCallsV2, closeEscrowV2
  * Pdas: getAgentPDA, getEscrowV2PDA, getAgentStatsPDA, getAgentStakePDA, getGlobalPDA
  */

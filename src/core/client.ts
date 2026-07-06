@@ -124,7 +124,7 @@ export class SapClient {
    * @description Underlying Solana RPC connection used by the provider.
    * @readonly
    * @category Core
-   * @since v0.3.0
+   * @since v1.0.0
    */
   readonly connection: Connection;
 
@@ -133,7 +133,7 @@ export class SapClient {
    * @description SAP program address targeted by this client.
    * @readonly
    * @category Core
-   * @since v0.3.0
+   * @since v1.0.0
    */
   readonly programId: PublicKey;
 
@@ -257,13 +257,13 @@ export class SapClient {
    * @name fromOptions
    * @description Create a client from RPC/connection options. This preserves
    * the legacy `createSapClient(rpcUrl, wallet)` path while returning the
-   * full v0.3.0 client surface.
+   * full v1.0.0 client surface.
    *
    * @param opts - Connection, wallet, commitment, and program ID options.
    * @returns A fully-initialised `SapClient`.
    *
    * @category Core
-   * @since v0.3.0
+   * @since v1.0.0
    */
   static fromOptions(opts: SapClientOpts = {}): SapClient {
     const connection = opts.connection ?? new Connection(

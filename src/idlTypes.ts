@@ -1,4 +1,4 @@
-// Auto-generated from IDL v0.3.0
+// Auto-generated from IDL v1.0.0
 
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";

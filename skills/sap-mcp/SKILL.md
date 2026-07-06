@@ -1,7 +1,7 @@
 ---
 name: sap-mcp
 description: |
-  MCP (Model Context Protocol) server integration for SAP SDK v0.3.0.
+  MCP (Model Context Protocol) server integration for SAP SDK v1.0.0.
   Use when: building MCP servers for AI agents, exposing SAP tools via MCP,
   LLM integration with on-chain actions, AI agent tool servers.
 triggers:
@@ -12,10 +12,10 @@ triggers:
   - sap tool server
 ---
 
-# SAP SDK v0.3.0 — MCP Server Integration
+# SAP SDK v1.0.0 — MCP Server Integration
 
 > **Level:** Advanced/MCP  
-> **Package:** `@oobe-protocol-labs/synapse-sap-sdk@0.3.0`  
+> **Package:** `@oobe-protocol-labs/synapse-sap-sdk@1.0.0`  
 > **MCP:** Model Context Protocol
 
 ---
@@ -41,7 +41,7 @@ class SAPMCPServer {
     this.server = new Server(
       {
         name: 'synapse-sap-mcp',
-        version: '0.3.0',
+        version: '1.0.0',
       },
       {
         capabilities: {
@@ -235,7 +235,7 @@ class SAPMCPClient {
   constructor() {
     this.client = new Client({
       name: 'sap-mcp-client',
-      version: '0.3.0',
+      version: '1.0.0',
     });
   }
   

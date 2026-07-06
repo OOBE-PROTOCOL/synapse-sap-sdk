@@ -1,5 +1,5 @@
 // ===============================================================
-//  Dispute Module — IDL v0.3.0
+//  Dispute Module — IDL v1.0.0
 //  6 instructions
 // ===============================================================
 
@@ -56,7 +56,7 @@ export class DisputeModule {
   /** create_pending_settlement (5 accounts, 4 args) */
   async createPendingSettlement(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; escrow: PublicKey; pendingSettlement: PublicKey; settlementIndex: BN; callsToSettle: BN; amount: BN; serviceHash: number[]; remainingAccounts?: any[] }): Promise<TransactionInstruction> {
     void ctx;
-    throw new Error("createPendingSettlement is deprecated in SAP 0.3.0; pass the pending PDA to settleCallsV2 remainingAccounts.");
+    throw new Error("createPendingSettlement is deprecated in SAP 1.0.0; pass the pending PDA to settleCallsV2 remainingAccounts.");
   }
 
   /** file_dispute (5 accounts, 2 args) */

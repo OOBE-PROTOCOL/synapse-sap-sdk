@@ -470,7 +470,7 @@ export interface ToolDescriptorData {
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * @deprecated Since v0.3.0 — Escrow V1 is removed from active SDK/program
+ * @deprecated Since v1.0.0 — Escrow V1 is removed from active SDK/program
  * flows. This compatibility name resolves to {@link EscrowAccountV2Data}.
  */
 export type EscrowAccountData = EscrowAccountV2Data;

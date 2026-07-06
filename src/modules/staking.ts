@@ -177,7 +177,7 @@ export class StakingModule extends BaseModule {
   /**
    * Close a legacy stake account after its agent PDA has already been closed.
    *
-   * Normal v0.3.0 agent closure returns stake automatically via `agent.close()`.
+   * Normal v1.0.0 agent closure returns stake automatically via `agent.close()`.
    * This helper exists for v0.18-era accounts where the agent was closed while
    * the permanent collateral floor stayed in the StakePDA.
    */

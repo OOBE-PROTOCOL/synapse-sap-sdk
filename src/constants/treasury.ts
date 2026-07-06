@@ -9,7 +9,7 @@
  * - Featured listings (1 SOL)
  * 
  * @category Constants
- * @since v0.3.0
+ * @since v1.0.0
  */
 
 import { PublicKey } from "@solana/web3.js";
