@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.1] - 2026-07-06
+
+Emergency patch aligned with SDK `1.0.1`.
+
+### Fixed
+
+- CLI dependency now targets `@oobe-protocol-labs/synapse-sap-sdk@^1.0.1`.
+- Keeps `agent close` and `agent close-stake` available for normal agent
+  closure and legacy closed-agent StakePDA recovery.
+
+### Validation
+
+- Verified CLI build.
+- `npm pack --dry-run` must be run against `1.0.1` before publish.
+
 ## [1.0.0] - 2026-07-06
 
 First official stable release of the SAP CLI, aligned with SDK `1.0.0`.

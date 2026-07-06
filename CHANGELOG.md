@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.1] - 2026-07-06
+
+Emergency patch for the npm `1.0.0` package.
+
+### Fixed
+- Rebuilt and republished the SDK with the corrected legacy `Pdas` export
+  surface. The npm `1.0.0` tarball still exposed stale `getEscrowV2PDA(agent,
+  nonce)` and placeholder `hashString()` behavior even though the repo/tag had
+  already been corrected.
+- `Pdas.getEscrowV2PDA()` now uses the canonical V2 seed shape:
+  `sap_escrow_v2(agent, depositor, nonce_u64_le)`.
+- `Pdas.getAgentStakePDA()` delegates to the canonical `deriveStake(agent)`
+  helper.
+- `Pdas.hashString()` now returns real SHA-256 output instead of a zero-filled
+  placeholder.
+- CLI package dependency now targets SDK `^1.0.1`.
+
+### Validation
+- SDK build passed.
+- CLI build passed.
+- SDK smoke tests passed.
+- `npm pack --dry-run` must be run against `1.0.1` before publish.
+
 ## [1.0.0] - 2026-07-06
 
 First official stable release of the SAP SDK.
