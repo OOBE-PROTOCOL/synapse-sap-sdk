@@ -28,6 +28,10 @@ Emergency patch for the npm `1.0.0` package.
 - SDK build passed.
 - CLI build passed.
 - SDK smoke tests passed.
+- Added and passed `npm run verify:release`, which packs SDK/CLI tarballs,
+  installs them in a temporary consumer project, verifies CJS/ESM imports,
+  checks IDL account shapes, checks canonical PDA derivations, checks CLI
+  commands, and scans release refs for secret-like strings.
 - `npm pack --dry-run` must be run against `1.0.1` before publish.
 
 ## [1.0.0] - 2026-07-06

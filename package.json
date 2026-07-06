@@ -163,6 +163,7 @@
     "postbuild": "node scripts/fix-esm-imports.js",
     "clean": "rm -rf dist",
     "test": "vitest",
+    "verify:release": "node scripts/verify-release.mjs",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\""
   },
