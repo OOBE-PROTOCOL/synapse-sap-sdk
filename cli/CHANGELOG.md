@@ -9,12 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2026-07-06
 
+First official stable release of the SAP CLI, aligned with SDK `1.0.0`.
+
+### Added
+
+- Stable CLI release metadata for npm and GitHub release consumers.
+- Help text and banners aligned to the SAP `1.0.0` commerce release.
+
 ### Changed
 
 - Aligned CLI package version with SDK `1.0.0`.
 - Updated the CLI SDK dependency range to `^1.0.0`.
-- Updated command banners, help text, README references, and skill metadata to
-  the SAP `1.0.0` commerce release.
+- Updated README references and command metadata to the SAP `1.0.0` release.
 
 ### Fixed
 

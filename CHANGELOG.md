@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2026-07-06
 
+First official stable release of the SAP SDK.
+
+This release promotes the validated SAP commerce SDK to `1.0.0` for npm and
+GitHub release consumers, while preserving the canonical deployed program
+layout that integrators already smoke-tested on devnet/mainnet.
+
+### Added
+- Canonical SDK, CLI, docs, skills, and embedded IDL metadata aligned to
+  `1.0.0`.
+- `staking.closeStake()` recovery helper for legacy accounts whose agent PDA
+  was already closed while the StakePDA remained funded.
+
 ### Changed
 - Escrow support is now V2-only in public SDK flows. `client.escrow`,
   `x402.preparePayment()`, `x402.addFunds()`, `x402.withdrawFunds()`,
@@ -37,10 +49,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `agent.close()` now passes `pricingMenu` and `stake`, matching the v1.0.0
   program IDL so closing an agent returns the AgentStake collateral when no
   active escrow obligations remain.
-- Added `staking.closeStake()` as a recovery helper for legacy v0.18 accounts
-  whose agent PDA was already closed while the StakePDA remained funded.
 - Removed stale `settlementReceipt` / `receiptMerkleRoot` arguments from V2
   settlement builders that do not exist in the canonical `1.0.0` IDL.
+- Sanitized release history and package docs so no secret-like OpenVSX,
+  Postgres, or private RPC strings are reachable from release refs.
+
+### Validation
+- SDK build passed.
+- CLI build passed.
+- SDK smoke tests passed.
+- `npm pack --dry-run` produced `@oobe-protocol-labs/synapse-sap-sdk@1.0.0`.
+- `npm pack --dry-run` produced `synapse-sap-cli@1.0.0`.
+- Verified all embedded SDK IDL JSON files expose `metadata.version = 1.0.0`.
 
 ## [0.21.0] - 2026-06-25
 
