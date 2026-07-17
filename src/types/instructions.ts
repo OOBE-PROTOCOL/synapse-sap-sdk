@@ -424,18 +424,26 @@ export type CompressionTypeValue =
  * @since v0.5.0
  */
 export interface CreateEscrowV2Args {
+  /** Escrow nonce; defaults to 0 in high-level helpers. */
   readonly escrowNonce: BN;
+  /** Price per call in the smallest unit of the escrow token. */
   readonly pricePerCall: BN;
   readonly maxCalls: BN;
+  /** Initial deposit in the smallest unit of the escrow token. */
   readonly initialDeposit: BN;
   readonly expiresAt: BN;
   readonly volumeCurve: VolumeCurveBreakpoint[];
+  /** SPL token mint, or null for native SOL. */
   readonly tokenMint: PublicKey | null;
+  /** Token decimals: 9 for SOL, 6 for USDC. */
   readonly tokenDecimals: number;
-  /** 0=SelfReport, 1=CoSigned, 2=DisputeWindow */
+  /** 1=CoSigned, 2=DisputeWindow. 0=SelfReport is deprecated and rejected. */
   readonly settlementSecurity: number;
+  /** Required when settlementSecurity=2. */
   readonly disputeWindowSlots: BN;
+  /** Required when settlementSecurity=1. */
   readonly coSigner: PublicKey | null;
+  /** Reserved for IDL compatibility. */
   readonly arbiter: PublicKey | null;
 }
 

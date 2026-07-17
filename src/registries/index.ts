@@ -56,6 +56,8 @@ export type {
   EscrowBalance,
   SettlementResult,
   BatchSettlementResult,
+  X402EscrowLookupOptions,
+  X402SettleOptions,
   SettleOptions,
 } from "./x402";
 

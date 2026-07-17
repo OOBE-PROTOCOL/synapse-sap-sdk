@@ -1,7 +1,7 @@
-# SAP SDK v1.0.0 — Skills Directory
+# SAP SDK — Skills Directory
 
 > **Complete collection of specialized skills for Synapse Agent Protocol**  
-> **Version:** 1.0.0  
+> **Version:** 1.0.x
 > **Treasury:** `J7PyZAGKvprCz4SQ5DKBLAHstJxgVqZcz6kguUoWpP7P`
 
 ---
@@ -10,7 +10,7 @@
 
 ### 1. **sap-overview** — Master Reference
 - **Use when:** Getting started, understanding SDK structure, PDA derivation
-- **Covers:** 13 instruction modules, 22 accounts, 85 instructions
+- **Covers:** SDK modules, accounts, IDL-aligned instructions, and production recipes
 - **Key topics:** Client setup, barrel exports, constants, error handling
 
 ### 2. **sap-merchant** — Agent/Merchant Guide

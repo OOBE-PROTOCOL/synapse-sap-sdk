@@ -5,7 +5,7 @@ description: |
   Covers: 13 instruction modules, 6 registries, typed account parsers,
   PDA derivations, constants, errors, events, and utilities.
   Use for any code generation or agentic orchestration against
-  @oobe-protocol-labs/synapse-sap-sdk@1.0.0.
+  @oobe-protocol-labs/synapse-sap-sdk.
 triggers:
   - synapse sap sdk
   - sap v0.3
@@ -13,10 +13,10 @@ triggers:
   - oobe protocol sdk
 ---
 
-# SAP SDK v1.0.0 — Agent Skill Reference
+# SAP SDK — Agent Skill Reference
 
 > **Package**: `@oobe-protocol-labs/synapse-sap-sdk`  
-> **Version**: `1.0.0`  
+> **Version**: `1.0.x`
 > **Program ID**: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`  
 > **IDL**: `v1.0.0` aligned  
 > **Runtime**: Node.js ≥ 18, TypeScript ≥ 5.0  
@@ -101,6 +101,15 @@ Lazy-loaded modules (instruction wrappers):
 ## 4. PDA Derivation (`pdas` subpath)
 
 All functions return `[PublicKey, number]` (address, bump).
+
+Start SAP / agent bootstrap:
+1. Load the relevant role skill before generating code.
+2. Inspect exact SDK or MCP schemas before calling tools.
+3. Never assume a fixed tool count.
+4. Never guess wallet or keypair paths.
+5. Prefer canonical fields: `wallet`, `category`, `nonce`, `tokenMint`, `tokenDecimals`, `settlementSecurity`, `disputeWindowSlots`, `coSigner`, `arbiter`, `expiresAt`.
+
+Valid tool category values: `Swap`, `Lend`, `Stake`, `Nft`, `Payment`, `Data`, `Governance`, `Bridge`, `Analytics`, `Custom`.
 
 ```ts
 import {
@@ -267,7 +276,7 @@ import {
 } from '@oobe-protocol-labs/synapse-sap-sdk/accounts';
 ```
 
-These are **hand-written, byte-level parsers** aligned to the v0.25 IDL
+These are **hand-written, byte-level parsers** aligned to the embedded SDK IDL
 layout (discriminator-first). Use them when you need raw account data
 without Anchor's `program.account.*.fetch()` overhead.
 
@@ -332,9 +341,9 @@ import {
 
 ## 13. Pitfalls & Breaking Changes from Old SDK Versions
 
-1. **Old module names removed** — `EscrowModule` in v0.14 wraps ONLY v2
+1. **Old module names removed** — `EscrowModule` wraps ONLY v2
    instructions (`createEscrowV2`, `settleCallsV2`, etc.). The v1 escrow
-   (`createEscrow`, `settleCalls`) was removed from the program at v0.25.
+   (`createEscrow`, `settleCalls`) was removed from the program.
    Do NOT generate code with `client.escrow.create()` or `createEscrow`.
 
 2. **Package name** — Always `@oobe-protocol-labs/synapse-sap-sdk`.

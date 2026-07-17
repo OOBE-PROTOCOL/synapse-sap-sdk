@@ -107,8 +107,8 @@ async function sendTip(
     volumeCurve: [],
     tokenMint: null,
     tokenDecimals: 9,
-    settlementSecurity: 0,
-    disputeWindowSlots: new BN(0),
+    settlementSecurity: 2,
+    disputeWindowSlots: new BN(2160),
     coSigner: null,
     arbiter: null,
   });

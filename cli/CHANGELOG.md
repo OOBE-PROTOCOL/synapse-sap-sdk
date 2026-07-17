@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.2] - 2026-07-17
+
+Patch release aligned with SDK `1.0.2` and SAP program v2.
+
+### Changed
+
+- CLI dependency now targets `@oobe-protocol-labs/synapse-sap-sdk@^1.0.2`.
+- `escrow create` exposes V2 params for nonce, token decimals, settlement
+  security, dispute window, co-signer, and arbiter.
+
+### Fixed
+
+- `escrow create` defaults to DisputeWindow instead of deprecated SelfReport.
+- `escrow create`, `deposit`, and `settle` include the SPL token accounts
+  required for USDC escrows.
+- `escrow settle` derives escrow by depositor and nonce, includes treasury
+  accounts, passes pending PDA for DisputeWindow, and sends a 32-byte
+  `serviceHash`.
+- Removed remaining CommonJS `require()` usage from ESM CLI files so CLI lint
+  exits successfully.
+
+### Validation
+
+- CLI typecheck passed.
+- CLI lint passed with 0 errors.
+- CLI build passed.
+- Covered by SDK `npm run verify:release`.
+
 ## [1.0.1] - 2026-07-06
 
 Emergency patch aligned with SDK `1.0.1`.

@@ -9,7 +9,7 @@ const root = process.cwd();
 const require = createRequire(import.meta.url);
 const pkg = require(resolve(root, "package.json"));
 const expectedSdkVersion = pkg.version;
-const expectedCliVersion = "1.0.1";
+const expectedCliVersion = "1.0.2";
 const expectedProgramVersion = "1.0.0";
 
 const checks = [];
@@ -150,7 +150,17 @@ function verifyConsumerInstall(sdkTarball, cliTarball) {
 function verifyNoSecretPatterns() {
   const patterns = ["sk_live_", "OpenVSX", "OPENVSX", "openvsx", "ovsx_", "postgresql://", "postgres://"];
   for (const pattern of patterns) {
-    const res = spawnSync("git", ["grep", "-I", "-n", "-e", pattern, "HEAD", "--", "."], {
+    const res = spawnSync("git", [
+      "grep",
+      "-I",
+      "-n",
+      "-e",
+      pattern,
+      "HEAD",
+      "--",
+      ".",
+      ":!scripts/verify-release.mjs",
+    ], {
       cwd: root,
       encoding: "utf8",
       maxBuffer: 10 * 1024 * 1024,

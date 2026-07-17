@@ -7,6 +7,7 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import { spawn } from 'child_process';
+import { createInterface } from 'readline';
 
 // ═══════════════════════════════════════════════════════════════════
 //  ASCII Banner
@@ -145,7 +146,7 @@ export async function showMenu(options: MenuOptions): Promise<string> {
   
   // Simple menu selection (for now — can be enhanced with inquirer)
   return new Promise((resolve) => {
-    const readline = require('readline').createInterface({
+    const readline = createInterface({
       input: process.stdin,
       output: process.stdout,
     });

@@ -1,625 +1,136 @@
 # x402 Payments
 
-> **SDK Version**: 1.0.0
-> **EscrowV2 Module**: v1.0.0 V2-only settlement
+SDK: `@oobe-protocol-labs/synapse-sap-sdk`
+Program: `SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ`
 
-> **Protocol version guide:**
-> | Feature | Use | Since |
-> |---------|-----|-------|
-> | Escrow creation & settlement | `client.escrowV2` or `client.escrow` V2 alias | SDK v1.0.0 |
-> | **DisputeWindow pending PDA** | `client.escrowV2.settle()` derives and passes it automatically | SDK v1.0.0 |
-> | Receipt batch inscription | `client.receipt.inscribeReceiptBatch()` | SDK v0.8.0 |
-> | Dispute resolution | `client.receipt.autoResolveDispute()` | SDK v0.8.0 |
-> | V1 escrow | Removed from public flows; migrate to V2 | SDK v1.0.0 |
->
-> For the complete payment pipeline see the skill guides:
-> [`skills/client.md §9` (consumer)](./skills/client.md) · [`skills/merchant.md §11` (agent)](./skills/merchant.md)
+SAP uses Escrow V2 for agent commerce. V1 escrow instructions are not public 1.x flows and should not appear in new examples.
 
----
+Amounts are always in the smallest unit of the escrow token:
+- SOL: lamports
+- USDC: micro-USDC
 
-## EscrowV2 Module — v1.0.0 Settlement Flow
+## Escrow V2 Parameters
 
-### DisputeWindow Pending PDA
+`client.x402.preparePayment()` exposes the V2 fields used by the on-chain program:
 
-When `settlementSecurity === DisputeWindow`, `client.escrowV2.settle()` derives the expected `PendingSettlement` PDA and passes it to `settle_calls_v2` as a remaining account. The separate `create_pending_settlement` wrapper is deprecated in 1.0.0.
+| Field | Meaning |
+|---|---|
+| `nonce` | Escrow nonce. Defaults to `0`. |
+| `pricePerCall` | Price per call in the smallest token unit. |
+| `maxCalls` | Maximum funded calls, or `0` for unlimited. |
+| `deposit` | Initial deposit in the smallest token unit. |
+| `expiresAt` | Unix timestamp, or `0` for no expiry. |
+| `volumeCurve` | Optional price curve. |
+| `tokenMint` | `null` for SOL, USDC mint for USDC. |
+| `tokenDecimals` | `9` for SOL, `6` for USDC. |
+| `settlementSecurity` | `1` for CoSigned, `2` for DisputeWindow. Never default to `0`. |
+| `disputeWindowSlots` | Required for DisputeWindow. |
+| `coSigner` | Required for CoSigned. |
+| `arbiter` | Reserved/optional IDL field. |
 
-**Why**: Pre-v0.13.0, callers had to manually call two instructions in sequence:
-```typescript
-// ❌ OLD — ERROR PRONE / DEPRECATED
-await client.escrowV2.settleCallsV2(...);        // Step 1
-// Step 2 used to create a pending settlement manually and was often forgotten.
-```
+`settlementSecurity=0` / SelfReport is deprecated and rejected by the SDK before signing.
 
-If Step 2 was forgotten or failed, it created an **orphan PendingSettlement** with `escrow.pending_amount = 0`, causing `finalizeSettlement()` to abort with `ArithmeticOverflow` (error 6075).
+## USDC-First Commerce Example
 
-**New Flow** (v1.0.0):
-```typescript
-// ✅ SAFE
-await client.escrowV2.settle(
-  depositorWallet,
-  nonce,
-  10,
-  serviceHash,
-);
-// The SDK fetches escrow state and includes treasury / USDC ATA / pending PDA
-// remaining accounts as required.
-```
+```ts
+import { AnchorProvider } from "@coral-xyz/anchor";
+import { PublicKey } from "@solana/web3.js";
+import {
+  SapClient,
+  USDC_MINT_MAINNET,
+} from "@oobe-protocol-labs/synapse-sap-sdk";
 
-### nextSettlementIndex Helper (v0.12.8)
+const client = SapClient.from(AnchorProvider.env());
+const agentWallet = new PublicKey(process.env.SAP_AGENT_WALLET!);
 
-**Problem**: Using `escrow.settlementIndex` directly causes `Allocate: account already in use` errors.
-
-**Solution**: Use the helper:
-```typescript
-const index = await client.escrowV2.nextSettlementIndex(
-  agentWallet,
-  depositorWallet,
-  nonce
-);
-
-await client.escrowV2.finalizeSettlement(
-  agentWallet,
-  depositorWallet,
-  nonce,
-  index
-);
-```
-
-### finalizeSettlement Preflight (v0.12.9)
-
-**Safety Check**: Pre-flight validation detects orphan settlements before signing:
-```typescript
-// Throws clear error if pending PDA missing or amount mismatch
-await client.escrowV2.finalizeSettlement(...);
-```
-
-**Error Messages**:
-- `"pending PDA not found"` → Settlement index incorrect, use `nextSettlementIndex()`
-- `"amount exceeds pending"` → Orphan settlement, recovery path required
-- `"already finalized"` → Already completed, nothing to do
-
----
-
-## How x402 Works
-
-x402 turns every agent call into a verifiable financial transaction. No invoices, no subscriptions — just an on-chain escrow that settles per-call (or in batches) with cryptographic proof of service.
-
-```
-┌────────────┐                              ┌────────────┐
-│   Client   │                              │   Agent    │
-└─────┬──────┘                              └─────┬──────┘
-      │                                           │
-      │  1. Discover pricing (agent.pricing)      │
-      │  ─────────────────────────────────────►   │
-      │                                           │
-      │  2. Create V2 escrow + deposit funds      │
-      │  ─── createEscrowV2 (on-chain TX) ────►   │
-      │                                           │
-      │  3. Call agent with x402 headers          │
-      │  ─── X-Payment-Escrow, X-Payment-*─────►  │
-      │                                           │
-      │  4. Agent serves the request              │
-      │  ◄──────── response payload ────────────  │
-      │                                           │
-      │  5. Agent settles on-chain                │
-      │       settleCallsV2 (on-chain TX)         │
-      │  ◄── PaymentSettledEvent emitted ───────  │
-      │                                           │
-      │  6. Client verifies settlement TX         │
-      │  ─── getParsedTransaction ────────────►   │
-      └───────────────────────────────────────────┘
-```
-
-The client side uses `client.x402` (high-level) or `client.escrowV2` / `client.escrow` (V2 low-level alias). The agent side calls `settle` after serving requests; legacy V1 settlement and batch settlement are not public 1.0.0 flows.
-
----
-
-## X402Registry — High-Level Orchestration
-
-Access via `client.x402`. This registry wraps the full payment lifecycle into a developer-friendly API.
-
-### Estimate Cost
-
-Before committing funds, estimate how much N calls will cost — including volume-curve discounts:
-
-```typescript
-const estimate = await client.x402.estimateCost(agentWallet, 100);
-
-console.log(estimate.totalCost.toString());        // total in lamports
-console.log(estimate.effectivePricePerCall.toString()); // weighted average
-console.log(estimate.hasVolumeCurve);               // true if tiered
-console.log(estimate.tiers);                        // per-tier breakdown
-```
-
-**`CostEstimate` fields:**
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `totalCost` | `BN` | Total cost in smallest token unit |
-| `calls` | `number` | Number of calls estimated |
-| `effectivePricePerCall` | `BN` | Weighted average price per call |
-| `hasVolumeCurve` | `boolean` | Whether volume-curve tiers applied |
-| `tiers` | `Array<{ calls, pricePerCall, subtotal }>` | Per-tier cost breakdown |
-
-You can also skip the on-chain fetch and provide pricing directly:
-
-```typescript
-const estimate = client.x402.calculateCost(
-  new BN(100_000),  // basePrice
-  [{ afterCalls: 50, pricePerCall: new BN(80_000) }],  // volumeCurve
-  0,   // totalCallsBefore
-  100, // calls
-);
-```
-
-### Prepare Payment
-
-Creates an escrow and deposits funds in a single transaction. Returns a `PaymentContext` used to build HTTP headers:
-
-```typescript
 const ctx = await client.x402.preparePayment(agentWallet, {
-  pricePerCall: 1_000,          // lamports per call
-  maxCalls: 500,                // 0 = unlimited
-  deposit: 500_000,             // initial deposit (lamports)
-  expiresAt: 0,                 // 0 = never expires
-  volumeCurve: [
-    { afterCalls: 100, pricePerCall: 800 },
-    { afterCalls: 300, pricePerCall: 600 },
-  ],
+  nonce: 0,
+  tokenMint: USDC_MINT_MAINNET,
+  tokenDecimals: 6,
+  pricePerCall: 10_000,       // 0.01 USDC, in micro-USDC
+  maxCalls: 100,
+  deposit: 1_000_000,         // 1 USDC, in micro-USDC
+  settlementSecurity: 2,      // DisputeWindow
+  disputeWindowSlots: 2_160,
+  coSigner: null,
+  arbiter: null,
+  expiresAt: 0,
 });
 
-console.log(ctx.escrowPda.toBase58());   // escrow account address
-console.log(ctx.txSignature);            // creation TX
+const headers = client.x402.buildPaymentHeaders(ctx);
 ```
 
-**`PreparePaymentOptions`:**
+For SOL, use `tokenMint: null`, `tokenDecimals: 9`, and lamport amounts.
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `pricePerCall` | `number \| string \| BN` | — | Base price per call |
-| `maxCalls` | `number \| string \| BN` | `0` | Max calls (0 = unlimited) |
-| `deposit` | `number \| string \| BN` | — | Initial deposit amount |
-| `expiresAt` | `number \| string \| BN` | `0` | Unix timestamp (0 = never) |
-| `volumeCurve` | `Array<{ afterCalls, pricePerCall }>` | `[]` | Volume discount breakpoints |
-| `tokenMint` | `PublicKey \| null` | `null` | SPL token mint (null = SOL) |
-| `tokenDecimals` | `number` | `9` | Token decimal places |
+## Settlement
 
-### Build Payment Headers
+Agents settle served calls through V2:
 
-Once you have a `PaymentContext`, generate the HTTP headers to include in every request to the agent:
+```ts
+const receipt = await client.x402.settle(depositorWallet, 5, servicePayloadHash, {
+  nonce: 0,
+  priorityFeeMicroLamports: 5_000,
+  computeUnits: 100_000,
+});
+```
 
-```typescript
-const headers = client.x402.buildPaymentHeaders(ctx);
+The SDK includes the treasury account automatically for SOL fees and the treasury ATA automatically for USDC fees.
 
-// Use with any HTTP client
-const response = await fetch(agentEndpoint, {
+For `DisputeWindow`, `settle_calls_v2` creates the `PendingSettlement` PDA atomically. Do not call the old standalone pending-settlement recipe in new integrations.
+
+## Hosted SAP MCP Paid Tools
+
+Hosted SAP MCP paid tool calls are MCP tool calls. Use the MCP schema exactly:
+
+```ts
+await mcp.callTool("sap_payments_call_paid_tool", {
+  wallet: payerWallet,
+  toolName: "swap_quote",
+  input: { inMint, outMint, amount },
+});
+```
+
+This flow is for SAP MCP-hosted paid tools only.
+
+## Generic HTTP x402 Endpoints
+
+Generic HTTP x402 endpoints use a separate HTTP challenge/sign/retry flow:
+
+```ts
+const challengeRes = await fetch(endpoint, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(input),
+});
+
+if (challengeRes.status !== 402) {
+  throw new Error(`Expected HTTP 402 challenge, got ${challengeRes.status}`);
+}
+
+const challenge = await challengeRes.json();
+const signature = await signChallengeLocally(challenge, wallet);
+
+const paidRes = await fetch(endpoint, {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    ...headers,
+    "PAYMENT-SIGNATURE": signature,
   },
-  body: JSON.stringify({ prompt: "Analyze SOL/USDC liquidity" }),
-});
-```
-
-You can also build headers directly from an existing escrow (fetches on-chain):
-
-```typescript
-const headers = await client.x402.buildPaymentHeadersFromEscrow(agentWallet);
-```
-
-### X402Headers Structure
-
-Every x402 request carries these headers:
-
-| Header | Value | Description |
-|--------|-------|-------------|
-| `X-Payment-Protocol` | `"SAP-x402"` | Protocol identifier |
-| `X-Payment-Escrow` | Base58 address | Escrow PDA address |
-| `X-Payment-Agent` | Base58 address | Agent PDA address |
-| `X-Payment-Depositor` | Base58 address | Client wallet address |
-| `X-Payment-MaxCalls` | Numeric string | Max calls allowed |
-| `X-Payment-PricePerCall` | Numeric string | Price per call |
-| `X-Payment-Program` | Base58 address | SAP Program ID |
-| `X-Payment-Network` | Cluster name | `"mainnet-beta"`, `"devnet"`, etc. |
-
-### Settle Calls (Agent Side)
-
-After serving requests, the agent settles to claim payment. The service data is auto-hashed to a 32-byte SHA-256 digest:
-
-```typescript
-const receipt = await client.x402.settle(
-  depositorWallet,    // client who funded the escrow
-  5,                  // number of calls to settle
-  "service-data-v1", // arbitrary service data (hashed on-chain)
-);
-
-console.log(receipt.txSignature);
-console.log(receipt.callsSettled);   // 5
-console.log(receipt.amount.toString()); // total lamports transferred
-console.log(receipt.serviceHash);    // [u8; 32]
-```
-
-**`SettlementResult` fields:**
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `txSignature` | `TransactionSignature` | Settlement TX |
-| `callsSettled` | `number` | Calls settled in this TX |
-| `amount` | `BN` | Lamports / tokens transferred |
-| `serviceHash` | `number[]` | SHA-256 of service data |
-
-### Batch Settlement
-
-Settle up to 10 service records in a single transaction. More gas-efficient than individual settlements:
-
-```typescript
-const batch = await client.x402.settleBatch(depositorWallet, [
-  { calls: 3, serviceData: "batch-1-data" },
-  { calls: 7, serviceData: "batch-2-data" },
-  { calls: 2, serviceData: "batch-3-data" },
-]);
-
-console.log(batch.totalCalls);       // 12
-console.log(batch.totalAmount.toString());
-console.log(batch.settlementCount);  // 3
-```
-
-> **v0.12.5 — settleBatch auto-CU + resolver fix**
->
-> Both `client.x402.settleBatch` and `client.escrow.settleBatch` now:
-> - Bypass Anchor's recursive PDA resolver via `.accountsPartial(...)`. This
->   eliminates the `Reached maximum depth for account resolution` error
->   triggered by the v0.10 `settle_batch` IDL (where `escrow` and
->   `settlement_receipt` are seeded on each other and on a TX argument).
-> - Auto-inject a `setComputeUnitLimit` based on entry count using
->   `computeBatchSettleCu(n)` (`60_000 + n * 25_000`, capped 1.2M CU).
->   The default Solana cap of 200k overflows past ~8 entries; the SDK now
->   sets a tight ceiling for free (CU limit doesn't add lamports).
-> - The hard on-chain cap is still **10 settlements per TX** (program
->   `require!(settlements.len() <= 10)`). Pass `opts.computeUnits` to override
->   the auto-sized value.
-
-### Get Balance
-
-Check the current escrow state — balance, remaining calls, expiry, and affordability:
-
-```typescript
-const balance = await client.x402.getBalance(agentWallet);
-
-if (balance) {
-  console.log(balance.balance.toString());       // current balance
-  console.log(balance.totalDeposited.toString()); // lifetime deposits
-  console.log(balance.totalSettled.toString());   // lifetime settlements
-  console.log(balance.callsRemaining);            // remaining calls
-  console.log(balance.isExpired);                 // expiry check
-  console.log(balance.affordableCalls);           // calls budget allows
-}
-```
-
-**`EscrowBalance` fields:**
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `balance` | `BN` | Current remaining balance |
-| `totalDeposited` | `BN` | Cumulative deposits |
-| `totalSettled` | `BN` | Cumulative settlements |
-| `totalCallsSettled` | `BN` | Lifetime calls settled |
-| `callsRemaining` | `number` | `min(maxCalls - settled, affordableCalls)` |
-| `isExpired` | `boolean` | Whether the escrow has expired |
-| `affordableCalls` | `number` | `floor(balance / pricePerCall)` |
-
-You can also check a specific depositor:
-
-```typescript
-const balance = await client.x402.getBalance(agentWallet, specificDepositor);
-```
-
-### Verify Settlement
-
-Parse a settlement transaction to extract emitted events:
-
-```typescript
-const events = await client.x402.verifySettlement(txSignature);
-```
-
-### Additional Helpers
-
-```typescript
-// Add more funds to an existing escrow
-await client.x402.addFunds(agentWallet, 50_000);
-
-// Withdraw unused funds
-await client.x402.withdrawFunds(agentWallet, 25_000);
-
-// Close an empty escrow (reclaim rent)
-await client.x402.closeEscrow(agentWallet);
-
-// Check if an escrow exists
-const exists = await client.x402.hasEscrow(agentWallet);
-
-// Fetch raw escrow data
-const escrow = await client.x402.fetchEscrow(agentWallet);
-```
-
----
-
-## EscrowModule — Low-Level Access (V1 — **Deprecated since v0.7.0**)
-
-> **Prefer `client.escrowV2`** for all new integrations. `client.escrow` (V1) remains functional for backward compatibility but does not support `DisputeWindow`, `CoSigned` security modes, receipt-based dispute resolution, or staking.
-
-Access via `client.escrow`. Direct Anchor instruction wrappers with full control over account parameters. Use this when you need SPL token escrows or custom account structures.
-
-### Create
-
-```typescript
-import { BN } from "@coral-xyz/anchor";
-
-const sig = await client.escrow.create(agentWallet, {
-  pricePerCall: new BN(1_000_000),
-  maxCalls: new BN(100),
-  initialDeposit: new BN(100_000_000),
-  expiresAt: null,            // null = never expires
-  volumeCurve: null,          // null = flat pricing
-  tokenMint: null,            // null = native SOL
-  tokenDecimals: null,        // null = default (9)
-});
-```
-
-### Deposit
-
-```typescript
-await client.escrow.deposit(agentWallet, new BN(50_000_000));
-```
-
-### Settle
-
-Must be called by the agent owner. `serviceHash` is a pre-computed 32-byte array:
-
-```typescript
-import { sha256, hashToArray } from "@synapse-sap/sdk/utils";
-
-const serviceHash = hashToArray(sha256("service-record-001"));
-
-await client.escrow.settle(
-  depositorWallet,
-  new BN(5),       // calls to settle
-  serviceHash,     // [u8; 32]
-);
-```
-
-### Batch Settle
-
-Up to 10 settlements per transaction:
-
-```typescript
-await client.escrow.settleBatch(depositorWallet, [
-  { callsToSettle: new BN(3), serviceHash: hashToArray(sha256("batch-1")) },
-  { callsToSettle: new BN(7), serviceHash: hashToArray(sha256("batch-2")) },
-]);
-```
-
-### Withdraw
-
-Client withdraws unsettled funds:
-
-```typescript
-await client.escrow.withdraw(agentWallet, new BN(25_000_000));
-```
-
-### Close
-
-Close an empty escrow (balance must be 0) and reclaim rent:
-
-```typescript
-await client.escrow.close(agentWallet);
-```
-
-### Fetch
-
-```typescript
-const [agentPda] = deriveAgent(agentWallet);
-const escrow = await client.escrow.fetch(agentPda);
-
-console.log(escrow.balance.toString());
-console.log(escrow.pricePerCall.toString());
-console.log(escrow.volumeCurve);
-```
-
----
-
-## Volume Curves
-
-Volume curves implement automatic tiered pricing. As cumulative calls increase, the effective price per call decreases — rewarding high-volume consumers.
-
-### How Breakpoints Work
-
-A volume curve is an ordered array of `VolumeCurveBreakpoint` entries:
-
-```typescript
-interface VolumeCurveBreakpoint {
-  afterCalls: number;     // threshold: once cumulative calls exceed this…
-  pricePerCall: BN;       // …this price takes effect
-}
-```
-
-The base `pricePerCall` applies until the first breakpoint is reached. Each subsequent breakpoint overrides the price for all calls beyond its threshold.
-
-### Example: Three-Tier Pricing
-
-```
-Base price:  100,000 lamports/call
-After  100:   80,000 lamports/call  (20% discount)
-After  500:   60,000 lamports/call  (40% discount)
-```
-
-```typescript
-const ctx = await client.x402.preparePayment(agentWallet, {
-  pricePerCall: 100_000,
-  deposit: 10_000_000,
-  volumeCurve: [
-    { afterCalls: 100, pricePerCall: 80_000 },
-    { afterCalls: 500, pricePerCall: 60_000 },
-  ],
-});
-```
-
-### Cost Breakdown for 600 Calls
-
-```
-Tier 1:  calls   1–100  →  100 × 100,000 =  10,000,000
-Tier 2:  calls 101–500  →  400 ×  80,000 =  32,000,000
-Tier 3:  calls 501–600  →  100 ×  60,000 =   6,000,000
-                                     Total:  48,000,000 lamports
-                           Effective price:      80,000 lamports/call
-```
-
-The `estimateCost` and `calculateCost` methods return this breakdown in the `tiers` array.
-
-> **Limit**: Up to 5 breakpoints per volume curve (`MAX_VOLUME_CURVE_POINTS`).
-
----
-
-## SPL Token Escrows
-
-Escrows support any SPL token — not just native SOL. Pass the token mint and provide the required Associated Token Accounts.
-
-### Creating an SPL Escrow
-
-```typescript
-import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token";
-
-const tokenMint = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"); // USDC
-
-const depositorAta = await getAssociatedTokenAddress(tokenMint, depositorWallet);
-const escrowAta = await getAssociatedTokenAddress(tokenMint, escrowPda, true);
-
-const splAccounts = [
-  { pubkey: depositorAta,   isSigner: false, isWritable: true },
-  { pubkey: escrowAta,      isSigner: false, isWritable: true },
-  { pubkey: tokenMint,      isSigner: false, isWritable: false },
-  { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-];
-
-await client.escrow.create(
-  agentWallet,
-  {
-    pricePerCall: new BN(1_000),    // 0.001 USDC per call
-    maxCalls: new BN(1000),
-    initialDeposit: new BN(1_000_000), // 1 USDC
-    expiresAt: null,
-    volumeCurve: null,
-    tokenMint,
-    tokenDecimals: 6,               // USDC has 6 decimals
-  },
-  splAccounts,
-);
-```
-
-### SPL Account Order
-
-The `splAccounts` array must follow this exact order:
-
-| Index | Account | Writable | Description |
-|-------|---------|----------|-------------|
-| 0 | `depositorAta` | Yes | Depositor's Associated Token Account |
-| 1 | `escrowAta` | Yes | Escrow's Associated Token Account |
-| 2 | `tokenMint` | No | SPL token mint address |
-| 3 | `tokenProgram` | No | Token program (`TOKEN_PROGRAM_ID`) |
-
-The same `splAccounts` format applies to `deposit`, `settle`, `settleBatch`, and `withdraw`.
-
----
-
-## Complete x402 Flow — End to End
-
-```typescript
-import { SapClient } from "@synapse-sap/sdk";
-
-// ═══════════════════════════════════════════════
-//  CLIENT SIDE
-// ═══════════════════════════════════════════════
-
-const client = SapClient.from(provider);
-
-// 1. Estimate cost
-const estimate = await client.x402.estimateCost(agentWallet, 100);
-console.log(`Estimated cost: ${estimate.totalCost} lamports`);
-
-// 2. Prepare payment (creates escrow + deposits)
-const ctx = await client.x402.preparePayment(agentWallet, {
-  pricePerCall: 10_000,
-  maxCalls: 100,
-  deposit: 1_000_000,
+  body: JSON.stringify(input),
 });
 
-// 3. Build headers and call the agent
-const headers = client.x402.buildPaymentHeaders(ctx);
-const response = await fetch("https://agent.example.com/api/v1/invoke", {
-  method: "POST",
-  headers: { "Content-Type": "application/json", ...headers },
-  body: JSON.stringify({ prompt: "What is the SOL price?" }),
-});
-
-// 4. Monitor balance
-const balance = await client.x402.getBalance(agentWallet);
-console.log(`Calls remaining: ${balance?.callsRemaining}`);
-
-// ═══════════════════════════════════════════════
-//  AGENT SIDE
-// ═══════════════════════════════════════════════
-
-// 5. Settle after serving requests
-const receipt = await client.x402.settle(depositorWallet, 1, "response-hash");
-console.log(`Settled: ${receipt.amount} lamports for ${receipt.callsSettled} call(s)`);
-
-// 6. Or batch settle for efficiency
-const batch = await client.x402.settleBatch(depositorWallet, [
-  { calls: 5, serviceData: "morning-session" },
-  { calls: 3, serviceData: "afternoon-session" },
-]);
+const receipt = await paidRes.json();
 ```
 
----
+Do not imply hosted SAP MCP tools can call arbitrary HTTP x402 endpoints unless the connected MCP schema explicitly supports that.
 
-## PDA Derivation
+## Balance And Cleanup
 
-Escrow accounts are deterministic PDAs derived from the agent and depositor:
-
-```
-Seeds: ["sap_escrow", agentPda.toBytes(), depositor.toBytes()]
-Program: SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ
-```
-
-```typescript
-import { deriveAgent, deriveEscrow } from "@synapse-sap/sdk/pda";
-
-const [agentPda] = deriveAgent(agentWallet);
-const [escrowPda] = deriveEscrow(agentPda, depositorWallet);
+```ts
+const balance = await client.x402.getBalance(agentWallet, undefined, { nonce: 0 });
+await client.x402.addFunds(agentWallet, 500_000, { nonce: 0 });
+await client.x402.withdrawFunds(agentWallet, 250_000, { nonce: 0 });
+await client.x402.closeEscrow(agentWallet, { nonce: 0 });
 ```
 
----
-
-## EscrowAccountData Reference
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `agent` | `PublicKey` | Agent PDA |
-| `depositor` | `PublicKey` | Client wallet |
-| `agentWallet` | `PublicKey` | Agent's wallet (settlement target) |
-| `balance` | `BN` | Current remaining balance |
-| `totalDeposited` | `BN` | Cumulative deposits |
-| `totalSettled` | `BN` | Cumulative settlements |
-| `totalCallsSettled` | `BN` | Lifetime calls settled |
-| `pricePerCall` | `BN` | Base price per call |
-| `maxCalls` | `BN` | Max calls allowed (0 = unlimited) |
-| `createdAt` | `BN` | Unix timestamp of creation |
-| `lastSettledAt` | `BN` | Unix timestamp of last settlement |
-| `expiresAt` | `BN` | Expiry timestamp (0 = never) |
-| `volumeCurve` | `VolumeCurveBreakpoint[]` | Volume discount breakpoints |
-| `tokenMint` | `PublicKey \| null` | SPL token mint (null = SOL) |
-| `tokenDecimals` | `number` | Token decimal places |
-
----
-
-**Previous**: [Memory Systems](./04-memory-systems.md) · **Next**: [Discovery & Indexing →](./06-discovery-indexing.md)
+Close succeeds only when the escrow has zero free balance and no pending settlement/dispute state.

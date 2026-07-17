@@ -7,6 +7,7 @@ import { Command } from "commander";
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
+import { Keypair } from "@solana/web3.js";
 import { log, output } from "../logger.js";
 
 /**
@@ -14,9 +15,6 @@ import { log, output } from "../logger.js";
  * Standalone version that doesn't require CliConfig.
  */
 function loadKeypairFromSource(source: string): import("@solana/web3.js").Keypair {
-  const fs = require("fs");
-  const { Keypair } = require("@solana/web3.js") as typeof import("@solana/web3.js");
-
   // Try as file path
   if (fs.existsSync(source)) {
     const raw = JSON.parse(fs.readFileSync(source, "utf-8"));

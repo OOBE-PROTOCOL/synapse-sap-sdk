@@ -26,7 +26,7 @@
  * const profile = await discovery.getAgentProfile(agentWallet);
  *
  * // Find all Swap tools across the network
- * const tools = await discovery.findToolsByCategory("swap");
+ * const tools = await discovery.findToolsByCategory("Swap");
  *
  * // Network overview
  * const stats = await discovery.getNetworkOverview();
@@ -165,7 +165,8 @@ export interface NetworkOverview {
  * @typedef {string} ToolCategoryName
  * @name ToolCategoryName
  * @description Tool category string literal type derived from `TOOL_CATEGORY_VALUES`.
- * Valid values include: `"swap"`, `"data"`, `"lending"`, `"governance"`, etc.
+ * Valid values are: `Swap`, `Lend`, `Stake`, `Nft`, `Payment`, `Data`,
+ * `Governance`, `Bridge`, `Analytics`, and `Custom`.
  * @category Registries
  * @since v0.1.0
  * @see {@link DiscoveryRegistry.findToolsByCategory}
@@ -291,7 +292,7 @@ export class DiscoveryRegistry {
    * @description Find all tool PDAs registered in a specific category.
    * Accepts either a category name string or a numeric category value.
    *
-   * @param category - Tool category name (e.g. `"swap"`) or numeric category value.
+   * @param category - Tool category name (e.g. `"Swap"`) or numeric category value.
    * @param opts - Optional settings.
    * @param opts.hydrate - If `false`, returns only PDAs without fetching descriptors. Defaults to `true`.
    * @returns An array of {@link DiscoveredTool} matching the category.
@@ -299,7 +300,7 @@ export class DiscoveryRegistry {
    *
    * @example
    * ```ts
-   * const tools = await discovery.findToolsByCategory("swap");
+   * const tools = await discovery.findToolsByCategory("Swap");
    * const tools = await discovery.findToolsByCategory(0); // numeric
    * ```
    */
@@ -307,10 +308,12 @@ export class DiscoveryRegistry {
     category: ToolCategoryName | number,
     opts?: { hydrate?: boolean },
   ): Promise<DiscoveredTool[]> {
-    const categoryNum =
-      typeof category === "number"
-        ? category
-        : TOOL_CATEGORY_VALUES[category] ?? 9;
+    const categoryNum = typeof category === "number" ? category : TOOL_CATEGORY_VALUES[category];
+    if (!Number.isInteger(categoryNum) || categoryNum < 0 || categoryNum > 9) {
+      throw new Error(
+        "Invalid tool category. Use one of: Swap, Lend, Stake, Nft, Payment, Data, Governance, Bridge, Analytics, Custom.",
+      );
+    }
 
     const [pda] = deriveToolCategoryIndex(categoryNum);
     const index = await this.fetchNullable<ToolCategoryIndexData>(

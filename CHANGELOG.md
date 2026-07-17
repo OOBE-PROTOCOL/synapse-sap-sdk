@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.2] - 2026-07-17
+
+Patch release for SAP program v2 compatibility and SAP MCP v0.9.x consumption.
+The embedded on-chain program IDL remains `1.0.0`; this release updates the
+SDK, CLI, skills, and docs around that deployed program surface.
+
+### Changed
+- Escrow guidance is now V2-only in active docs and skills. Deprecated V1
+  escrow recipes are removed from recommended paths.
+- `X402Registry` now carries `nonce` through prepare, balance, funding,
+  withdraw, close, settlement, and batch settlement helpers.
+- Tool category docs now teach only canonical category values:
+  `Swap`, `Lend`, `Stake`, `Nft`, `Payment`, `Data`, `Governance`, `Bridge`,
+  `Analytics`, and `Custom`.
+- x402 docs now separate hosted SAP MCP paid tool calls from generic HTTP x402
+  challenge/sign/retry flows.
+
+### Fixed
+- `settlementSecurity=0` / SelfReport is no longer present as a default in
+  active SDK/CLI/skill paths.
+- CLI `escrow create` now defaults to DisputeWindow, exposes all V2 security
+  params, supports nonce/token decimals, and passes SPL remaining accounts for
+  USDC escrows.
+- CLI `escrow settle` now derives the correct escrow by depositor/nonce, hashes
+  service data to 32 bytes, and includes SOL/USDC treasury plus pending PDA
+  accounts as required by V2 settlement.
+- `DiscoveryRegistry.findToolsByCategory()` now rejects invalid category names
+  instead of silently falling back to `Custom`.
+- Release verification no longer self-flags its own secret-pattern sentinels.
+
+### Validation
+- SDK tests passed.
+- SDK typecheck passed.
+- SDK lint passed with 0 errors.
+- SDK build passed.
+- CLI typecheck passed.
+- CLI lint passed with 0 errors.
+- CLI build passed.
+- `npm run verify:release` passed, including SDK/CLI pack, temporary consumer
+  install, CJS/ESM imports, IDL account-shape checks, PDA checks, CLI command
+  checks, and secret-pattern scan.
+
 ## [1.0.1] - 2026-07-06
 
 Emergency patch for the npm `1.0.0` package.

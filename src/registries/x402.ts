@@ -110,7 +110,7 @@ export type { SettleOptions } from "../utils/priority-fee";
  * @since v0.1.0
  */
 export interface CostEstimate {
-  /** Total cost in smallest token unit. */
+  /** Total cost in the smallest unit of the escrow token. */
   readonly totalCost: BN;
   /** Number of calls estimated. */
   readonly calls: number;
@@ -143,10 +143,12 @@ export interface PaymentContext {
   readonly agentWallet: PublicKey;
   /** Depositor (client) wallet. */
   readonly depositorWallet: PublicKey;
-  /** Price per call in smallest token unit. */
+  /** Price per call in the smallest unit of the escrow token. */
   readonly pricePerCall: BN;
   /** Max calls allowed. */
   readonly maxCalls: BN;
+  /** Escrow nonce used to derive the V2 escrow PDA. */
+  readonly nonce: BN;
   /** Escrow creation TX signature. */
   readonly txSignature: TransactionSignature;
   /**
@@ -169,11 +171,11 @@ export interface PaymentContext {
  * @since v0.1.0
  */
 export interface PreparePaymentOptions {
-  /** Base price per call (smallest token unit). */
+  /** Base price per call in the smallest unit of the escrow token. */
   readonly pricePerCall: number | string | BN;
   /** Max calls allowed (0 = unlimited). */
   readonly maxCalls?: number | string | BN;
-  /** Initial deposit amount (smallest token unit). */
+  /** Initial deposit amount in the smallest unit of the escrow token. */
   readonly deposit: number | string | BN;
   /** Expiry timestamp in unix seconds (0 = never). */
   readonly expiresAt?: number | string | BN;
@@ -186,6 +188,8 @@ export interface PreparePaymentOptions {
   readonly tokenMint?: PublicKey | null;
   /** Token decimals (default: 9 for SOL). */
   readonly tokenDecimals?: number;
+  /** Escrow nonce. Defaults to 0 for the canonical escrow. */
+  readonly nonce?: number | string | BN;
   /** Settlement security for the V2 escrow: 1=CoSigned, 2=DisputeWindow. */
   readonly settlementSecurity?: 1 | 2;
   /** Dispute window slots for DisputeWindow escrows. */
@@ -314,6 +318,16 @@ export interface BatchSettlementResult {
   readonly settlementCount: number;
 }
 
+export interface X402EscrowLookupOptions {
+  /** Escrow nonce. Defaults to 0 for the canonical escrow. */
+  readonly nonce?: number | string | BN;
+}
+
+export interface X402SettleOptions extends SettleOptions {
+  /** Escrow nonce. Defaults to 0 for the canonical escrow. */
+  readonly nonce?: number | string | BN;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  x402 Registry
 // ═══════════════════════════════════════════════════════════════════
@@ -348,6 +362,14 @@ export class X402Registry {
 
   constructor(private readonly program: SapProgram) {
     this.wallet = (program.provider as AnchorProvider).wallet.publicKey;
+  }
+
+  private nonceBn(nonce: number | string | BN | undefined): BN {
+    return new BN((nonce ?? 0).toString());
+  }
+
+  private nonceNumber(nonce: number | string | BN | undefined): number {
+    return this.nonceBn(nonce).toNumber();
   }
 
   // ── Pricing & Estimation ─────────────────────────────
@@ -385,7 +407,7 @@ export class X402Registry {
       volumeCurve = opts.volumeCurve ?? [];
       totalBefore = opts.totalCallsBefore ?? 0;
     } else {
-      // Try to read from existing escrow (V2 first, then V1)
+      // Try to read from the canonical V2 escrow.
       const [agentPda] = deriveAgent(agentWallet);
       const resolved = await this.resolveEscrow(agentPda, this.wallet);
 
@@ -422,7 +444,7 @@ export class X402Registry {
    * @description Pure cost calculation (no network calls).
    * Implements the same tiered pricing logic as the on-chain program.
    *
-   * @param basePrice - Base price per call in smallest token unit.
+   * @param basePrice - Base price per call in the smallest unit of the escrow token.
    * @param volumeCurve - Volume curve breakpoints.
    * @param totalCallsBefore - Total calls already settled (cursor offset).
    * @param calls - Number of calls to calculate cost for.
@@ -518,7 +540,8 @@ export class X402Registry {
     opts: PreparePaymentOptions,
   ): Promise<PaymentContext> {
     const [agentPda] = deriveAgent(agentWallet);
-    const [escrowPda] = deriveEscrowV2(agentPda, this.wallet, 0);
+    const escrowNonce = this.nonceBn(opts.nonce);
+    const [escrowPda] = deriveEscrowV2(agentPda, this.wallet, escrowNonce.toNumber());
     const [agentStake] = deriveStake(agentPda);
     const [agentStats] = deriveAgentStats(agentPda);
     const [pricingMenu] = derivePricingMenu(agentPda);
@@ -563,7 +586,7 @@ export class X402Registry {
 
     const txSignature = await this.methods
       .createEscrowV2(
-        new BN(0),
+        escrowNonce,
         pricePerCall,
         maxCalls,
         initialDeposit,
@@ -595,6 +618,7 @@ export class X402Registry {
       depositorWallet: this.wallet,
       pricePerCall,
       maxCalls,
+      nonce: escrowNonce,
       txSignature,
       networkIdentifier: opts.networkIdentifier ?? SapNetwork.SOLANA_MAINNET,
     };
@@ -605,16 +629,18 @@ export class X402Registry {
    * @description Add more funds to an existing escrow.
    *
    * @param agentWallet - Agent wallet of the escrow.
-   * @param amount - Amount to deposit in smallest token unit.
+   * @param amount - Amount to deposit in the smallest unit of the escrow token.
    * @returns The transaction signature.
    * @since v0.1.0
    */
   async addFunds(
     agentWallet: PublicKey,
     amount: number | string | BN,
+    opts?: X402EscrowLookupOptions,
   ): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(agentWallet);
-    const [escrowPda] = deriveEscrowV2(agentPda, this.wallet, 0);
+    const nonce = this.nonceNumber(opts?.nonce);
+    const [escrowPda] = deriveEscrowV2(agentPda, this.wallet, nonce);
     const escrow = await this.fetchNullable<EscrowAccountV2Data>("escrowAccountV2", escrowPda);
     if (!escrow) throw new Error("No V2 escrow found for this agent + depositor pair");
     const remainingAccounts =
@@ -635,7 +661,7 @@ export class X402Registry {
           ];
 
     return this.methods
-      .depositEscrowV2(new BN(0), new BN(amount.toString()))
+      .depositEscrowV2(new BN(nonce), new BN(amount.toString()))
       .accounts({
         depositor: this.wallet,
         escrow: escrowPda,
@@ -650,16 +676,17 @@ export class X402Registry {
    * @description Withdraw remaining funds from an escrow.
    *
    * @param agentWallet - Agent wallet of the escrow.
-   * @param amount - Amount to withdraw in smallest token unit.
+   * @param amount - Amount to withdraw in the smallest unit of the escrow token.
    * @returns The transaction signature.
    * @since v0.1.0
    */
   async withdrawFunds(
     agentWallet: PublicKey,
     amount: number | string | BN,
+    opts?: X402EscrowLookupOptions,
   ): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(agentWallet);
-    const [escrowPda] = deriveEscrowV2(agentPda, this.wallet, 0);
+    const [escrowPda] = deriveEscrowV2(agentPda, this.wallet, this.nonceNumber(opts?.nonce));
     const escrow = await this.fetchNullable<EscrowAccountV2Data>("escrowAccountV2", escrowPda);
     if (!escrow) throw new Error("No V2 escrow found for this agent + depositor pair");
     const remainingAccounts =
@@ -698,9 +725,12 @@ export class X402Registry {
    * @returns The transaction signature.
    * @since v0.1.0
    */
-  async closeEscrow(agentWallet: PublicKey): Promise<TransactionSignature> {
+  async closeEscrow(
+    agentWallet: PublicKey,
+    opts?: X402EscrowLookupOptions,
+  ): Promise<TransactionSignature> {
     const [agentPda] = deriveAgent(agentWallet);
-    const [escrowPda] = deriveEscrowV2(agentPda, this.wallet, 0);
+    const [escrowPda] = deriveEscrowV2(agentPda, this.wallet, this.nonceNumber(opts?.nonce));
     const [agentStats] = deriveAgentStats(agentPda);
 
     return this.methods
@@ -760,10 +790,10 @@ export class X402Registry {
    */
   async buildPaymentHeadersFromEscrow(
     agentWallet: PublicKey,
-    opts?: { network?: SapNetworkId | string },
+    opts?: { network?: SapNetworkId | string; nonce?: number | string | BN },
   ): Promise<X402Headers | null> {
     const [agentPda] = deriveAgent(agentWallet);
-    const resolved = await this.resolveEscrow(agentPda, this.wallet);
+    const resolved = await this.resolveEscrow(agentPda, this.wallet, opts?.nonce);
     if (!resolved) return null;
 
     const escrow = resolved.escrow;
@@ -817,7 +847,7 @@ export class X402Registry {
     depositorWallet: PublicKey,
     callsToSettle: number,
     serviceData: string | Buffer | Uint8Array,
-    opts?: SettleOptions,
+    opts?: X402SettleOptions,
   ): Promise<SettlementResult> {
     const serviceHash = hashToArray(
       sha256(typeof serviceData === "string" ? serviceData : Buffer.from(serviceData)),
@@ -827,7 +857,8 @@ export class X402Registry {
     const [statsPda] = deriveAgentStats(agentPda);
 
     // Auto-detect escrow version
-    const resolved = await this.resolveEscrow(agentPda, depositorWallet);
+    const escrowNonce = this.nonceBn(opts?.nonce);
+    const resolved = await this.resolveEscrow(agentPda, depositorWallet, escrowNonce);
     if (!resolved) {
       throw new Error("No escrow found for this agent + depositor pair");
     }
@@ -868,7 +899,7 @@ export class X402Registry {
           ];
 
     let builder = this.methods
-      .settleCallsV2(new BN(0), new BN(callsToSettle), serviceHash)
+      .settleCallsV2(escrowNonce, new BN(callsToSettle), serviceHash)
       .accounts({
         wallet: this.wallet,
         agent: agentPda,
@@ -919,12 +950,12 @@ export class X402Registry {
       calls: number;
       serviceData: string | Buffer | Uint8Array;
     }>,
-    opts?: SettleOptions,
+    opts?: X402SettleOptions,
   ): Promise<BatchSettlementResult> {
     const totalCalls = entries.reduce((sum, e) => sum + e.calls, 0);
 
     const [agentPda] = deriveAgent(this.wallet);
-    const resolved = await this.resolveEscrow(agentPda, depositorWallet);
+    const resolved = await this.resolveEscrow(agentPda, depositorWallet, opts?.nonce);
     if (!resolved) {
       throw new Error("No escrow found for this agent + depositor pair");
     }
@@ -974,11 +1005,12 @@ export class X402Registry {
   async getBalance(
     agentWallet: PublicKey,
     depositor?: PublicKey,
+    opts?: X402EscrowLookupOptions,
   ): Promise<EscrowBalance | null> {
     const [agentPda] = deriveAgent(agentWallet);
     const dep = depositor ?? this.wallet;
 
-    const resolved = await this.resolveEscrow(agentPda, dep);
+    const resolved = await this.resolveEscrow(agentPda, dep, opts?.nonce);
     if (!resolved) return null;
 
     const escrow = resolved.escrow;
@@ -1017,12 +1049,13 @@ export class X402Registry {
   async hasEscrow(
     agentWallet: PublicKey,
     depositor?: PublicKey,
+    opts?: X402EscrowLookupOptions,
   ): Promise<boolean> {
     const [agentPda] = deriveAgent(agentWallet);
     const dep = depositor ?? this.wallet;
     const conn = this.program.provider.connection;
 
-    const [v2Pda] = deriveEscrowV2(agentPda, dep, 0);
+    const [v2Pda] = deriveEscrowV2(agentPda, dep, this.nonceNumber(opts?.nonce));
     const v2Info = await conn.getAccountInfo(v2Pda);
     return v2Info !== null;
   }
@@ -1039,10 +1072,11 @@ export class X402Registry {
   async fetchEscrow(
     agentWallet: PublicKey,
     depositor?: PublicKey,
+    opts?: X402EscrowLookupOptions,
   ): Promise<EscrowAccountV2Data | null> {
     const [agentPda] = deriveAgent(agentWallet);
     const dep = depositor ?? this.wallet;
-    const resolved = await this.resolveEscrow(agentPda, dep);
+    const resolved = await this.resolveEscrow(agentPda, dep, opts?.nonce);
     return resolved?.escrow ?? null;
   }
 
@@ -1083,12 +1117,13 @@ export class X402Registry {
   private async resolveEscrow(
     agentPda: PublicKey,
     depositor: PublicKey,
+    nonce?: number | string | BN,
   ): Promise<{
     escrow: EscrowAccountV2Data;
     escrowPda: PublicKey;
     version: 2;
   } | null> {
-    const [v2Pda] = deriveEscrowV2(agentPda, depositor, 0);
+    const [v2Pda] = deriveEscrowV2(agentPda, depositor, this.nonceNumber(nonce));
     const v2 = await this.fetchNullable<EscrowAccountV2Data>(
       "escrowAccountV2",
       v2Pda,

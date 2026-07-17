@@ -464,31 +464,30 @@ await client.vault.closeVault();
 ### Escrow (x402 Micropayments)
 
 ```typescript
-// Create SOL escrow
-await client.escrow.create(agentWallet, {
-  pricePerCall: new BN(1_000_000),
+// Create USDC escrow through the high-level x402 registry
+const payment = await client.x402.preparePayment(agentWallet, {
+  nonce: 0,
+  tokenMint: USDC_MINT_MAINNET,
+  tokenDecimals: 6,
+  pricePerCall: 10_000,       // micro-USDC
   maxCalls: new BN(100),
-  initialDeposit: new BN(100_000_000),
+  deposit: 1_000_000,         // micro-USDC
   expiresAt: new BN(0),
   volumeCurve: [],
-  tokenMint: null,
-  tokenDecimals: 9,
+  settlementSecurity: 2,
+  disputeWindowSlots: 2_160,
+  coSigner: null,
+  arbiter: null,
 });
 
 // Deposit
-await client.escrow.deposit(agentWallet, new BN(50_000_000));
+await client.x402.addFunds(agentWallet, 500_000, { nonce: 0 });
 
 // Agent settles calls
-await client.escrow.settle(depositorWallet, 10, serviceHash);
-
-// Batch settlement (up to 10 per TX, SDK auto-sizes CU since v0.12.5)
-await client.escrow.settleBatch(depositorWallet, [
-  { callsToSettle: new BN(5), serviceHash: hash1 },
-  { callsToSettle: new BN(3), serviceHash: hash2 },
-]);
+await client.x402.settle(depositorWallet, 10, serviceHash, { nonce: 0 });
 
 // Withdraw remaining
-await client.escrow.withdraw(agentWallet, new BN(10_000_000));
+await client.x402.withdrawFunds(agentWallet, 250_000, { nonce: 0 });
 ```
 
 ### Ledger (Ring Buffer Memory)
@@ -560,7 +559,7 @@ const profile = await client.discovery.getAgentProfile(agentWallet);
 // → { agent, stats, tools, feedback, attestations }
 
 // Find tools by category
-const tools = await client.discovery.findToolsByCategory("swap");
+const tools = await client.discovery.findToolsByCategory("Swap");
 
 // Network overview
 const overview = await client.discovery.getNetworkOverview();
@@ -572,14 +571,19 @@ const overview = await client.discovery.getNetworkOverview();
 ```typescript
 // Prepare payment context
 const ctx = await client.x402.preparePayment(agentWallet, {
-  tierId: "standard",
+  nonce: 0,
+  tokenMint: USDC_MINT_MAINNET,
+  tokenDecimals: 6,
+  pricePerCall: 10_000,
   maxCalls: 100,
-  initialDeposit: new BN(100_000_000),
+  deposit: 1_000_000,
+  settlementSecurity: 2,
+  disputeWindowSlots: 2_160,
 });
 
 // Build HTTP headers (for x402 protocol)
 const headers = client.x402.buildPaymentHeaders(ctx);
-// → { "X-402-Token": "...", "X-402-Agent": "...", ... }
+// → { "X-Payment-Protocol": "SAP-x402", "X-Payment-Escrow": "...", ... }
 
 // Estimate costs
 const cost = await client.x402.estimateCost(agentWallet, 50);
@@ -588,11 +592,8 @@ const cost = await client.x402.estimateCost(agentWallet, 50);
 // Settle
 const receipt = await client.x402.settle(depositor, 5, serviceData);
 
-// Batch settle
-const results = await client.x402.batchSettle(depositor, settlements);
-
 // Check balance
-const balance = await client.x402.getBalance(agentWallet, depositorWallet);
+const balance = await client.x402.getBalance(agentWallet, depositorWallet, { nonce: 0 });
 ```
 
 ### SessionManager
@@ -688,7 +689,7 @@ const tools = kit.getTools(); // → 52 LangChain StructuredTool instances
 | `sap-agent` | registerAgent, updateAgent, deactivateAgent, reactivateAgent, reportCalls, updateReputation, fetchAgent, fetchGlobalRegistry |
 | `sap-feedback` | giveFeedback, updateFeedback, revokeFeedback, fetchFeedback |
 | `sap-attestation` | createAttestation, revokeAttestation, fetchAttestation |
-| `sap-escrow` | createEscrow, depositEscrow, settleEscrow, withdrawEscrow, batchSettle, fetchEscrow |
+| `sap-escrow-v2` | preparePayment, addFunds, settle, withdrawFunds, closeEscrow, fetchEscrow |
 | `sap-tools` | publishToolByName, inscribeToolSchema, updateTool, deactivateTool, reactivateTool, reportInvocations, fetchTool |
 | `sap-vault` | initVault, openSession, inscribeMemory, closeSession, closeVault, rotateNonce, addDelegate, revokeDelegate, fetchVault, fetchSession |
 | `sap-indexing` | initCapabilityIndex, addToCapabilityIndex, removeFromCapabilityIndex, initProtocolIndex, addToProtocolIndex, removeFromProtocolIndex, fetchCapabilityIndex, fetchProtocolIndex |
