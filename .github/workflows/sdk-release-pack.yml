@@ -1,0 +1,49 @@
+name: SAP SDK Release Pack
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+      - "sdk-v*"
+
+concurrency:
+  group: sap-sdk-release-pack-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-pack:
+    name: Verify and pack SDK/CLI tarballs
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install SDK dependencies
+        run: npm ci
+
+      - name: Verify release
+        run: npm run verify:release
+
+      - name: Pack SDK and CLI
+        run: |
+          mkdir -p release-artifacts
+          npm pack --json --pack-destination release-artifacts
+          npm pack ./cli --json --pack-destination release-artifacts
+          (cd release-artifacts && sha256sum *.tgz > SHA256SUMS)
+          cat release-artifacts/SHA256SUMS
+
+      - name: Upload npm tarballs
+        uses: actions/upload-artifact@v4
+        with:
+          name: sap-sdk-release-tarballs
+          path: release-artifacts/
+          if-no-files-found: error

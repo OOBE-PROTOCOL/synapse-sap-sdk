@@ -1,0 +1,47 @@
+name: SAP SDK CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "release/**"
+      - "codex/**"
+    tags:
+      - "v*"
+      - "sdk-v*"
+
+concurrency:
+  group: sap-sdk-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sdk-ci:
+    name: SDK, CLI, package, and consumer checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install SDK dependencies
+        run: npm ci
+
+      - name: Lint SDK
+        run: npm run lint
+
+      - name: Test SDK
+        run: npm test -- --run
+
+      - name: Build SDK
+        run: npm run build
+
+      - name: Verify release packaging
+        run: npm run verify:release
