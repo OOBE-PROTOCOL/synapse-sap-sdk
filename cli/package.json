@@ -1,7 +1,7 @@
 {
   "name": "synapse-sap-cli",
-  "version": "1.0.2",
-  "description": "CLI toolkit for the Synapse Agent Protocol (SAP v2) on Solana - register agents, manage V2 escrows, automate x402 payments, publish tool manifests, and more. Aligned to SDK v1.0.2.",
+  "version": "1.0.3",
+  "description": "CLI toolkit for the Synapse Agent Protocol (SAP v2) on Solana - register agents, manage V2 escrows, automate x402 payments, publish tool manifests, and more. Aligned to SDK v1.0.3.",
   "type": "module",
   "license": "MIT",
   "author": "OOBE Protocol Labs <steve@oobeprotocol.ai>",
@@ -54,7 +54,7 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",
-    "@oobe-protocol-labs/synapse-sap-sdk": "^1.0.2",
+    "@oobe-protocol-labs/synapse-sap-sdk": "^1.0.3",
     "@solana/web3.js": "^1.98.0",
     "chalk": "^5.3.0",
     "commander": "^12.1.0",

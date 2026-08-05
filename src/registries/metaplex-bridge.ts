@@ -37,10 +37,7 @@
  * @see https://eips.ethereum.org/EIPS/eip-8004
  */
 
-import {
-  PublicKey,
-  type TransactionInstruction,
-} from "@solana/web3.js";
+import { PublicKey, type TransactionInstruction } from "@solana/web3.js";
 import type {
   AssetV1,
   HookableLifecycleEvent as HookableLifecycleEventEnum,
@@ -53,7 +50,13 @@ import type {
   Umi,
 } from "@metaplex-foundation/umi";
 import type { SapProgram } from "../modules/base";
-import { deriveAgent, deriveAgentStats, deriveVault } from "../pda";
+import {
+  deriveAgent,
+  deriveAgentStats,
+  derivePricingMenu,
+  deriveVault,
+} from "../pda";
+import { TREASURY_WALLET } from "../constants/treasury";
 import type {
   AgentAccountData,
   AgentStatsData,
@@ -66,7 +69,8 @@ import type { Capability } from "../types/common";
 // ═══════════════════════════════════════════════════════════════════
 
 type MplCoreModule = typeof import("@metaplex-foundation/mpl-core");
-type UmiBundleModule = typeof import("@metaplex-foundation/umi-bundle-defaults");
+type UmiBundleModule =
+  typeof import("@metaplex-foundation/umi-bundle-defaults");
 type UmiModule = typeof import("@metaplex-foundation/umi");
 
 interface MplCoreRuntime {
@@ -592,7 +596,9 @@ export class MetaplexBridge {
     const createBuilder: TransactionBuilder = mplCore.create(umi, {
       asset: assetUmiSigner,
       collection: opts.collection
-        ? ({ publicKey: umiCore.publicKey(opts.collection.toBase58()) } as never)
+        ? ({
+            publicKey: umiCore.publicKey(opts.collection.toBase58()),
+          } as never)
         : undefined,
       authority,
       payer,
@@ -748,7 +754,11 @@ export class MetaplexBridge {
 
     let mpl: MplAgentSnapshot | null = null;
     if (input.asset) {
-      mpl = await this.fetchMplSnapshot(input.asset, input.rpcUrl, input.rpcHeaders);
+      mpl = await this.fetchMplSnapshot(
+        input.asset,
+        input.rpcUrl,
+        input.rpcHeaders,
+      );
       if (!sapPda && mpl?.registration?.synapseAgent) {
         try {
           sapPda = new PublicKey(mpl.registration.synapseAgent);
@@ -775,7 +785,7 @@ export class MetaplexBridge {
    * @name resolveAgentIdentifier
    * @description Resolve a generic agent identifier to canonical SAP routing
    * keys. Useful when callers may receive either owner wallets or Metaplex
-   * Core asset IDs (e.g. metaplex.com/agents/<core-asset-id>). 
+   * Core asset IDs (e.g. metaplex.com/agents/<core-asset-id>).
    *
    * Resolution order:
    *   1) Treat input as wallet and check if a SAP agent exists.
@@ -819,7 +829,11 @@ export class MetaplexBridge {
     }
 
     // 2) MPL Core asset resolution
-    const mpl = await this.fetchMplSnapshot(asPubkey, input.rpcUrl, input.rpcHeaders);
+    const mpl = await this.fetchMplSnapshot(
+      asPubkey,
+      input.rpcUrl,
+      input.rpcHeaders,
+    );
     if (!mpl) {
       return {
         input: input.identifier,
@@ -859,7 +873,11 @@ export class MetaplexBridge {
     rpcUrl: string;
     rpcHeaders?: Record<string, string>;
   }): Promise<boolean> {
-    const snap = await this.fetchMplSnapshot(args.asset, args.rpcUrl, args.rpcHeaders);
+    const snap = await this.fetchMplSnapshot(
+      args.asset,
+      args.rpcUrl,
+      args.rpcHeaders,
+    );
     if (!snap?.agentIdentityUri || !snap.registration) return false;
     const expectedSuffix = `/agents/${args.sapAgentPda.toBase58()}/eip-8004.json`;
     if (!snap.agentIdentityUri.endsWith(expectedSuffix)) return false;
@@ -885,7 +903,11 @@ export class MetaplexBridge {
     rpcUrl: string;
     rpcHeaders?: Record<string, string>;
   }): Promise<TripleCheckResult> {
-    const snap = await this.fetchMplSnapshot(args.asset, args.rpcUrl, args.rpcHeaders);
+    const snap = await this.fetchMplSnapshot(
+      args.asset,
+      args.rpcUrl,
+      args.rpcHeaders,
+    );
     if (!snap) {
       const fallbackPda = args.expectedOwner
         ? deriveAgent(args.expectedOwner)[0]
@@ -996,10 +1018,12 @@ export class MetaplexBridge {
     // umi-bundle-defaults.createUmi accepts an options object with httpHeaders
     // since umi 1.x — required for gated providers like Synapse RPC that
     // enforce `x-api-key`. Without it `getAccountInfo` returns 401 silently.
-    const umi: Umi = (umiBundle.createUmi as unknown as (
-      endpoint: string,
-      opts?: { httpHeaders?: Record<string, string> },
-    ) => Umi)(rpcUrl, rpcHeaders ? { httpHeaders: rpcHeaders } : undefined).use(
+    const umi: Umi = (
+      umiBundle.createUmi as unknown as (
+        endpoint: string,
+        opts?: { httpHeaders?: Record<string, string> },
+      ) => Umi
+    )(rpcUrl, rpcHeaders ? { httpHeaders: rpcHeaders } : undefined).use(
       mplCore.mplCore(),
     );
     return umi;
@@ -1090,22 +1114,26 @@ export class MetaplexBridge {
       umiCore.publicKey(args.payer.toBase58()),
     );
     // HookableLifecycleEvent.Execute = 4; ExternalCheckResult { flags: 1 } = CanApprove
-    const ExecuteEvent = mplCore.HookableLifecycleEvent.Execute as HookableLifecycleEventEnum;
-    const builder: TransactionBuilder = mplCore.addExternalPluginAdapterV1(umi, {
-      asset: umiCore.publicKey(args.asset.toBase58()),
-      authority,
-      payer,
-      initInfo: {
-        __kind: "AgentIdentity",
-        fields: [
-          {
-            uri: args.uri,
-            initPluginAuthority: { __kind: "UpdateAuthority" },
-            lifecycleChecks: [[ExecuteEvent, { flags: 1 }]],
-          },
-        ],
+    const ExecuteEvent = mplCore.HookableLifecycleEvent
+      .Execute as HookableLifecycleEventEnum;
+    const builder: TransactionBuilder = mplCore.addExternalPluginAdapterV1(
+      umi,
+      {
+        asset: umiCore.publicKey(args.asset.toBase58()),
+        authority,
+        payer,
+        initInfo: {
+          __kind: "AgentIdentity",
+          fields: [
+            {
+              uri: args.uri,
+              initPluginAuthority: { __kind: "UpdateAuthority" },
+              lifecycleChecks: [[ExecuteEvent, { flags: 1 }]],
+            },
+          ],
+        },
       },
-    });
+    );
     return this.firstWeb3Ix(builder, "addExternalPluginAdapterV1");
   }
 
@@ -1122,6 +1150,7 @@ export class MetaplexBridge {
     const { SystemProgram } = await import("@solana/web3.js");
     const [agentPda] = deriveAgent(args.wallet);
     const [statsPda] = deriveAgentStats(agentPda);
+    const [pricingPda] = derivePricingMenu(agentPda);
     const [globalPda] = deriveGlobalRegistry();
     const a = args.args;
     // Cast to `any` to sidestep Anchor's deep generic IDL inference, which
@@ -1142,9 +1171,13 @@ export class MetaplexBridge {
         wallet: args.wallet,
         agent: agentPda,
         agentStats: statsPda,
+        pricingMenu: pricingPda,
         globalRegistry: globalPda,
         systemProgram: SystemProgram.programId,
       })
+      .remainingAccounts([
+        { pubkey: TREASURY_WALLET, isSigner: false, isWritable: true },
+      ])
       .instruction();
   }
 
@@ -1177,23 +1210,25 @@ export class MetaplexBridge {
   // ═════════════════════════════════════════════════════
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private detectLink(
-    sapPda: PublicKey,
-    mpl: MplAgentSnapshot | null,
-  ): boolean {
+  private detectLink(sapPda: PublicKey, mpl: MplAgentSnapshot | null): boolean {
     if (!mpl?.agentIdentityUri || !mpl.registration) return false;
     const expectedSuffix = `/agents/${sapPda.toBase58()}/eip-8004.json`;
     if (!mpl.agentIdentityUri.endsWith(expectedSuffix)) return false;
     return mpl.registration.synapseAgent === sapPda.toBase58();
   }
 
-  private readString(identity: AgentAccountData, key: keyof AgentAccountData): string | null {
+  private readString(
+    identity: AgentAccountData,
+    key: keyof AgentAccountData,
+  ): string | null {
     const value = identity[key];
     return typeof value === "string" ? value : null;
   }
 
   private readCapabilities(identity: AgentAccountData): string[] {
     const caps: ReadonlyArray<Capability> = identity.capabilities ?? [];
-    return caps.map((c) => c.id).filter((s): s is string => typeof s === "string");
+    return caps
+      .map((c) => c.id)
+      .filter((s): s is string => typeof s === "string");
   }
 }

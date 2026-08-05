@@ -10,7 +10,11 @@
  * @packageDocumentation
  */
 
-import { SystemProgram, type PublicKey, type TransactionSignature } from "@solana/web3.js";
+import {
+  SystemProgram,
+  type PublicKey,
+  type TransactionSignature,
+} from "@solana/web3.js";
 import { BaseModule } from "./base";
 import {
   deriveAgent,
@@ -115,7 +119,9 @@ export class AgentModule extends BaseModule {
         globalRegistry: globalPda,
         systemProgram: SystemProgram.programId,
       })
-      .remainingAccounts([{ pubkey: TREASURY_WALLET, isSigner: false, isWritable: true }])
+      .remainingAccounts([
+        { pubkey: TREASURY_WALLET, isSigner: false, isWritable: true },
+      ])
       .rpc();
   }
 
@@ -142,6 +148,30 @@ export class AgentModule extends BaseModule {
         args.agentUri ?? null,
         args.x402Endpoint ?? null,
       )
+      .accounts({
+        wallet: this.walletPubkey,
+        agent: agentPda,
+        pricingMenu: pricingPda,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+  }
+
+  /**
+   * @name migratePricingMenu
+   * @description Backfill or resync the `AgentPricingMenu` PDA for legacy
+   *   agents registered before pricing menus were created at registration.
+   *   Run this once if `update`, `close`, or `createEscrowV2` fails with
+   *   `AccountNotInitialized` on `pricing_menu`.
+   * @returns {Promise<TransactionSignature>} The transaction signature.
+   * @since v1.0.3
+   */
+  async migratePricingMenu(): Promise<TransactionSignature> {
+    const [agentPda] = this.deriveAgent();
+    const [pricingPda] = derivePricingMenu(agentPda);
+
+    return this.methods
+      .migratePricingMenu()
       .accounts({
         wallet: this.walletPubkey,
         agent: agentPda,
@@ -223,7 +253,9 @@ export class AgentModule extends BaseModule {
         stake: stakePda,
         globalRegistry: globalPda,
       })
-      .remainingAccounts([{ pubkey: TREASURY_WALLET, isSigner: false, isWritable: true }])
+      .remainingAccounts([
+        { pubkey: TREASURY_WALLET, isSigner: false, isWritable: true },
+      ])
       .rpc();
   }
 
@@ -235,7 +267,9 @@ export class AgentModule extends BaseModule {
    * @returns {Promise<TransactionSignature>} The transaction signature.
    * @since v0.1.0
    */
-  async reportCalls(callsServed: number | bigint): Promise<TransactionSignature> {
+  async reportCalls(
+    callsServed: number | bigint,
+  ): Promise<TransactionSignature> {
     const [agentPda] = this.deriveAgent();
     const [statsPda] = this.deriveStats(agentPda);
 
@@ -322,7 +356,9 @@ export class AgentModule extends BaseModule {
    * @returns {Promise<AgentStatsData | null>} The stats data or `null`.
    * @since v0.1.0
    */
-  async fetchStatsNullable(agentPda: PublicKey): Promise<AgentStatsData | null> {
+  async fetchStatsNullable(
+    agentPda: PublicKey,
+  ): Promise<AgentStatsData | null> {
     const [pda] = this.deriveStats(agentPda);
     return this.fetchAccountNullable<AgentStatsData>("agentStats", pda);
   }

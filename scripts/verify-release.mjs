@@ -9,7 +9,7 @@ const root = process.cwd();
 const require = createRequire(import.meta.url);
 const pkg = require(resolve(root, "package.json"));
 const expectedSdkVersion = pkg.version;
-const expectedCliVersion = "1.0.2";
+const expectedCliVersion = expectedSdkVersion;
 const expectedProgramVersion = "1.0.0";
 
 const checks = [];
@@ -172,6 +172,7 @@ function verifyNoSecretPatterns() {
 try {
   run(root, "npm", ["run", "build"]);
   run(root, "npm", ["run", "test", "--", "--run"]);
+  run(join(root, "cli"), "npm", ["ci"]);
   run(join(root, "cli"), "npm", ["run", "build"]);
 
   const sdk = pack(root, "@oobe-protocol-labs/synapse-sap-sdk");

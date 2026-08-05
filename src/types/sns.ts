@@ -293,8 +293,15 @@ export interface FetchedSnsRecords {
 }
 
 /**
- * Re-export Record enum from Bonfida SDK for convenience
- * 
- * @since v1.0.0
+ * Deprecated SNS record labels retained for source compatibility while SNS is
+ * disabled in v1.0.3.
+ *
+ * @deprecated SNS integration is disabled until it is migrated to a current
+ * Solana Name Service SDK.
  */
-export { Record } from '@bonfida/spl-name-service';
+export enum Record {
+  SOL = "SOL",
+  TXT = "TXT",
+  URL = "URL",
+  Pic = "Pic",
+}

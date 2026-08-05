@@ -1,7 +1,7 @@
 {
   "name": "@oobe-protocol-labs/synapse-sap-sdk",
-  "version": "1.0.2",
-  "description": "Synapse Agent Protocol (SAP) SDK for Solana | v1.0.2 aligned program and SDK",
+  "version": "1.0.3",
+  "description": "Synapse Agent Protocol (SAP) SDK for Solana | v1.0.3 legacy pricing menu migration",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
@@ -181,7 +181,6 @@
   ],
   "license": "Apache-2.0",
   "dependencies": {
-    "@bonfida/spl-name-service": "^3.0.23",
     "@coral-xyz/anchor": "^0.30.1",
     "@metaplex-foundation/mpl-core": "^1.10.0",
     "@metaplex-foundation/umi": "^1.5.1",

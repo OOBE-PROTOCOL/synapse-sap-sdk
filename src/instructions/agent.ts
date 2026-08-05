@@ -1,26 +1,46 @@
 // ===============================================================
 //  Agent Module — IDL v1.0.0
-//  5 instructions
+//  6 instructions
 // ===============================================================
 
-import { PublicKey, Signer, TransactionInstruction, SystemProgram } from '@solana/web3.js';
-import { Program, BN } from '@coral-xyz/anchor';
-import { Capability, PricingTier } from '../idlTypes';
-import { TREASURY_WALLET } from '../constants/treasury';
+import {
+  PublicKey,
+  Signer,
+  TransactionInstruction,
+  SystemProgram,
+} from "@solana/web3.js";
+import { Program, BN } from "@coral-xyz/anchor";
+import { Capability, PricingTier } from "../idlTypes";
+import { TREASURY_WALLET } from "../constants/treasury";
 
 function withTreasury(remainingAccounts: any[] = []): any[] {
-  return remainingAccounts.some((account) => account.pubkey?.equals?.(TREASURY_WALLET))
+  return remainingAccounts.some((account) =>
+    account.pubkey?.equals?.(TREASURY_WALLET),
+  )
     ? remainingAccounts
-    : [{ pubkey: TREASURY_WALLET, isSigner: false, isWritable: true }, ...remainingAccounts];
+    : [
+        { pubkey: TREASURY_WALLET, isSigner: false, isWritable: true },
+        ...remainingAccounts,
+      ];
 }
 
 export class AgentModule {
   constructor(private program: Program) {}
 
   /** close_agent (7 accounts, 0 args) */
-  async closeAgent(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; agentStats: PublicKey; vaultCheck: PublicKey; pricingMenu: PublicKey; stake: PublicKey; globalRegistry: PublicKey; remainingAccounts?: any[] }): Promise<TransactionInstruction> {
-    return this.program
-      .methods.closeAgent()
+  async closeAgent(ctx: {
+    signer: Signer;
+    wallet: PublicKey;
+    agent: PublicKey;
+    agentStats: PublicKey;
+    vaultCheck: PublicKey;
+    pricingMenu: PublicKey;
+    stake: PublicKey;
+    globalRegistry: PublicKey;
+    remainingAccounts?: any[];
+  }): Promise<TransactionInstruction> {
+    return this.program.methods
+      .closeAgent()
       .accounts({
         wallet: ctx.wallet,
         agent: ctx.agent,
@@ -36,9 +56,16 @@ export class AgentModule {
   }
 
   /** deactivate_agent (4 accounts, 0 args) */
-  async deactivateAgent(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; agentStats: PublicKey; globalRegistry: PublicKey; remainingAccounts?: any[] }): Promise<TransactionInstruction> {
-    return this.program
-      .methods.deactivateAgent()
+  async deactivateAgent(ctx: {
+    signer: Signer;
+    wallet: PublicKey;
+    agent: PublicKey;
+    agentStats: PublicKey;
+    globalRegistry: PublicKey;
+    remainingAccounts?: any[];
+  }): Promise<TransactionInstruction> {
+    return this.program.methods
+      .deactivateAgent()
       .accounts({
         wallet: ctx.wallet,
         agent: ctx.agent,
@@ -51,9 +78,16 @@ export class AgentModule {
   }
 
   /** reactivate_agent (4 accounts, 0 args) */
-  async reactivateAgent(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; agentStats: PublicKey; globalRegistry: PublicKey; remainingAccounts?: any[] }): Promise<TransactionInstruction> {
-    return this.program
-      .methods.reactivateAgent()
+  async reactivateAgent(ctx: {
+    signer: Signer;
+    wallet: PublicKey;
+    agent: PublicKey;
+    agentStats: PublicKey;
+    globalRegistry: PublicKey;
+    remainingAccounts?: any[];
+  }): Promise<TransactionInstruction> {
+    return this.program.methods
+      .reactivateAgent()
       .accounts({
         wallet: ctx.wallet,
         agent: ctx.agent,
@@ -66,9 +100,34 @@ export class AgentModule {
   }
 
   /** register_agent (6 accounts, 8 args) */
-  async registerAgent(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; agentStats: PublicKey; pricingMenu: PublicKey; globalRegistry: PublicKey; name: string; description: string; capabilities: Capability[]; pricing: PricingTier[]; protocols: string[]; agentId: (string | null); agentUri: (string | null); x402Endpoint: (string | null); remainingAccounts?: any[] }): Promise<TransactionInstruction> {
-    return this.program
-      .methods.registerAgent(ctx.name, ctx.description, ctx.capabilities, ctx.pricing, ctx.protocols, ctx.agentId, ctx.agentUri, ctx.x402Endpoint)
+  async registerAgent(ctx: {
+    signer: Signer;
+    wallet: PublicKey;
+    agent: PublicKey;
+    agentStats: PublicKey;
+    pricingMenu: PublicKey;
+    globalRegistry: PublicKey;
+    name: string;
+    description: string;
+    capabilities: Capability[];
+    pricing: PricingTier[];
+    protocols: string[];
+    agentId: string | null;
+    agentUri: string | null;
+    x402Endpoint: string | null;
+    remainingAccounts?: any[];
+  }): Promise<TransactionInstruction> {
+    return this.program.methods
+      .registerAgent(
+        ctx.name,
+        ctx.description,
+        ctx.capabilities,
+        ctx.pricing,
+        ctx.protocols,
+        ctx.agentId,
+        ctx.agentUri,
+        ctx.x402Endpoint,
+      )
       .accounts({
         wallet: ctx.wallet,
         agent: ctx.agent,
@@ -83,9 +142,32 @@ export class AgentModule {
   }
 
   /** update_agent (3 accounts, 8 args) */
-  async updateAgent(ctx: { signer: Signer; wallet: PublicKey; agent: PublicKey; pricingMenu: PublicKey; name: (string | null); description: (string | null); capabilities: (Capability[] | null); pricing: (PricingTier[] | null); protocols: (string[] | null); agentId: (string | null); agentUri: (string | null); x402Endpoint: (string | null); remainingAccounts?: any[] }): Promise<TransactionInstruction> {
-    return this.program
-      .methods.updateAgent(ctx.name, ctx.description, ctx.capabilities, ctx.pricing, ctx.protocols, ctx.agentId, ctx.agentUri, ctx.x402Endpoint)
+  async updateAgent(ctx: {
+    signer: Signer;
+    wallet: PublicKey;
+    agent: PublicKey;
+    pricingMenu: PublicKey;
+    name: string | null;
+    description: string | null;
+    capabilities: Capability[] | null;
+    pricing: PricingTier[] | null;
+    protocols: string[] | null;
+    agentId: string | null;
+    agentUri: string | null;
+    x402Endpoint: string | null;
+    remainingAccounts?: any[];
+  }): Promise<TransactionInstruction> {
+    return this.program.methods
+      .updateAgent(
+        ctx.name,
+        ctx.description,
+        ctx.capabilities,
+        ctx.pricing,
+        ctx.protocols,
+        ctx.agentId,
+        ctx.agentUri,
+        ctx.x402Endpoint,
+      )
       .accounts({
         wallet: ctx.wallet,
         agent: ctx.agent,
@@ -97,4 +179,24 @@ export class AgentModule {
       .instruction();
   }
 
+  /** migrate_pricing_menu (4 accounts, 0 args) */
+  async migratePricingMenu(ctx: {
+    signer: Signer;
+    wallet: PublicKey;
+    agent: PublicKey;
+    pricingMenu: PublicKey;
+    remainingAccounts?: any[];
+  }): Promise<TransactionInstruction> {
+    return this.program.methods
+      .migratePricingMenu()
+      .accounts({
+        wallet: ctx.wallet,
+        agent: ctx.agent,
+        pricingMenu: ctx.pricingMenu,
+        systemProgram: SystemProgram.programId,
+      })
+      .remainingAccounts(ctx.remainingAccounts ?? [])
+      .signers([ctx.signer])
+      .instruction();
+  }
 }

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.3] - 2026-08-04
+
+Patch release aligned with SDK `1.0.3` and the SAP Anchor 1.x Program
+Metadata rollout.
+
+### Changed
+
+- CLI dependency now targets `@oobe-protocol-labs/synapse-sap-sdk@^1.0.3`.
+- CLI version/help metadata now reports `1.0.3` so support screenshots match
+  the package version.
+
+### Validation
+
+- Covered by SDK `npm run verify:release`.
+
 ## [1.0.2] - 2026-07-17
 
 Patch release aligned with SDK `1.0.2` and SAP program v2.

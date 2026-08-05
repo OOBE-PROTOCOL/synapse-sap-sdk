@@ -1,18 +1,45 @@
 # Migration Guide — v0.12.x to v1.0.0
 
-> **SDK Version**: 1.0.0
+> **SDK Version**: 1.0.3
 > **Program Compatibility**: 1.0.0
-> **Last Updated**: June 8, 2026
+> **Last Updated**: July 30, 2026
 
 ---
 
 ## Breaking Changes
+
+### v1.0.3 — Legacy AgentPricingMenu Backfill
+
+**What Changed**: Agents registered before `AgentPricingMenu` existed may have
+an `AgentAccount` with inline pricing but no `["sap_pricing", agent_pda]` PDA.
+Current `update_agent`, `close_agent`, and `create_escrow_v2` require that PDA,
+so those legacy agents can fail with `AccountNotInitialized` on `pricing_menu`.
+
+**Migration**:
+
+```typescript
+// ✅ Run once for a legacy agent before update/close/escrow.
+await client.agent.migratePricingMenu();
+
+// Then normal lifecycle and commerce paths work again.
+await client.agent.update({ description, pricing });
+await client.agent.close();
+```
+
+**Why**: Backfills the missing `AgentPricingMenu` from the existing
+`AgentAccount.pricing` field. Do not re-register just to recover from this
+state; re-registering creates a new agent PDA and does not close the old stake
+account. After `migratePricingMenu()`, `close_agent` can return the initialized
+stake when `agent_stats.active_escrows == 0` and no vault remains.
+
+---
 
 ### v1.0.0 — DisputeWindow Via `settle_calls_v2`
 
 **What Changed**: `client.escrowV2.settle()` now derives the `PendingSettlement` PDA and passes it directly to `settle_calls_v2`. The generated `createPendingSettlement` wrapper is deprecated and should not be called in new integrations.
 
 **Migration**:
+
 ```typescript
 // ❌ BEFORE (v0.12.x)
 await client.escrowV2.settleCallsV2(agentWallet, nonce, {
@@ -23,12 +50,7 @@ await client.escrowV2.settleCallsV2(agentWallet, nonce, {
 // instruction, which is now deprecated and intentionally omitted.
 
 // ✅ AFTER (v1.0.0)
-await client.escrowV2.settle(
-  depositorWallet,
-  nonce,
-  10,
-  serviceHash,
-);
+await client.escrowV2.settle(depositorWallet, nonce, 10, serviceHash);
 ```
 
 **Why**: Eliminates orphan PendingSettlement bug (ArithmeticOverflow 6075).
@@ -40,6 +62,7 @@ await client.escrowV2.settle(
 **What Changed**: Never use `escrow.settlementIndex` directly anymore.
 
 **Migration**:
+
 ```typescript
 // ❌ BEFORE (v0.12.x)
 const index = escrowAccount.settlementIndex;
@@ -63,6 +86,7 @@ await client.escrowV2.finalizeSettlement(..., index);
 **What Changed**: Pre-flight validation throws before signing if pending PDA is invalid.
 
 **Migration**:
+
 ```typescript
 // ✅ Wrap in try-catch with specific error handling
 try {
@@ -88,6 +112,7 @@ try {
 **What Changed**: `require("./idl.json")` → `require("./idl/synapse_agent_sap.json")`
 
 **Migration**:
+
 ```typescript
 // ❌ BEFORE (v0.10.x) — BREAKS in Node ESM
 import { IDL } from "@synapse-sap/sdk/idl.json";
@@ -105,6 +130,7 @@ import { IDL } from "@synapse-sap/sdk/idl/synapse_agent_sap.json";
 **What Changed**: `SettlementSecurity.SelfReport` deprecated (returns error on-chain).
 
 **Migration**:
+
 ```typescript
 // ❌ BEFORE (v0.9.x)
 const escrow = await client.escrowV2.create(agentWallet, {
@@ -161,13 +187,13 @@ const escrow = await client.escrowV2.create(agentWallet, {
 
 ### Common Pitfalls
 
-| Pitfall | Error | Solution |
-|---------|-------|----------|
-| Using `escrow.settlementIndex` directly | `Allocate: account already in use` | Use `nextSettlementIndex()` helper |
-| Forgetting `createPendingSettlement` (pre-v0.13.0) | `ArithmeticOverflow` (6075) | Upgrade to v0.13.0+ (auto-bundle) |
-| `disputeWindowSlots < 2_160` for security=2 | `InvalidSettlementSecurity` | Use >= 2_160 for mainnet |
-| Using `SelfReport` mode | `SelfReportDeprecated` error | Use `DisputeWindow` instead |
-| Node ESM `await import()` | Directory re-export breaks on old SDKs | Upgrade to v1.0.0 and use public imports such as `@oobe-protocol-labs/synapse-sap-sdk/registries` |
+| Pitfall                                            | Error                                  | Solution                                                                                          |
+| -------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Using `escrow.settlementIndex` directly            | `Allocate: account already in use`     | Use `nextSettlementIndex()` helper                                                                |
+| Forgetting `createPendingSettlement` (pre-v0.13.0) | `ArithmeticOverflow` (6075)            | Upgrade to v0.13.0+ (auto-bundle)                                                                 |
+| `disputeWindowSlots < 2_160` for security=2        | `InvalidSettlementSecurity`            | Use >= 2_160 for mainnet                                                                          |
+| Using `SelfReport` mode                            | `SelfReportDeprecated` error           | Use `DisputeWindow` instead                                                                       |
+| Node ESM `await import()`                          | Directory re-export breaks on old SDKs | Upgrade to v1.0.0 and use public imports such as `@oobe-protocol-labs/synapse-sap-sdk/registries` |
 
 ---
 
@@ -204,18 +230,9 @@ const settleSig = await client.escrowV2.settle(agentWallet, nonce, {
 await sleep(900_000); // 15 minutes in ms
 
 // Step 5: Finalize settlement
-const index = await client.escrowV2.nextSettlementIndex(
-  agentWallet,
-  depositorWallet,
-  nonce
-);
+const index = await client.escrowV2.nextSettlementIndex(agentWallet, depositorWallet, nonce);
 
-const finalizeSig = await client.escrowV2.finalizeSettlement(
-  agentWallet,
-  depositorWallet,
-  nonce,
-  index
-);
+const finalizeSig = await client.escrowV2.finalizeSettlement(agentWallet, depositorWallet, nonce, index);
 
 console.log("Payment complete:", finalizeSig);
 ```
@@ -235,29 +252,24 @@ const evidenceSig = await client.dispute.submitAgentEvidence(agentWallet, {
 });
 
 // Permissionless: Auto-resolve (after deadline)
-const resolveSig = await client.receipt.autoResolveDispute(
-  agentWallet,
-  depositorWallet,
-  nonce,
-  index
-);
+const resolveSig = await client.receipt.autoResolveDispute(agentWallet, depositorWallet, nonce, index);
 ```
 
 ---
 
 ## Error Codes Reference
 
-| Code | Name | Message | Recovery |
-|------|------|---------|----------|
-| 6075 | ArithmeticOverflow | `overflow in settle` | Use `nextSettlementIndex()`, check orphan recovery |
-| 6093 | InvalidCoSigner | `bad co-signer` | Pass `Keypair` as 7th arg, not in args |
-| 6098 | SettlementAlreadyFinalized | `already final` | Nothing to do, settlement complete |
-| 6099 | DisputeWindowNotExpired | `too early` | Wait for dispute window to close |
-| 6100 | DisputeWindowExpired | `window closed` | File dispute before deadline |
-| 6101 | NotDepositor | `not depositor` | Sign with depositor wallet |
-| 6102 | DisputeAlreadyFiled | `dup dispute` | Wait for existing dispute to resolve |
-| 6103 | DisputeStillOpen | `dispute open` | Wait for resolution |
-| 6104 | NotArbiter | `not arbiter` | Sign with arbiter wallet |
+| Code | Name                       | Message              | Recovery                                           |
+| ---- | -------------------------- | -------------------- | -------------------------------------------------- |
+| 6075 | ArithmeticOverflow         | `overflow in settle` | Use `nextSettlementIndex()`, check orphan recovery |
+| 6093 | InvalidCoSigner            | `bad co-signer`      | Pass `Keypair` as 7th arg, not in args             |
+| 6098 | SettlementAlreadyFinalized | `already final`      | Nothing to do, settlement complete                 |
+| 6099 | DisputeWindowNotExpired    | `too early`          | Wait for dispute window to close                   |
+| 6100 | DisputeWindowExpired       | `window closed`      | File dispute before deadline                       |
+| 6101 | NotDepositor               | `not depositor`      | Sign with depositor wallet                         |
+| 6102 | DisputeAlreadyFiled        | `dup dispute`        | Wait for existing dispute to resolve               |
+| 6103 | DisputeStillOpen           | `dispute open`       | Wait for resolution                                |
+| 6104 | NotArbiter                 | `not arbiter`        | Sign with arbiter wallet                           |
 
 ---
 
@@ -271,4 +283,4 @@ const resolveSig = await client.receipt.autoResolveDispute(
 
 ---
 
-*Migration guide prepared by OOBE Protocol Labs — June 4, 2026*
+_Migration guide prepared by OOBE Protocol Labs — June 4, 2026_

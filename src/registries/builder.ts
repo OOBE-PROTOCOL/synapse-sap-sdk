@@ -50,11 +50,13 @@ import type { SapProgram } from "../modules/base";
 import {
   deriveAgent,
   deriveAgentStats,
+  derivePricingMenu,
   deriveTool,
   deriveGlobalRegistry,
 } from "../pda";
 import { sha256, hashToArray, assert } from "../utils";
 import { LIMITS, TOOL_CATEGORY_VALUES, HTTP_METHOD_VALUES } from "../constants";
+import { TREASURY_WALLET } from "../constants/treasury";
 import type {
   PricingTier,
   TokenTypeKind,
@@ -106,7 +108,10 @@ export interface PricingTierInput {
   readonly batchIntervalSec?: number;
   readonly minPricePerCall?: number | string | BN;
   readonly maxPricePerCall?: number | string | BN;
-  readonly volumeCurve?: Array<{ afterCalls: number; pricePerCall: number | string | BN }>;
+  readonly volumeCurve?: Array<{
+    afterCalls: number;
+    pricePerCall: number | string | BN;
+  }>;
 }
 
 /**
@@ -217,7 +222,10 @@ export class AgentBuilder {
    * @since v0.1.0
    */
   agent(name: string): this {
-    assert(name.length <= LIMITS.MAX_NAME_LEN, `Name exceeds ${LIMITS.MAX_NAME_LEN} chars`);
+    assert(
+      name.length <= LIMITS.MAX_NAME_LEN,
+      `Name exceeds ${LIMITS.MAX_NAME_LEN} chars`,
+    );
     this._name = name;
     return this;
   }
@@ -230,7 +238,10 @@ export class AgentBuilder {
    * @since v0.1.0
    */
   description(desc: string): this {
-    assert(desc.length <= LIMITS.MAX_DESC_LEN, `Description exceeds ${LIMITS.MAX_DESC_LEN} chars`);
+    assert(
+      desc.length <= LIMITS.MAX_DESC_LEN,
+      `Description exceeds ${LIMITS.MAX_DESC_LEN} chars`,
+    );
     this._description = desc;
     return this;
   }
@@ -243,7 +254,10 @@ export class AgentBuilder {
    * @since v0.1.0
    */
   agentId(id: string): this {
-    assert(id.length <= LIMITS.MAX_AGENT_ID_LEN, `Agent ID exceeds ${LIMITS.MAX_AGENT_ID_LEN} chars`);
+    assert(
+      id.length <= LIMITS.MAX_AGENT_ID_LEN,
+      `Agent ID exceeds ${LIMITS.MAX_AGENT_ID_LEN} chars`,
+    );
     this._agentId = id;
     return this;
   }
@@ -256,7 +270,10 @@ export class AgentBuilder {
    * @since v0.1.0
    */
   agentUri(uri: string): this {
-    assert(uri.length <= LIMITS.MAX_URI_LEN, `URI exceeds ${LIMITS.MAX_URI_LEN} chars`);
+    assert(
+      uri.length <= LIMITS.MAX_URI_LEN,
+      `URI exceeds ${LIMITS.MAX_URI_LEN} chars`,
+    );
     this._agentUri = uri;
     return this;
   }
@@ -269,7 +286,10 @@ export class AgentBuilder {
    * @since v0.1.0
    */
   x402Endpoint(url: string): this {
-    assert(url.length <= LIMITS.MAX_URI_LEN, `x402 endpoint exceeds ${LIMITS.MAX_URI_LEN} chars`);
+    assert(
+      url.length <= LIMITS.MAX_URI_LEN,
+      `x402 endpoint exceeds ${LIMITS.MAX_URI_LEN} chars`,
+    );
     this._x402Endpoint = url;
     return this;
   }
@@ -422,6 +442,7 @@ export class AgentBuilder {
 
     const [agentPda] = deriveAgent(this.wallet);
     const [statsPda] = deriveAgentStats(agentPda);
+    const [pricingPda] = derivePricingMenu(agentPda);
     const [globalPda] = deriveGlobalRegistry();
 
     const txSignature = await this.methods
@@ -439,9 +460,13 @@ export class AgentBuilder {
         wallet: this.wallet,
         agent: agentPda,
         agentStats: statsPda,
+        pricingMenu: pricingPda,
         globalRegistry: globalPda,
         systemProgram: SystemProgram.programId,
       })
+      .remainingAccounts([
+        { pubkey: TREASURY_WALLET, isSigner: false, isWritable: true },
+      ])
       .rpc();
 
     return { txSignature, agentPda, statsPda };
@@ -467,12 +492,19 @@ export class AgentBuilder {
 
     for (const tool of this._tools) {
       const toolNameHash = hashToArray(sha256(tool.name));
-      const [toolPda] = deriveTool(result.agentPda, new Uint8Array(toolNameHash));
+      const [toolPda] = deriveTool(
+        result.agentPda,
+        new Uint8Array(toolNameHash),
+      );
 
       const httpMethod =
-        HTTP_METHOD_VALUES[(tool.httpMethod ?? "post") as keyof typeof HTTP_METHOD_VALUES] ?? 1;
+        HTTP_METHOD_VALUES[
+          (tool.httpMethod ?? "post") as keyof typeof HTTP_METHOD_VALUES
+        ] ?? 1;
       const category =
-        TOOL_CATEGORY_VALUES[(tool.category ?? "Custom") as keyof typeof TOOL_CATEGORY_VALUES] ?? 9;
+        TOOL_CATEGORY_VALUES[
+          (tool.category ?? "Custom") as keyof typeof TOOL_CATEGORY_VALUES
+        ] ?? 9;
 
       const txSignature = await this.methods
         .publishTool(

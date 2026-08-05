@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * @module cli
- * @description synapse-sap CLI — v1.0.0 Edition
+ * @description synapse-sap CLI — v1.0.3 Edition
  *
  * Complete toolbox for the Synapse Agent Protocol (SAP v2):
  *   - Agent lifecycle management
@@ -13,7 +13,7 @@
  *   - Environment & config management
  *
  * @since v1.0.0
- * @requires @oobe-protocol-labs/synapse-sap-sdk@^1.0.0
+ * @requires @oobe-protocol-labs/synapse-sap-sdk@^1.0.3
  */
 
 import { Command } from "commander";
@@ -39,8 +39,8 @@ const program = new Command();
 
 program
   .name("synapse-sap")
-  .description("synapse-sap CLI — v1.0.0 Edition\nComplete toolbox for the Synapse Agent Protocol (SAP v2) on Solana")
-  .version("1.0.0")
+  .description("synapse-sap CLI — v1.0.3 Edition\nComplete toolbox for the Synapse Agent Protocol (SAP v2) on Solana")
+  .version("1.0.3")
   .addHelpText("after", `
 Quick Start:
   $ synapse-sap wizard                        # Interactive MCP setup (recommended)

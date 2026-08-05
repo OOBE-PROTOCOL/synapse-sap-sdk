@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- `agent.migratePricingMenu()` for legacy agents whose
+  `AgentPricingMenu` PDA was never initialized. Run it once before
+  `agent.update()`, `agent.close()`, or `escrowV2.create()` if the transaction
+  fails with `AccountNotInitialized` on `pricing_menu`.
+
+### Fixed
+
+- Embedded IDL JSON now includes `migrate_pricing_menu`, keeping SDK account
+  schemas aligned with the program migration path.
+- Treasury constants no longer document an `Agent close` fee that is not
+  enforced by the current program.
+- Release packaging no longer depends on the non-existent
+  `@bonfida/spl-name-service` npm package. SNS module/adapters now fail fast
+  with an explicit deprecation error until migrated to a current Solana Name
+  Service SDK and tested end to end.
+- CLI release metadata and dependency range now align to SDK `1.0.3`.
+- GitHub Actions now run SDK/CLI lint, tests, build, release verification,
+  clean consumer install checks, and manual SDK/CLI tarball packing.
+
 ## [1.0.2] - 2026-07-17
 
 Patch release for SAP program v2 compatibility and SAP MCP v0.9.x consumption.
@@ -14,6 +37,7 @@ The embedded on-chain program IDL remains `1.0.0`; this release updates the
 SDK, CLI, skills, and docs around that deployed program surface.
 
 ### Changed
+
 - Escrow guidance is now V2-only in active docs and skills. Deprecated V1
   escrow recipes are removed from recommended paths.
 - `X402Registry` now carries `nonce` through prepare, balance, funding,
@@ -25,6 +49,7 @@ SDK, CLI, skills, and docs around that deployed program surface.
   challenge/sign/retry flows.
 
 ### Fixed
+
 - `settlementSecurity=0` / SelfReport is no longer present as a default in
   active SDK/CLI/skill paths.
 - CLI `escrow create` now defaults to DisputeWindow, exposes all V2 security
@@ -38,6 +63,7 @@ SDK, CLI, skills, and docs around that deployed program surface.
 - Release verification no longer self-flags its own secret-pattern sentinels.
 
 ### Validation
+
 - SDK tests passed.
 - SDK typecheck passed.
 - SDK lint passed with 0 errors.
@@ -54,9 +80,10 @@ SDK, CLI, skills, and docs around that deployed program surface.
 Emergency patch for the npm `1.0.0` package.
 
 ### Fixed
+
 - Rebuilt and republished the SDK with the corrected legacy `Pdas` export
   surface. The npm `1.0.0` tarball still exposed stale `getEscrowV2PDA(agent,
-  nonce)` and placeholder `hashString()` behavior even though the repo/tag had
+nonce)` and placeholder `hashString()` behavior even though the repo/tag had
   already been corrected.
 - `Pdas.getEscrowV2PDA()` now uses the canonical V2 seed shape:
   `sap_escrow_v2(agent, depositor, nonce_u64_le)`.
@@ -67,6 +94,7 @@ Emergency patch for the npm `1.0.0` package.
 - CLI package dependency now targets SDK `^1.0.1`.
 
 ### Validation
+
 - SDK build passed.
 - CLI build passed.
 - SDK smoke tests passed.
@@ -85,12 +113,14 @@ GitHub release consumers, while preserving the canonical deployed program
 layout that integrators already smoke-tested on devnet/mainnet.
 
 ### Added
+
 - Canonical SDK, CLI, docs, skills, and embedded IDL metadata aligned to
   `1.0.0`.
 - `staking.closeStake()` recovery helper for legacy accounts whose agent PDA
   was already closed while the StakePDA remained funded.
 
 ### Changed
+
 - Escrow support is now V2-only in public SDK flows. `client.escrow`,
   `x402.preparePayment()`, `x402.addFunds()`, `x402.withdrawFunds()`,
   `x402.closeEscrow()`, and `x402.settle()` all target the canonical
@@ -102,6 +132,7 @@ layout that integrators already smoke-tested on devnet/mainnet.
   calling the removed legacy `settle_batch` instruction.
 
 ### Fixed
+
 - Program and SDK are aligned on version `1.0.0`.
 - Aligned all embedded IDL JSON paths with the Anchor-generated program IDL
   (`settle_calls_v2` uses 5 accounts; `create_pending_settlement` uses 4 args).
@@ -129,6 +160,7 @@ layout that integrators already smoke-tested on devnet/mainnet.
   secret-like strings are reachable from release refs.
 
 ### Validation
+
 - SDK build passed.
 - CLI build passed.
 - SDK smoke tests passed.
@@ -140,17 +172,20 @@ layout that integrators already smoke-tested on devnet/mainnet.
 
 ## [0.21.0] - 2026-06-25
 
-###  Major Features
+### Major Features
 
 #### SNS Integration — Modular Record System
+
 Complete SNS (Solana Name Service) integration with modular, composable record system.
 
 **Philosophy:** Free choice, strong typing, modularity
+
 - ✅ **Free Choice** — Every record optional, agents choose what to expose
 - ✅ **Strong Typing** — Rigorous TypeScript with extensibility
 - ✅ **Modularity** — Builder pattern with composable packs
 
 **Key Features:**
+
 - Modular record builder with optional packs (Identity, Decentralized, Multi-Chain, DNS)
 - Core identity records (SOL, Pic, TXT) always present
 - Optional social records (Twitter, Discord, Telegram, Github, Email, Url)
@@ -160,6 +195,7 @@ Complete SNS (Solana Name Service) integration with modular, composable record s
 - Extensible data structure with `[key: string]: unknown`
 
 **Components:**
+
 - `src/modules/sns.ts` — SNS module (753 lines)
 - `src/utils/sns-adapter.ts` — Mainnet adapter (508 lines)
 - `src/utils/sns-devnet-adapter.ts` — Devnet adapter (576 lines)
@@ -167,6 +203,7 @@ Complete SNS (Solana Name Service) integration with modular, composable record s
 - `cli/src/commands/sns.ts` — CLI commands (492 lines)
 
 **CLI Commands (8 total):**
+
 - `sns check` — Check domain availability
 - `sns register` — Register domain with custom records
 - `sns resolve` — Resolve domain to agent identity
@@ -177,6 +214,7 @@ Complete SNS (Solana Name Service) integration with modular, composable record s
 - `sns pda` — Derive domain/record PDA
 
 **Documentation:**
+
 - `docs/partnerships/sns/03_MODULAR_RECORD_SYSTEM.md` — Modular system guide (15.9 KB, English)
 - `skills/sns-skill/README.md` — Complete practical skill (17.6 KB, English)
 - `docs/partnerships/sns/00_COMPLETE_IMPLEMENTATION_GUIDE.md` — Implementation guide (30.9 KB)
@@ -190,10 +228,12 @@ Complete SNS (Solana Name Service) integration with modular, composable record s
 ### 🔒 Security
 
 #### Security Audit — Production Ready
+
 **Audit Date:** 2026-06-25  
 **Status:** ✅ **APPROVED FOR PRODUCTION**
 
 **Findings:**
+
 - Critical Issues: **0**
 - High Issues: **0**
 - Medium Issues: **0**
@@ -201,6 +241,7 @@ Complete SNS (Solana Name Service) integration with modular, composable record s
 - Informational: **3** (version bump, translation, tests)
 
 **Security Checklist:**
+
 - ✅ No `eval()` or `Function()` usage
 - ✅ No `@ts-expect-error` in critical paths
 - ✅ No hardcoded secrets or API keys
@@ -217,18 +258,21 @@ Complete SNS (Solana Name Service) integration with modular, composable record s
 ### 🛠️ Technical Improvements
 
 #### Type Safety
+
 - Added `Signer` and `Commitment` imports to `src/types/sns.ts`
 - Updated `SnsModuleConfig` interface with proper types
 - All record types fully typed with validation
 - Extensible data structure with `[key: string]: unknown`
 
 #### Error Handling
+
 - Proper try/catch with typed errors throughout
 - No error swallowing
 - Consistent error messages
 - Error recovery patterns documented
 
 #### Build System
+
 - ESM imports fixed (182 specifiers)
 - Anchor CJS imports rewritten (16 imports)
 - Type definitions generated correctly
@@ -239,6 +283,7 @@ Complete SNS (Solana Name Service) integration with modular, composable record s
 ### 📚 Documentation
 
 #### New Documentation (English)
+
 - `docs/partnerships/sns/03_MODULAR_RECORD_SYSTEM.md` — Complete modular system guide
   - Architecture diagram
   - Record types with validation
@@ -259,6 +304,7 @@ Complete SNS (Solana Name Service) integration with modular, composable record s
   - Best practices
 
 #### Updated Documentation
+
 - `skills/README.md` — Added skill #12 (sns-skill)
 - `README.md` — Updated with SNS integration section
 
@@ -270,24 +316,26 @@ Complete SNS (Solana Name Service) integration with modular, composable record s
 
 All features follow SAP core principles:
 
-| Principle | Implementation |
-|-----------|----------------|
-| **Free Choice** | Every record optional, no obligations |
-| **Strong Typing** | TypeScript rigorous but flexible |
-| **Modularity** | Builder pattern, composable packs |
-| **No Imposition** | No rigid roles  |
-| **URI Delegation** | Can point to off-chain metadata |
-| **Extensibility** | Custom data support |
+| Principle          | Implementation                        |
+| ------------------ | ------------------------------------- |
+| **Free Choice**    | Every record optional, no obligations |
+| **Strong Typing**  | TypeScript rigorous but flexible      |
+| **Modularity**     | Builder pattern, composable packs     |
+| **No Imposition**  | No rigid roles                        |
+| **URI Delegation** | Can point to off-chain metadata       |
+| **Extensibility**  | Custom data support                   |
 
 ---
 
 ### Package Updates
 
 #### Dependencies
+
 - `@bonfida/spl-name-service@3.0.9` — Official SNS SDK
 - `@synapse-sap/sdk@0.21.0` — SDK version aligned with CLI
 
 #### CLI Version
+
 - `@oobe-protocol-labs/synapse-sap-cli@0.21.0` — Updated from 0.20.0
 
 ---
@@ -295,6 +343,7 @@ All features follow SAP core principles:
 ### Bug Fixes
 
 #### SNS Module
+
 - Fixed signer verification in `registerAgentDomain()`
 - Fixed PDA derivation for agent domains
 - Fixed record parsing with proper offset handling
@@ -302,6 +351,7 @@ All features follow SAP core principles:
 - Removed all TODOs/FIXMEs from SNS code
 
 #### CLI
+
 - Fixed `config.rpcUrl` → `config.rpc`
 - Fixed `config.sapProgramId` → `config.programId`
 - Fixed `config.keypairPath` → `config.walletPath`
@@ -311,28 +361,30 @@ All features follow SAP core principles:
 
 ### Code Metrics
 
-| Metric | Value |
-|--------|-------|
-| TypeScript Files | 105 |
+| Metric              | Value               |
+| ------------------- | ------------------- |
+| TypeScript Files    | 105                 |
 | Total Lines of Code | ~7,500 (SNS module) |
-| Documentation Files | 5 (114 KB) |
-| Skills | 1 (17.6 KB) |
-| CLI Commands | 8 |
-| Build Success Rate | 100% |
-| Type Coverage | 100% |
-| TODO/FIXME Count | 0 |
+| Documentation Files | 5 (114 KB)          |
+| Skills              | 1 (17.6 KB)         |
+| CLI Commands        | 8                   |
+| Build Success Rate  | 100%                |
+| Type Coverage       | 100%                |
+| TODO/FIXME Count    | 0                   |
 
 ---
 
 ### ✅ Testing
 
 #### Manual Testing
+
 - ✅ Build passing (SDK + CLI)
 - ✅ CLI commands functional
 - ✅ Help text complete
 - ✅ Type definitions correct
 
 #### Pending Tests
+
 - Unit tests for SNS module (future)
 - Integration tests on devnet (future)
 - E2E tests with real USDC (future)
@@ -358,13 +410,14 @@ All features follow SAP core principles:
 **No Breaking Changes** — This is a feature release.
 
 **New Features Available:**
+
 ```typescript
-import { buildSnsRecords } from '@synapse-sap/sdk/utils/sns-builder';
+import { buildSnsRecords } from "@synapse-sap/sdk/utils/sns-builder";
 
 // Minimal (core only)
 const records = buildSnsRecords({
   wallet: agentWallet,
-  agentPda: agentPda
+  agentPda: agentPda,
 });
 
 // With social
@@ -374,8 +427,8 @@ const records = buildSnsRecords({
   includeIdentity: true,
   social: {
     twitter: "crypto_trader",
-    discord: "discord.gg/bot"
-  }
+    discord: "discord.gg/bot",
+  },
 });
 
 // Full (but you choose)
@@ -386,11 +439,12 @@ const records = buildSnsRecords({
   includeIdentity: true,
   social: { twitter: "crypto_trader" },
   includeDecentralized: true,
-  metadata: { ipfs: "QmX...123" }
+  metadata: { ipfs: "QmX...123" },
 });
 ```
 
 **CLI Usage:**
+
 ```bash
 # Register domain with custom records
 synapse-sap sns register trading-bot \
@@ -408,15 +462,17 @@ synapse-sap sns register trading-bot \
 
 ---
 
-###  Future Roadmap
+### Future Roadmap
 
 #### v0.22.0 (Planned)
+
 - Unit tests for SNS module
 - Integration tests on devnet
 - Translate remaining docs to English
 - E2E tests with real USDC
 
 #### v0.23.0 (Planned)
+
 - SNS partnership features
 - Grant application integration
 - Enhanced social verification

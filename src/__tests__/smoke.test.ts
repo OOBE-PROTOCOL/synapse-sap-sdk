@@ -32,7 +32,8 @@ function listMarkdownFiles(relativeDir: string): string[] {
   const out: string[] = [];
   const walk = (dir: string) => {
     for (const entry of readdirSync(dir)) {
-      if (entry === ".history" || entry === "node_modules" || entry === "dist") continue;
+      if (entry === ".history" || entry === "node_modules" || entry === "dist")
+        continue;
       const full = join(dir, entry);
       const stat = statSync(full);
       if (stat.isDirectory()) walk(full);
@@ -110,7 +111,9 @@ describe("SDK smoke", () => {
   });
 
   it("keeps agent lifecycle builders aligned with pricing/global accounts", () => {
-    expect(instruction("register_agent").accounts.map((account) => account.name)).toEqual([
+    expect(
+      instruction("register_agent").accounts.map((account) => account.name),
+    ).toEqual([
       "wallet",
       "agent",
       "agent_stats",
@@ -118,29 +121,51 @@ describe("SDK smoke", () => {
       "global_registry",
       "system_program",
     ]);
-    expect(instruction("update_agent").accounts.map((account) => account.name)).toEqual([
-      "wallet",
-      "agent",
-      "pricing_menu",
-      "system_program",
-    ]);
-    expect(instruction("deactivate_agent").accounts.map((account) => account.name)).toEqual([
-      "wallet",
-      "agent",
-      "agent_stats",
-      "global_registry",
-    ]);
-    expect(instruction("reactivate_agent").accounts.map((account) => account.name)).toEqual([
-      "wallet",
-      "agent",
-      "agent_stats",
-      "global_registry",
-    ]);
-    expect(instruction("close_stake").accounts.map((account) => account.name)).toEqual([
-      "wallet",
-      "agent",
-      "stake",
-    ]);
+    expect(
+      instruction("update_agent").accounts.map((account) => account.name),
+    ).toEqual(["wallet", "agent", "pricing_menu", "system_program"]);
+    expect(
+      instruction("migrate_pricing_menu").accounts.map(
+        (account) => account.name,
+      ),
+    ).toEqual(["wallet", "agent", "pricing_menu", "system_program"]);
+    expect(
+      instruction("deactivate_agent").accounts.map((account) => account.name),
+    ).toEqual(["wallet", "agent", "agent_stats", "global_registry"]);
+    expect(
+      instruction("reactivate_agent").accounts.map((account) => account.name),
+    ).toEqual(["wallet", "agent", "agent_stats", "global_registry"]);
+    expect(
+      instruction("close_stake").accounts.map((account) => account.name),
+    ).toEqual(["wallet", "agent", "stake"]);
+  });
+
+  it("keeps every public register builder wired to the protocol treasury", () => {
+    const registerSources = [
+      "src/modules/agent.ts",
+      "src/instructions/agent.ts",
+      "src/registries/builder.ts",
+      "src/registries/metaplex-bridge.ts",
+    ].map((file) => [file, readPackageFile(file)] as const);
+
+    for (const [file, source] of registerSources) {
+      expect(source, file).toContain("TREASURY_WALLET");
+      expect(source, file).toContain("remainingAccounts");
+    }
+
+    const treasuryConstants = readPackageFile("src/constants/treasury.ts");
+    expect(treasuryConstants).toContain("REGISTRATION_FEE_LAMPORTS");
+    expect(treasuryConstants).not.toContain("Agent close");
+  });
+
+  it("documents the legacy AgentPricingMenu migration path", () => {
+    const migrationGuide = readPackageFile("docs/12-migration-guide.md");
+    const agentModule = readPackageFile("src/modules/agent.ts");
+
+    expect(migrationGuide).toContain("migratePricingMenu");
+    expect(migrationGuide).toContain("AccountNotInitialized");
+    expect(migrationGuide.toLowerCase()).toContain("do not re-register");
+    expect(agentModule).toContain("async migratePricingMenu()");
   });
 
   it("maps legacy SDK escrow aliases to V2 nonce zero", () => {
@@ -161,9 +186,15 @@ describe("SDK smoke", () => {
     const [agent] = deriveAgent(wallet);
 
     expect(Pdas.getAgentPDA(wallet)[0].toBase58()).toBe(agent.toBase58());
-    expect(Pdas.getAgentStatsPDA(agent)[0].toBase58()).toBe(deriveAgentStats(agent)[0].toBase58());
-    expect(Pdas.getPricingMenuPDA(agent)[0].toBase58()).toBe(derivePricingMenu(agent)[0].toBase58());
-    expect(Pdas.getAgentStakePDA(agent)[0].toBase58()).toBe(deriveStake(agent)[0].toBase58());
+    expect(Pdas.getAgentStatsPDA(agent)[0].toBase58()).toBe(
+      deriveAgentStats(agent)[0].toBase58(),
+    );
+    expect(Pdas.getPricingMenuPDA(agent)[0].toBase58()).toBe(
+      derivePricingMenu(agent)[0].toBase58(),
+    );
+    expect(Pdas.getAgentStakePDA(agent)[0].toBase58()).toBe(
+      deriveStake(agent)[0].toBase58(),
+    );
     expect(Pdas.getEscrowV2PDA(agent, depositor, 0)[0].toBase58()).toBe(
       deriveEscrowV2(agent, depositor, 0)[0].toBase58(),
     );
@@ -221,7 +252,9 @@ describe("SDK smoke", () => {
 
     for (const [file, text] of activeDocs) {
       for (const pattern of banned) {
-        expect(text, `${file} contains stale pattern ${pattern}`).not.toContain(pattern);
+        expect(text, `${file} contains stale pattern ${pattern}`).not.toContain(
+          pattern,
+        );
       }
       expect(text).toContain("sap_payments_call_paid_tool");
     }
@@ -242,6 +275,8 @@ describe("SDK smoke", () => {
     expect(docs).toContain("status !== 402");
     expect(docs).toContain("signChallengeLocally");
     expect(docs).toContain("PAYMENT-SIGNATURE");
-    expect(docs).toContain("Do not imply hosted SAP MCP tools can call arbitrary HTTP x402 endpoints");
+    expect(docs).toContain(
+      "Do not imply hosted SAP MCP tools can call arbitrary HTTP x402 endpoints",
+    );
   });
 });
