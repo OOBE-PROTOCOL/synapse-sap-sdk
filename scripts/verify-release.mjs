@@ -170,9 +170,11 @@ function verifyNoSecretPatterns() {
 }
 
 try {
+  run(root, "npm", ["run", "clean"]);
   run(root, "npm", ["run", "build"]);
   run(root, "npm", ["run", "test", "--", "--run"]);
   run(join(root, "cli"), "npm", ["ci"]);
+  run(join(root, "cli"), "npm", ["run", "clean"]);
   run(join(root, "cli"), "npm", ["run", "build"]);
 
   const sdk = pack(root, "@oobe-protocol-labs/synapse-sap-sdk");

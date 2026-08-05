@@ -4,6 +4,7 @@
  */
 
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -86,4 +87,14 @@ mkdirSync('dist/cjs', { recursive: true });
 writeFileSync('dist/cjs/package.json', '{ "type": "commonjs" }\n');
 console.log('✓ Added dist/cjs/package.json for CommonJS consumers');
 
-console.log('\n✅ Done! (idlTypes excluded - it is a file, not a directory)');
+for (const format of ['esm', 'cjs']) {
+  const idlDir = path.join('dist', format, 'idl');
+  mkdirSync(idlDir, { recursive: true });
+  copyFileSync(
+    'src/idl/synapse_agent_sap.json',
+    path.join(idlDir, 'synapse_agent_sap.json'),
+  );
+}
+console.log('✓ Copied embedded IDL JSON into dist/esm and dist/cjs');
+
+console.log('\n✅ Done!');
