@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.0.3] - 2026-08-05
 
 ### Added
 
@@ -15,11 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `AgentPricingMenu` PDA was never initialized. Run it once before
   `agent.update()`, `agent.close()`, or `escrowV2.create()` if the transaction
   fails with `AccountNotInitialized` on `pricing_menu`.
+- Embedded IDL metadata version aligned to `1.0.3` across all SDK IDL paths.
+- GitHub Actions for SDK CI (lint, tests, build, consumer install checks)
+  and SDK release pack (tarball generation with SHA256 checksums).
 
-### Fixed
+### Changed
 
 - Embedded IDL JSON now includes `migrate_pricing_menu`, keeping SDK account
   schemas aligned with the program migration path.
+- All embedded IDL `metadata.version` fields bumped from `1.0.0` to `1.0.3`.
+- Release verification (`verify-release.mjs`) now expects program IDL
+  version `1.0.3`.
+
+### Fixed
+
 - Treasury constants no longer document an `Agent close` fee that is not
   enforced by the current program.
 - Release packaging no longer depends on the non-existent

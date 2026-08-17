@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 const pkg = require(resolve(root, "package.json"));
 const expectedSdkVersion = pkg.version;
 const expectedCliVersion = expectedSdkVersion;
-const expectedProgramVersion = "1.0.0";
+const expectedProgramVersion = "1.0.3";
 
 const checks = [];
 const tmp = mkdtempSync(join(tmpdir(), "sap-release-verify-"));
