@@ -53,8 +53,8 @@ function instruction(name: string): IdlInstruction {
 }
 
 describe("SDK smoke", () => {
-  it("ships the canonical 1.0.0 IDL without legacy escrow instructions", () => {
-    expect(idl.metadata.version).toBe("1.0.0");
+  it("ships the canonical 1.0.3 IDL without legacy escrow instructions", () => {
+    expect(idl.metadata.version).toBe("1.0.3");
 
     const names = instructions.map((ix) => ix.name);
     expect(names).not.toContain("create_escrow");
