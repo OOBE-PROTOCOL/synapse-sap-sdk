@@ -1,13 +1,16 @@
-// Auto-generated from IDL v1.0.0
+// Auto-generated from IDL v1.0.3 — regen: `python3 scripts/regen-idl-types.py`
+// DO NOT EDIT BY HAND: fields are camelCase to match the BorshCoder that
+// @coral-xyz/anchor builds via convertIdlToCamelCase (Program ctor).
+// Keep in sync anchor: src/types/common.ts mirrors these shapes with JSDoc.
 
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 
 export interface AccountMigratedEvent {
   account: PublicKey;
-  account_type: string;
-  from_version: number;
-  to_version: number;
+  accountType: string;
+  fromVersion: number;
+  toVersion: number;
   timestamp: BN;
 }
 
@@ -17,80 +20,80 @@ export interface AgentAccount {
   wallet: PublicKey;
   name: string;
   description: string;
-  agent_id: string | null;
-  agent_uri: string | null;
-  x402_endpoint: string | null;
-  is_active: boolean;
-  created_at: BN;
-  updated_at: BN;
-  reputation_score: number;
-  total_feedbacks: number;
-  reputation_sum: BN;
-  total_calls_served: BN;
-  avg_latency_ms: number;
-  uptime_percent: number;
+  agentId: (string | null);
+  agentUri: (string | null);
+  x402Endpoint: (string | null);
+  isActive: boolean;
+  createdAt: BN;
+  updatedAt: BN;
+  reputationScore: number;
+  totalFeedbacks: number;
+  reputationSum: BN;
+  totalCallsServed: BN;
+  avgLatencyMs: number;
+  uptimePercent: number;
   capabilities: Capability[];
   pricing: PricingTier[];
   protocols: string[];
-  active_plugins: PluginRef[];
+  activePlugins: PluginRef[];
 }
 
 export interface AgentAttestation {
   bump: number;
   agent: PublicKey;
   attester: PublicKey;
-  attestation_type: string;
-  metadata_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  is_active: boolean;
-  expires_at: BN;
-  created_at: BN;
-  updated_at: BN;
+  attestationType: string;
+  metadataHash: number[];
+  isActive: boolean;
+  expiresAt: BN;
+  createdAt: BN;
+  updatedAt: BN;
 }
 
 export interface AgentPricingMenu {
   bump: number;
   agent: PublicKey;
   tiers: PricingTier[];
-  updated_at: BN;
+  updatedAt: BN;
 }
 
 export interface AgentStake {
   bump: number;
   agent: PublicKey;
   wallet: PublicKey;
-  staked_amount: BN;
-  slashed_amount: BN;
-  last_stake_at: BN;
-  unstake_requested_at: BN;
-  unstake_amount: BN;
-  unstake_available_at: BN;
-  total_disputes_won: number;
-  total_disputes_lost: number;
-  created_at: BN;
+  stakedAmount: BN;
+  slashedAmount: BN;
+  lastStakeAt: BN;
+  unstakeRequestedAt: BN;
+  unstakeAmount: BN;
+  unstakeAvailableAt: BN;
+  totalDisputesWon: number;
+  totalDisputesLost: number;
+  createdAt: BN;
 }
 
 export interface AgentStats {
   bump: number;
   agent: PublicKey;
   wallet: PublicKey;
-  total_calls_served: BN;
-  is_active: boolean;
-  active_escrows: number;
-  updated_at: BN;
+  totalCallsServed: BN;
+  isActive: boolean;
+  activeEscrows: number;
+  updatedAt: BN;
 }
 
 export interface AttestationCreatedEvent {
   agent: PublicKey;
   attester: PublicKey;
-  attestation_type: string;
-  expires_at: BN;
+  attestationType: string;
+  expiresAt: BN;
   timestamp: BN;
 }
 
 export interface AttestationRevokedEvent {
   agent: PublicKey;
   attester: PublicKey;
-  attestation_type: string;
+  attestationType: string;
   timestamp: BN;
 }
 
@@ -98,49 +101,52 @@ export interface BatchSettledEvent {
   escrow: PublicKey;
   agent: PublicKey;
   depositor: PublicKey;
-  num_settlements: number;
-  total_calls: BN;
-  total_amount: BN;
-  service_hashes: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number][];
-  calls_per_settlement: BN[];
-  remaining_balance: BN;
+  numSettlements: number;
+  totalCalls: BN;
+  totalAmount: BN;
+  serviceHashes: number[][];
+  callsPerSettlement: BN[];
+  remainingBalance: BN;
   timestamp: BN;
 }
 
-export interface BillingInterval {
-}
+export type BillingInterval =
+  | { Daily: null | Record<string, never> }
+  | { Weekly: null | Record<string, never> }
+  | { Monthly: null | Record<string, never> }
+;
 
 export interface CallsReportedEvent {
   agent: PublicKey;
   wallet: PublicKey;
-  calls_reported: BN;
-  total_calls_served: BN;
+  callsReported: BN;
+  totalCallsServed: BN;
   timestamp: BN;
 }
 
 export interface Capability {
   id: string;
-  description: string | null;
-  protocol_id: string | null;
-  version: string | null;
+  description: (string | null);
+  protocolId: (string | null);
+  version: (string | null);
 }
 
 export interface CapabilityIndex {
   bump: number;
-  capability_id: string;
-  capability_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
+  capabilityId: string;
+  capabilityHash: number[];
   agents: PublicKey[];
-  total_pages: number;
-  last_updated: BN;
+  totalPages: number;
+  lastUpdated: BN;
 }
 
 export interface CheckpointCreatedEvent {
   session: PublicKey;
   checkpoint: PublicKey;
-  checkpoint_index: number;
-  merkle_root: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  sequence_at: number;
-  epoch_at: number;
+  checkpointIndex: number;
+  merkleRoot: number[];
+  sequenceAt: number;
+  epochAt: number;
   timestamp: BN;
 }
 
@@ -154,26 +160,26 @@ export interface CoSignedSettlementEvent {
   escrow: PublicKey;
   agent: PublicKey;
   depositor: PublicKey;
-  co_signer: PublicKey;
-  calls_settled: BN;
+  coSigner: PublicKey;
+  callsSettled: BN;
   amount: BN;
-  service_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
+  serviceHash: number[];
   timestamp: BN;
 }
 
 export interface CounterShard {
   bump: number;
-  shard_index: number;
-  total_agents: BN;
-  active_agents: BN;
-  total_feedbacks: BN;
-  total_tools: number;
-  total_vaults: number;
-  total_attestations: number;
-  total_settlements: BN;
-  total_disputes: number;
-  total_subscriptions: number;
-  last_updated: BN;
+  shardIndex: number;
+  totalAgents: BN;
+  activeAgents: BN;
+  totalFeedbacks: BN;
+  totalTools: number;
+  totalVaults: number;
+  totalAttestations: number;
+  totalSettlements: BN;
+  totalDisputes: number;
+  totalSubscriptions: number;
+  lastUpdated: BN;
 }
 
 export interface DeactivatedEvent {
@@ -186,7 +192,7 @@ export interface DelegateAddedEvent {
   vault: PublicKey;
   delegate: PublicKey;
   permissions: number;
-  expires_at: BN;
+  expiresAt: BN;
   timestamp: BN;
 }
 
@@ -198,90 +204,100 @@ export interface DelegateRevokedEvent {
 
 export interface DisputeAutoResolvedEvent {
   dispute: PublicKey;
-  pending_settlement: PublicKey;
+  pendingSettlement: PublicKey;
   escrow: PublicKey;
   outcome: number;
-  proven_calls: number;
-  claimed_calls: number;
-  agent_amount: BN;
-  depositor_amount: BN;
-  slash_amount: BN;
+  provenCalls: number;
+  claimedCalls: number;
+  agentAmount: BN;
+  depositorAmount: BN;
+  slashAmount: BN;
   timestamp: BN;
 }
 
 export interface DisputeFiledEvent {
   dispute: PublicKey;
-  pending_settlement: PublicKey;
+  pendingSettlement: PublicKey;
   escrow: PublicKey;
   depositor: PublicKey;
   agent: PublicKey;
-  evidence_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  dispute_type: number;
-  dispute_bond: BN;
-  proof_deadline: BN;
+  evidenceHash: number[];
+  disputeType: number;
+  disputeBond: BN;
+  proofDeadline: BN;
   timestamp: BN;
 }
 
-export interface DisputeOutcome {
-}
+export type DisputeOutcome =
+  | { Pending: null | Record<string, never> }
+  | { DepositorWins: null | Record<string, never> }
+  | { AgentWins: null | Record<string, never> }
+  | { AutoReleased: null | Record<string, never> }
+  | { PartialRefund: null | Record<string, never> }
+  | { Split: null | Record<string, never> }
+;
 
 export interface DisputeRecord {
   bump: number;
-  pending_settlement: PublicKey;
+  pendingSettlement: PublicKey;
   escrow: PublicKey;
   depositor: PublicKey;
   agent: PublicKey;
-  dispute_type: DisputeType;
-  evidence_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  agent_evidence_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
+  disputeType: DisputeType;
+  evidenceHash: number[];
+  agentEvidenceHash: number[];
   outcome: DisputeOutcome;
-  resolution_layer: ResolutionLayer;
-  created_at: BN;
-  resolved_at: BN;
-  resolution_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  slash_amount: BN;
-  dispute_bond: BN;
-  proven_calls: number;
-  claimed_calls: number;
-  proof_deadline: BN;
+  resolutionLayer: ResolutionLayer;
+  createdAt: BN;
+  resolvedAt: BN;
+  resolutionHash: number[];
+  slashAmount: BN;
+  disputeBond: BN;
+  provenCalls: number;
+  claimedCalls: number;
+  proofDeadline: BN;
 }
 
 export interface DisputeResolvedEvent {
   dispute: PublicKey;
-  pending_settlement: PublicKey;
+  pendingSettlement: PublicKey;
   escrow: PublicKey;
   outcome: number;
-  slash_amount: BN;
-  resolution_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
+  slashAmount: BN;
+  resolutionHash: number[];
   timestamp: BN;
 }
 
-export interface DisputeType {
-}
+export type DisputeType =
+  | { NonDelivery: null | Record<string, never> }
+  | { PartialDelivery: null | Record<string, never> }
+  | { Overcharge: null | Record<string, never> }
+  | { Quality: null | Record<string, never> }
+;
 
 export interface EpochOpenedEvent {
   session: PublicKey;
-  epoch_page: PublicKey;
-  epoch_index: number;
-  start_sequence: number;
+  epochPage: PublicKey;
+  epochIndex: number;
+  startSequence: number;
   timestamp: BN;
 }
 
 export interface EpochPage {
   bump: number;
   session: PublicKey;
-  epoch_index: number;
-  start_sequence: number;
-  inscription_count: number;
-  total_bytes: number;
-  first_ts: BN;
-  last_ts: BN;
+  epochIndex: number;
+  startSequence: number;
+  inscriptionCount: number;
+  totalBytes: number;
+  firstTs: BN;
+  lastTs: BN;
 }
 
 export interface EpochPageClosedEvent {
   session: PublicKey;
-  epoch_page: PublicKey;
-  epoch_index: number;
+  epochPage: PublicKey;
+  epochIndex: number;
   timestamp: BN;
 }
 
@@ -290,39 +306,39 @@ export interface EscrowAccountV2 {
   version: number;
   agent: PublicKey;
   depositor: PublicKey;
-  agent_wallet: PublicKey;
-  escrow_nonce: BN;
+  agentWallet: PublicKey;
+  escrowNonce: BN;
   balance: BN;
-  total_deposited: BN;
-  total_settled: BN;
-  total_calls_settled: BN;
-  price_per_call: BN;
-  max_calls: BN;
-  created_at: BN;
-  last_settled_at: BN;
-  expires_at: BN;
-  volume_curve: VolumeCurveBreakpoint[];
-  token_mint: PublicKey | null;
-  token_decimals: number;
-  settlement_security: SettlementSecurity;
-  dispute_window_slots: BN;
-  settlement_index: BN;
-  co_signer: PublicKey | null;
-  arbiter: PublicKey | null;
-  pending_amount: BN;
-  pending_calls: BN;
-  receipt_batch_count: number;
-  dispute_bond_total: BN;
-  max_obligation: BN;
-  pending_settlement_count: number;
+  totalDeposited: BN;
+  totalSettled: BN;
+  totalCallsSettled: BN;
+  pricePerCall: BN;
+  maxCalls: BN;
+  createdAt: BN;
+  lastSettledAt: BN;
+  expiresAt: BN;
+  volumeCurve: VolumeCurveBreakpoint[];
+  tokenMint: (PublicKey | null);
+  tokenDecimals: number;
+  settlementSecurity: SettlementSecurity;
+  disputeWindowSlots: BN;
+  settlementIndex: BN;
+  coSigner: (PublicKey | null);
+  arbiter: (PublicKey | null);
+  pendingAmount: BN;
+  pendingCalls: BN;
+  receiptBatchCount: number;
+  disputeBondTotal: BN;
+  maxObligation: BN;
+  pendingSettlementCount: number;
 }
 
 export interface EscrowClosedEvent {
   escrow: PublicKey;
   agent: PublicKey;
   depositor: PublicKey;
-  total_settled: BN;
-  total_calls_settled: BN;
+  totalSettled: BN;
+  totalCallsSettled: BN;
   timestamp: BN;
 }
 
@@ -330,10 +346,10 @@ export interface EscrowCreatedEvent {
   escrow: PublicKey;
   agent: PublicKey;
   depositor: PublicKey;
-  price_per_call: BN;
-  max_calls: BN;
-  initial_deposit: BN;
-  expires_at: BN;
+  pricePerCall: BN;
+  maxCalls: BN;
+  initialDeposit: BN;
+  expiresAt: BN;
   timestamp: BN;
 }
 
@@ -341,7 +357,7 @@ export interface EscrowDepositedEvent {
   escrow: PublicKey;
   depositor: PublicKey;
   amount: BN;
-  new_balance: BN;
+  newBalance: BN;
   timestamp: BN;
 }
 
@@ -349,14 +365,14 @@ export interface EscrowV2CreatedEvent {
   escrow: PublicKey;
   agent: PublicKey;
   depositor: PublicKey;
-  escrow_nonce: BN;
-  price_per_call: BN;
-  max_calls: BN;
-  initial_deposit: BN;
-  settlement_security: number;
-  dispute_window_slots: BN;
-  co_signer: PublicKey | null;
-  arbiter: PublicKey | null;
+  escrowNonce: BN;
+  pricePerCall: BN;
+  maxCalls: BN;
+  initialDeposit: BN;
+  settlementSecurity: number;
+  disputeWindowSlots: BN;
+  coSigner: (PublicKey | null);
+  arbiter: (PublicKey | null);
   timestamp: BN;
 }
 
@@ -364,7 +380,7 @@ export interface EscrowWithdrawnEvent {
   escrow: PublicKey;
   depositor: PublicKey;
   amount: BN;
-  remaining_balance: BN;
+  remainingBalance: BN;
   timestamp: BN;
 }
 
@@ -374,10 +390,10 @@ export interface FeedbackAccount {
   reviewer: PublicKey;
   score: number;
   tag: string;
-  comment_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number] | null;
-  created_at: BN;
-  updated_at: BN;
-  is_revoked: boolean;
+  commentHash: number[] | null;
+  createdAt: BN;
+  updatedAt: BN;
+  isRevoked: boolean;
 }
 
 export interface FeedbackEvent {
@@ -397,72 +413,72 @@ export interface FeedbackRevokedEvent {
 export interface FeedbackUpdatedEvent {
   agent: PublicKey;
   reviewer: PublicKey;
-  old_score: number;
-  new_score: number;
+  oldScore: number;
+  newScore: number;
   timestamp: BN;
 }
 
 export interface GlobalRegistry {
   bump: number;
-  total_agents: BN;
-  active_agents: BN;
-  total_feedbacks: BN;
-  total_capabilities: number;
-  total_protocols: number;
-  last_registered_at: BN;
-  initialized_at: BN;
+  totalAgents: BN;
+  activeAgents: BN;
+  totalFeedbacks: BN;
+  totalCapabilities: number;
+  totalProtocols: number;
+  lastRegisteredAt: BN;
+  initializedAt: BN;
   authority: PublicKey;
-  total_tools: number;
-  total_vaults: number;
-  total_escrows: number;
-  total_attestations: number;
+  totalTools: number;
+  totalVaults: number;
+  totalEscrows: number;
+  totalAttestations: number;
 }
 
 export interface IndexPage {
   bump: number;
-  parent_index: PublicKey;
-  page_index: number;
+  parentIndex: PublicKey;
+  pageIndex: number;
   entries: PublicKey[];
-  last_updated: BN;
+  lastUpdated: BN;
 }
 
 export interface IndexPageCreatedEvent {
-  parent_index: PublicKey;
-  index_page: PublicKey;
-  page_index: number;
+  parentIndex: PublicKey;
+  indexPage: PublicKey;
+  pageIndex: number;
   timestamp: BN;
 }
 
 export interface LedgerEntryEvent {
   session: PublicKey;
   ledger: PublicKey;
-  entry_index: number;
-  data: Buffer;
-  content_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  data_len: number;
-  merkle_root: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
+  entryIndex: number;
+  data: number[];
+  contentHash: number[];
+  dataLen: number;
+  merkleRoot: number[];
   timestamp: BN;
 }
 
 export interface LedgerPage {
   bump: number;
   ledger: PublicKey;
-  page_index: number;
-  sealed_at: BN;
-  entries_in_page: number;
-  data_size: number;
-  merkle_root_at_seal: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  data: Buffer;
+  pageIndex: number;
+  sealedAt: BN;
+  entriesInPage: number;
+  dataSize: number;
+  merkleRootAtSeal: number[];
+  data: number[];
 }
 
 export interface LedgerSealedEvent {
   session: PublicKey;
   ledger: PublicKey;
   page: PublicKey;
-  page_index: number;
-  entries_in_page: number;
-  data_size: number;
-  merkle_root_at_seal: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
+  pageIndex: number;
+  entriesInPage: number;
+  dataSize: number;
+  merkleRootAtSeal: number[];
   timestamp: BN;
 }
 
@@ -470,15 +486,15 @@ export interface MemoryInscribedEvent {
   vault: PublicKey;
   session: PublicKey;
   sequence: number;
-  epoch_index: number;
-  encrypted_data: Buffer;
-  nonce: [number, number, number, number, number, number, number, number, number, number, number, number];
-  content_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  total_fragments: number;
-  fragment_index: number;
+  epochIndex: number;
+  encryptedData: number[];
+  nonce: number[];
+  contentHash: number[];
+  totalFragments: number;
+  fragmentIndex: number;
   compression: number;
-  data_len: number;
-  nonce_version: number;
+  dataLen: number;
+  nonceVersion: number;
   timestamp: BN;
 }
 
@@ -486,39 +502,39 @@ export interface MemoryLedger {
   bump: number;
   session: PublicKey;
   authority: PublicKey;
-  num_entries: number;
-  merkle_root: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  latest_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  total_data_size: BN;
-  created_at: BN;
-  updated_at: BN;
-  num_pages: number;
-  ring: Buffer;
+  numEntries: number;
+  merkleRoot: number[];
+  latestHash: number[];
+  totalDataSize: BN;
+  createdAt: BN;
+  updatedAt: BN;
+  numPages: number;
+  ring: number[];
 }
 
 export interface MemoryVault {
   bump: number;
   agent: PublicKey;
   wallet: PublicKey;
-  vault_nonce: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  total_sessions: number;
-  total_inscriptions: BN;
-  total_bytes_inscribed: BN;
-  created_at: BN;
-  protocol_version: number;
-  nonce_version: number;
-  last_nonce_rotation: BN;
+  vaultNonce: number[];
+  totalSessions: number;
+  totalInscriptions: BN;
+  totalBytesInscribed: BN;
+  createdAt: BN;
+  protocolVersion: number;
+  nonceVersion: number;
+  lastNonceRotation: BN;
 }
 
 export interface PaymentSettledEvent {
   escrow: PublicKey;
   agent: PublicKey;
   depositor: PublicKey;
-  calls_settled: BN;
+  callsSettled: BN;
   amount: BN;
-  service_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  total_calls_settled: BN;
-  remaining_balance: BN;
+  serviceHash: number[];
+  totalCallsSettled: BN;
+  remainingBalance: BN;
   timestamp: BN;
 }
 
@@ -526,51 +542,66 @@ export interface PendingSettlement {
   bump: number;
   escrow: PublicKey;
   agent: PublicKey;
-  agent_wallet: PublicKey;
+  agentWallet: PublicKey;
   depositor: PublicKey;
-  settlement_index: BN;
-  calls_to_settle: BN;
+  settlementIndex: BN;
+  callsToSettle: BN;
   amount: BN;
-  service_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  created_at: BN;
-  release_slot: BN;
-  is_finalized: boolean;
-  is_disputed: boolean;
+  serviceHash: number[];
+  receiptMerkleRoot: number[];
+  createdAt: BN;
+  releaseSlot: BN;
+  isFinalized: boolean;
+  isDisputed: boolean;
   outcome: DisputeOutcome;
 }
 
 export interface PluginRef {
-  plugin_type: PluginType;
+  pluginType: PluginType;
   pda: PublicKey;
 }
 
-export interface PluginType {
+export type PluginType =
+  | { Memory: null | Record<string, never> }
+  | { Validation: null | Record<string, never> }
+  | { Delegation: null | Record<string, never> }
+  | { Analytics: null | Record<string, never> }
+  | { Governance: null | Record<string, never> }
+  | { Custom: null | Record<string, never> }
+;
+
+export interface PricingMenuMigratedEvent {
+  agent: PublicKey;
+  wallet: PublicKey;
+  pricingMenu: PublicKey;
+  tierCount: number;
+  timestamp: BN;
 }
 
 export interface PricingTier {
-  tier_id: string;
-  price_per_call: BN;
-  min_price_per_call: BN | null;
-  max_price_per_call: BN | null;
-  rate_limit: number;
-  max_calls_per_session: number;
-  burst_limit: number | null;
-  token_type: TokenType;
-  token_mint: PublicKey | null;
-  token_decimals: number | null;
-  settlement_mode: SettlementMode | null;
-  min_escrow_deposit: BN | null;
-  batch_interval_sec: number | null;
-  volume_curve: VolumeCurveBreakpoint[] | null;
+  tierId: string;
+  pricePerCall: BN;
+  minPricePerCall: (BN | null);
+  maxPricePerCall: (BN | null);
+  rateLimit: number;
+  maxCallsPerSession: number;
+  burstLimit: (number | null);
+  tokenType: TokenType;
+  tokenMint: (PublicKey | null);
+  tokenDecimals: (number | null);
+  settlementMode: (SettlementMode | null);
+  minEscrowDeposit: (BN | null);
+  batchIntervalSec: (number | null);
+  volumeCurve: VolumeCurveBreakpoint[] | null;
 }
 
 export interface ProtocolIndex {
   bump: number;
-  protocol_id: string;
-  protocol_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
+  protocolId: string;
+  protocolHash: number[];
   agents: PublicKey[];
-  total_pages: number;
-  last_updated: BN;
+  totalPages: number;
+  lastUpdated: BN;
 }
 
 export interface ReactivatedEvent {
@@ -582,22 +613,22 @@ export interface ReactivatedEvent {
 export interface ReceiptBatch {
   bump: number;
   escrow: PublicKey;
-  batch_index: number;
-  merkle_root: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  call_count: number;
-  period_start: BN;
-  period_end: BN;
-  inscribed_at: BN;
+  batchIndex: number;
+  merkleRoot: number[];
+  callCount: number;
+  periodStart: BN;
+  periodEnd: BN;
+  inscribedAt: BN;
 }
 
 export interface ReceiptBatchInscribedEvent {
   escrow: PublicKey;
   agent: PublicKey;
-  batch_index: number;
-  merkle_root: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  call_count: number;
-  period_start: BN;
-  period_end: BN;
+  batchIndex: number;
+  merkleRoot: number[];
+  callCount: number;
+  periodStart: BN;
+  periodEnd: BN;
   timestamp: BN;
 }
 
@@ -605,9 +636,9 @@ export interface ReceiptProofSubmittedEvent {
   dispute: PublicKey;
   escrow: PublicKey;
   agent: PublicKey;
-  receipts_submitted: number;
-  receipts_verified: number;
-  total_proven: number;
+  receiptsSubmitted: number;
+  receiptsVerified: number;
+  totalProven: number;
   timestamp: BN;
 }
 
@@ -622,113 +653,114 @@ export interface RegisteredEvent {
 export interface ReputationUpdatedEvent {
   agent: PublicKey;
   wallet: PublicKey;
-  avg_latency_ms: number;
-  uptime_percent: number;
+  avgLatencyMs: number;
+  uptimePercent: number;
   timestamp: BN;
 }
 
-export interface ResolutionLayer {
-}
+export type ResolutionLayer =
+  | { Pending: null | Record<string, never> }
+  | { Auto: null | Record<string, never> }
+  | { Governance: null | Record<string, never> }
+;
 
 export interface SessionCheckpoint {
   bump: number;
   session: PublicKey;
-  checkpoint_index: number;
-  merkle_root: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  sequence_at: number;
-  epoch_at: number;
-  total_bytes_at: BN;
-  inscriptions_at: BN;
-  created_at: BN;
+  checkpointIndex: number;
+  merkleRoot: number[];
+  sequenceAt: number;
+  epochAt: number;
+  totalBytesAt: BN;
+  inscriptionsAt: BN;
+  createdAt: BN;
 }
 
 export interface SessionClosedEvent {
   vault: PublicKey;
   session: PublicKey;
-  total_inscriptions: number;
-  total_bytes: BN;
-  total_epochs: number;
+  totalInscriptions: number;
+  totalBytes: BN;
+  totalEpochs: number;
   timestamp: BN;
 }
 
 export interface SessionLedger {
   bump: number;
   vault: PublicKey;
-  session_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  sequence_counter: number;
-  total_bytes: BN;
-  current_epoch: number;
-  total_epochs: number;
-  created_at: BN;
-  last_inscribed_at: BN;
-  is_closed: boolean;
-  merkle_root: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  total_checkpoints: number;
-  tip_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
+  sessionHash: number[];
+  sequenceCounter: number;
+  totalBytes: BN;
+  currentEpoch: number;
+  totalEpochs: number;
+  createdAt: BN;
+  lastInscribedAt: BN;
+  isClosed: boolean;
+  merkleRoot: number[];
+  totalCheckpoints: number;
+  tipHash: number[];
 }
 
 export interface SessionOpenedEvent {
   vault: PublicKey;
   session: PublicKey;
-  session_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
+  sessionHash: number[];
   timestamp: BN;
 }
 
 export interface SessionPdaClosedEvent {
   vault: PublicKey;
   session: PublicKey;
-  total_inscriptions: number;
-  total_bytes: BN;
+  totalInscriptions: number;
+  totalBytes: BN;
   timestamp: BN;
 }
 
 export interface SettlementFinalizedEvent {
-  pending_settlement: PublicKey;
+  pendingSettlement: PublicKey;
   escrow: PublicKey;
   agent: PublicKey;
   amount: BN;
-  calls_settled: BN;
+  callsSettled: BN;
   timestamp: BN;
 }
 
-export interface SettlementMode {
-}
+export type SettlementMode =
+  | { Instant: null | Record<string, never> }
+  | { Escrow: null | Record<string, never> }
+  | { Batched: null | Record<string, never> }
+  | { X402: null | Record<string, never> }
+;
 
 export interface SettlementPendingEvent {
-  pending_settlement: PublicKey;
+  pendingSettlement: PublicKey;
   escrow: PublicKey;
   agent: PublicKey;
   depositor: PublicKey;
-  settlement_index: BN;
-  calls_to_settle: BN;
+  settlementIndex: BN;
+  callsToSettle: BN;
   amount: BN;
-  service_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  release_slot: BN;
+  serviceHash: number[];
+  releaseSlot: BN;
   timestamp: BN;
 }
 
-export interface SettlementReceipt {
-  bump: number;
-  escrow: PublicKey;
-  service_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  calls_settled: BN;
-  amount: BN;
-  settled_at: BN;
-}
-
-export interface SettlementSecurity {
-}
+export type SettlementSecurity =
+  | { SelfReport: null | Record<string, never> }
+  | { CoSigned: null | Record<string, never> }
+  | { DisputeWindow: null | Record<string, never> }
+;
 
 export interface ShardInitializedEvent {
   shard: PublicKey;
-  shard_index: number;
+  shardIndex: number;
   timestamp: BN;
 }
 
 export interface StakeClosedEvent {
   agent: PublicKey;
   wallet: PublicKey;
-  returned_lamports: BN;
+  returnedLamports: BN;
   timestamp: BN;
 }
 
@@ -736,16 +768,16 @@ export interface StakeDepositedEvent {
   agent: PublicKey;
   wallet: PublicKey;
   amount: BN;
-  total_staked: BN;
+  totalStaked: BN;
   timestamp: BN;
 }
 
 export interface StakeSlashedEvent {
   agent: PublicKey;
   dispute: PublicKey;
-  slash_amount: BN;
-  remaining_staked: BN;
-  compensated_to: PublicKey;
+  slashAmount: BN;
+  remainingStaked: BN;
+  compensatedTo: PublicKey;
   timestamp: BN;
 }
 
@@ -753,28 +785,28 @@ export interface Subscription {
   bump: number;
   agent: PublicKey;
   subscriber: PublicKey;
-  agent_wallet: PublicKey;
-  sub_id: BN;
-  price_per_interval: BN;
-  billing_interval: BillingInterval;
-  token_mint: PublicKey | null;
-  token_decimals: number;
+  agentWallet: PublicKey;
+  subId: BN;
+  pricePerInterval: BN;
+  billingInterval: BillingInterval;
+  tokenMint: (PublicKey | null);
+  tokenDecimals: number;
   balance: BN;
-  total_paid: BN;
-  intervals_paid: number;
-  started_at: BN;
-  last_claimed_at: BN;
-  cancelled_at: BN;
-  next_due_at: BN;
-  created_at: BN;
+  totalPaid: BN;
+  intervalsPaid: number;
+  startedAt: BN;
+  lastClaimedAt: BN;
+  cancelledAt: BN;
+  nextDueAt: BN;
+  createdAt: BN;
 }
 
 export interface SubscriptionCancelledEvent {
   subscription: PublicKey;
   agent: PublicKey;
   subscriber: PublicKey;
-  refund_amount: BN;
-  intervals_used: number;
+  refundAmount: BN;
+  intervalsUsed: number;
   timestamp: BN;
 }
 
@@ -783,8 +815,8 @@ export interface SubscriptionClaimedEvent {
   agent: PublicKey;
   subscriber: PublicKey;
   amount: BN;
-  intervals_paid: number;
-  remaining_balance: BN;
+  intervalsPaid: number;
+  remainingBalance: BN;
   timestamp: BN;
 }
 
@@ -792,103 +824,121 @@ export interface SubscriptionCreatedEvent {
   subscription: PublicKey;
   agent: PublicKey;
   subscriber: PublicKey;
-  sub_id: BN;
-  price_per_interval: BN;
-  billing_interval: number;
-  initial_deposit: BN;
+  subId: BN;
+  pricePerInterval: BN;
+  billingInterval: number;
+  initialDeposit: BN;
   timestamp: BN;
 }
 
-export interface TokenType {
-}
+export type TokenType =
+  | { Sol: null | Record<string, never> }
+  | { Usdc: null | Record<string, never> }
+  | { Spl: null | Record<string, never> }
+;
 
-export interface ToolCategory {
-}
+export type ToolCategory =
+  | { Swap: null | Record<string, never> }
+  | { Lend: null | Record<string, never> }
+  | { Stake: null | Record<string, never> }
+  | { Nft: null | Record<string, never> }
+  | { Payment: null | Record<string, never> }
+  | { Data: null | Record<string, never> }
+  | { Governance: null | Record<string, never> }
+  | { Bridge: null | Record<string, never> }
+  | { Analytics: null | Record<string, never> }
+  | { Custom: null | Record<string, never> }
+;
 
 export interface ToolCategoryIndex {
   bump: number;
   category: number;
   tools: PublicKey[];
-  total_pages: number;
-  last_updated: BN;
+  totalPages: number;
+  lastUpdated: BN;
 }
 
 export interface ToolClosedEvent {
   agent: PublicKey;
   tool: PublicKey;
-  tool_name: string;
-  total_invocations: BN;
+  toolName: string;
+  totalInvocations: BN;
   timestamp: BN;
 }
 
 export interface ToolDeactivatedEvent {
   agent: PublicKey;
   tool: PublicKey;
-  tool_name: string;
+  toolName: string;
   timestamp: BN;
 }
 
 export interface ToolDescriptor {
   bump: number;
   agent: PublicKey;
-  tool_name_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  tool_name: string;
-  protocol_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
+  toolNameHash: number[];
+  toolName: string;
+  protocolHash: number[];
   version: number;
-  description_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  input_schema_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  output_schema_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  http_method: ToolHttpMethod;
+  descriptionHash: number[];
+  inputSchemaHash: number[];
+  outputSchemaHash: number[];
+  httpMethod: ToolHttpMethod;
   category: ToolCategory;
-  params_count: number;
-  required_params: number;
-  is_compound: boolean;
-  is_active: boolean;
-  total_invocations: BN;
-  created_at: BN;
-  updated_at: BN;
-  previous_version: PublicKey;
+  paramsCount: number;
+  requiredParams: number;
+  isCompound: boolean;
+  isActive: boolean;
+  totalInvocations: BN;
+  createdAt: BN;
+  updatedAt: BN;
+  previousVersion: PublicKey;
 }
 
-export interface ToolHttpMethod {
-}
+export type ToolHttpMethod =
+  | { Get: null | Record<string, never> }
+  | { Post: null | Record<string, never> }
+  | { Put: null | Record<string, never> }
+  | { Delete: null | Record<string, never> }
+  | { Compound: null | Record<string, never> }
+;
 
 export interface ToolInvocationReportedEvent {
   agent: PublicKey;
   tool: PublicKey;
-  invocations_reported: BN;
-  total_invocations: BN;
+  invocationsReported: BN;
+  totalInvocations: BN;
   timestamp: BN;
 }
 
 export interface ToolPublishedEvent {
   agent: PublicKey;
   tool: PublicKey;
-  tool_name: string;
-  protocol_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
+  toolName: string;
+  protocolHash: number[];
   version: number;
-  http_method: number;
+  httpMethod: number;
   category: number;
-  params_count: number;
-  required_params: number;
-  is_compound: boolean;
+  paramsCount: number;
+  requiredParams: number;
+  isCompound: boolean;
   timestamp: BN;
 }
 
 export interface ToolReactivatedEvent {
   agent: PublicKey;
   tool: PublicKey;
-  tool_name: string;
+  toolName: string;
   timestamp: BN;
 }
 
 export interface ToolSchemaInscribedEvent {
   agent: PublicKey;
   tool: PublicKey;
-  tool_name: string;
-  schema_type: number;
-  schema_data: Buffer;
-  schema_hash: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
+  toolName: string;
+  schemaType: number;
+  schemaData: number[];
+  schemaHash: number[];
   compression: number;
   version: number;
   timestamp: BN;
@@ -897,16 +947,16 @@ export interface ToolSchemaInscribedEvent {
 export interface ToolUpdatedEvent {
   agent: PublicKey;
   tool: PublicKey;
-  tool_name: string;
-  old_version: number;
-  new_version: number;
+  toolName: string;
+  oldVersion: number;
+  newVersion: number;
   timestamp: BN;
 }
 
 export interface UnstakeCancelledEvent {
   agent: PublicKey;
   wallet: PublicKey;
-  cancelled_amount: BN;
+  cancelledAmount: BN;
   timestamp: BN;
 }
 
@@ -914,7 +964,7 @@ export interface UnstakeCompletedEvent {
   agent: PublicKey;
   wallet: PublicKey;
   amount: BN;
-  remaining_staked: BN;
+  remainingStaked: BN;
   timestamp: BN;
 }
 
@@ -922,14 +972,14 @@ export interface UnstakeRequestedEvent {
   agent: PublicKey;
   wallet: PublicKey;
   amount: BN;
-  available_at: BN;
+  availableAt: BN;
   timestamp: BN;
 }
 
 export interface UpdatedEvent {
   agent: PublicKey;
   wallet: PublicKey;
-  updated_fields: string[];
+  updatedFields: string[];
   timestamp: BN;
 }
 
@@ -937,8 +987,8 @@ export interface VaultClosedEvent {
   vault: PublicKey;
   agent: PublicKey;
   wallet: PublicKey;
-  total_sessions: number;
-  total_inscriptions: BN;
+  totalSessions: number;
+  totalInscriptions: BN;
   timestamp: BN;
 }
 
@@ -947,8 +997,8 @@ export interface VaultDelegate {
   vault: PublicKey;
   delegate: PublicKey;
   permissions: number;
-  expires_at: BN;
-  created_at: BN;
+  expiresAt: BN;
+  createdAt: BN;
 }
 
 export interface VaultInitializedEvent {
@@ -961,91 +1011,380 @@ export interface VaultInitializedEvent {
 export interface VaultNonceRotatedEvent {
   vault: PublicKey;
   wallet: PublicKey;
-  old_nonce: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  new_nonce: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
-  nonce_version: number;
+  oldNonce: number[];
+  newNonce: number[];
+  nonceVersion: number;
   timestamp: BN;
 }
 
 export interface VolumeCurveBreakpoint {
-  after_calls: number;
-  price_per_call: BN;
+  afterCalls: number;
+  pricePerCall: BN;
 }
 
-export interface AgentAccount {
+// ── Events (event parser DTOs) ──
+
+export interface AccountMigratedEvent {
 }
 
-export interface AgentAttestation {
+export interface AttestationCreatedEvent {
 }
 
-export interface AgentPricingMenu {
+export interface AttestationRevokedEvent {
 }
 
-export interface AgentStake {
+export interface BatchSettledEvent {
 }
 
-export interface AgentStats {
+export interface CallsReportedEvent {
 }
 
-export interface CapabilityIndex {
+export interface CheckpointCreatedEvent {
 }
 
-export interface CounterShard {
+export interface ClosedEvent {
 }
 
-export interface DisputeRecord {
+export interface CoSignedSettlementEvent {
 }
 
-export interface EpochPage {
+export interface DeactivatedEvent {
 }
 
-export interface EscrowAccountV2 {
+export interface DelegateAddedEvent {
 }
 
-export interface FeedbackAccount {
+export interface DelegateRevokedEvent {
 }
 
-export interface GlobalRegistry {
+export interface DisputeAutoResolvedEvent {
 }
 
-export interface IndexPage {
+export interface DisputeFiledEvent {
 }
 
-export interface LedgerPage {
+export interface DisputeResolvedEvent {
 }
 
-export interface MemoryLedger {
+export interface EpochOpenedEvent {
 }
 
-export interface MemoryVault {
+export interface EpochPageClosedEvent {
 }
 
-export interface PendingSettlement {
+export interface EscrowClosedEvent {
 }
 
-export interface ProtocolIndex {
+export interface EscrowCreatedEvent {
 }
 
-export interface ReceiptBatch {
+export interface EscrowDepositedEvent {
 }
 
-export interface SessionCheckpoint {
+export interface EscrowV2CreatedEvent {
 }
 
-export interface SessionLedger {
+export interface EscrowWithdrawnEvent {
 }
 
-export interface SettlementReceipt {
+export interface FeedbackEvent {
 }
 
-export interface Subscription {
+export interface FeedbackRevokedEvent {
 }
 
-export interface ToolCategoryIndex {
+export interface FeedbackUpdatedEvent {
 }
 
-export interface ToolDescriptor {
+export interface IndexPageCreatedEvent {
 }
 
-export interface VaultDelegate {
+export interface LedgerEntryEvent {
 }
+
+export interface LedgerSealedEvent {
+}
+
+export interface MemoryInscribedEvent {
+}
+
+export interface PaymentSettledEvent {
+}
+
+export interface PricingMenuMigratedEvent {
+}
+
+export interface ReactivatedEvent {
+}
+
+export interface ReceiptBatchInscribedEvent {
+}
+
+export interface ReceiptProofSubmittedEvent {
+}
+
+export interface RegisteredEvent {
+}
+
+export interface ReputationUpdatedEvent {
+}
+
+export interface SessionClosedEvent {
+}
+
+export interface SessionOpenedEvent {
+}
+
+export interface SessionPdaClosedEvent {
+}
+
+export interface SettlementFinalizedEvent {
+}
+
+export interface SettlementPendingEvent {
+}
+
+export interface ShardInitializedEvent {
+}
+
+export interface StakeClosedEvent {
+}
+
+export interface StakeDepositedEvent {
+}
+
+export interface StakeSlashedEvent {
+}
+
+export interface SubscriptionCancelledEvent {
+}
+
+export interface SubscriptionClaimedEvent {
+}
+
+export interface SubscriptionCreatedEvent {
+}
+
+export interface ToolClosedEvent {
+}
+
+export interface ToolDeactivatedEvent {
+}
+
+export interface ToolInvocationReportedEvent {
+}
+
+export interface ToolPublishedEvent {
+}
+
+export interface ToolReactivatedEvent {
+}
+
+export interface ToolSchemaInscribedEvent {
+}
+
+export interface ToolUpdatedEvent {
+}
+
+export interface UnstakeCancelledEvent {
+}
+
+export interface UnstakeCompletedEvent {
+}
+
+export interface UnstakeRequestedEvent {
+}
+
+export interface UpdatedEvent {
+}
+
+export interface VaultClosedEvent {
+}
+
+export interface VaultInitializedEvent {
+}
+
+export interface VaultNonceRotatedEvent {
+}
+
+// ── Program error names (by numeric code) ──
+export const SAP_ERROR_NAMES: Record<number, string> = {
+  6000: "NameTooLong",
+  6001: "DescriptionTooLong",
+  6002: "UriTooLong",
+  6003: "TooManyCapabilities",
+  6004: "TooManyPricingTiers",
+  6005: "TooManyProtocols",
+  6006: "TooManyPlugins",
+  6007: "AlreadyActive",
+  6008: "AlreadyInactive",
+  6009: "InvalidFeedbackScore",
+  6010: "TagTooLong",
+  6011: "SelfReviewNotAllowed",
+  6012: "FeedbackAlreadyRevoked",
+  6013: "CapabilityIndexFull",
+  6014: "ProtocolIndexFull",
+  6015: "AgentNotInIndex",
+  6016: "InvalidCapabilityHash",
+  6017: "InvalidProtocolHash",
+  6018: "InvalidPluginType",
+  6019: "ChunkDataTooLarge",
+  6020: "ContentTypeTooLong",
+  6021: "IpfsCidTooLong",
+  6022: "EmptyName",
+  6023: "ControlCharInName",
+  6024: "EmptyDescription",
+  6025: "AgentIdTooLong",
+  6026: "InvalidCapabilityFormat",
+  6027: "DuplicateCapability",
+  6028: "EmptyTierId",
+  6029: "DuplicateTierId",
+  6030: "InvalidRateLimit",
+  6031: "SplRequiresTokenMint",
+  6032: "InvalidX402Endpoint",
+  6033: "InvalidVolumeCurve",
+  6034: "TooManyVolumeCurvePoints",
+  6035: "MinPriceExceedsMax",
+  6036: "InvalidUptimePercent",
+  6037: "SessionClosed",
+  6038: "InvalidSequence",
+  6039: "InvalidFragmentIndex",
+  6040: "InscriptionTooLarge",
+  6041: "EmptyInscription",
+  6042: "InvalidTotalFragments",
+  6043: "EpochMismatch",
+  6044: "VaultNotClosed",
+  6045: "SessionNotClosed",
+  6046: "DelegateExpired",
+  6047: "InvalidDelegate",
+  6048: "ToolNameTooLong",
+  6049: "EmptyToolName",
+  6050: "InvalidToolNameHash",
+  6051: "InvalidToolHttpMethod",
+  6052: "InvalidToolCategory",
+  6053: "ToolAlreadyInactive",
+  6054: "ToolAlreadyActive",
+  6055: "InvalidSchemaHash",
+  6056: "InvalidSchemaType",
+  6057: "InvalidCheckpointIndex",
+  6058: "FeedbackNotRevoked",
+  6059: "IndexNotEmpty",
+  6060: "SessionStillOpen",
+  6061: "NoFieldsToUpdate",
+  6062: "InsufficientEscrowBalance",
+  6063: "EscrowMaxCallsExceeded",
+  6064: "EscrowEmpty",
+  6065: "EscrowNotEmpty",
+  6066: "InvalidSettlementCalls",
+  6067: "AttestationTypeTooLong",
+  6068: "EmptyAttestationType",
+  6069: "SelfAttestationNotAllowed",
+  6070: "AttestationAlreadyRevoked",
+  6071: "AttestationNotRevoked",
+  6072: "ToolCategoryIndexFull",
+  6073: "ToolNotInCategoryIndex",
+  6074: "ToolCategoryMismatch",
+  6075: "ArithmeticOverflow",
+  6076: "EscrowExpired",
+  6077: "AgentInactive",
+  6078: "AttestationExpired",
+  6079: "BufferFull",
+  6080: "BufferDataTooLarge",
+  6081: "Unauthorized",
+  6082: "InvalidSession",
+  6083: "EmptyDigestHash",
+  6084: "LedgerDataTooLarge",
+  6085: "LedgerRingEmpty",
+  6086: "BatchEmpty",
+  6087: "BatchTooLarge",
+  6088: "SplTokenRequired",
+  6089: "InvalidTokenAccount",
+  6090: "InvalidTokenProgram",
+  6091: "InvalidPaymentToken",
+  6092: "InvalidSettlementSecurity",
+  6093: "CoSignerRequired",
+  6094: "InvalidCoSigner",
+  6095: "InvalidArbiter",
+  6096: "ArbiterRequired",
+  6097: "EscrowNonceReused",
+  6098: "SettlementNotPending",
+  6099: "SettlementAlreadyFinalized",
+  6100: "DisputeWindowNotExpired",
+  6101: "DisputeWindowExpired",
+  6102: "NotDepositor",
+  6103: "DisputeAlreadyFiled",
+  6104: "DisputeStillOpen",
+  6105: "NotArbiter",
+  6106: "InvalidDisputeOutcome",
+  6107: "StakeBelowMinimum",
+  6108: "NoStakeAccount",
+  6109: "UnstakeAlreadyPending",
+  6110: "UnstakeCooldownNotMet",
+  6111: "NoUnstakePending",
+  6112: "SlashExceedsStake",
+  6113: "SubscriptionAlreadyActive",
+  6114: "SubscriptionCancelled",
+  6115: "NoIntervalDue",
+  6116: "SubscriptionInsufficientBalance",
+  6117: "InvalidBillingInterval",
+  6118: "InvalidShardIndex",
+  6119: "IndexPageFull",
+  6120: "InvalidPageIndex",
+  6121: "IndexPageNotEmpty",
+  6122: "AlreadyMigrated",
+  6123: "MigrationV1Only",
+  6124: "SettlementDisputed",
+  6125: "InvalidAgentWallet",
+  6126: "StakeAgentMismatch",
+  6127: "NotAuthority",
+  6128: "UnstakeBelowRent",
+  6129: "InsufficientStake",
+  6130: "SelfReportDeprecated",
+  6131: "ArbiterDeprecated",
+  6132: "InvalidBatchIndex",
+  6133: "InvalidPeriod",
+  6134: "InvalidDisputeType",
+  6135: "ProofDeadlineExpired",
+  6136: "ProofDeadlineNotExpired",
+  6137: "InvalidReceiptProof",
+  6138: "SettlementReplay",
+  6139: "PaymentTokenNotAllowed",
+  6140: "AgentStakeRequired",
+  6141: "DelegateExpiryInvalid",
+  6142: "EscrowNotClosed",
+  6143: "VolumeCurveNotDescending",
+  6144: "DuplicateServiceHash",
+  6145: "StakeBelowCoverage",
+  6146: "StakeNotClosable",
+  6147: "AgentStakeAccountMissing",
+  6148: "PricingTierNotFound",
+  6149: "AgentStatsMigrationRequired",
+  6150: "InvalidPricingMenu",
+  6151: "MaxCallsPerSettlementExceeded",
+  6152: "InvalidVolumeCurvePrice",
+  6153: "EscrowCoverageExceeded",
+  6154: "CoSignerIsAgentWallet",
+  6155: "EscrowAlreadyExpired",
+  6156: "PendingSettlementExists",
+  6157: "TokenAccountOwnerMismatch",
+  6158: "InvalidTreasury",
+  6159: "PendingSettlementRequired",
+  6160: "InvalidPendingSettlement",
+  6161: "PendingSettlementDeprecated",
+  6162: "MaxReceiptProofExceeded",
+  6163: "MaxMerkleDepthExceeded",
+  6164: "PendingAmountMismatch",
+  6165: "StakeSlashLocksUnstake",
+  6166: "InvalidPricePerCall",
+  6167: "SubscriptionIntervalOverflow",
+  6168: "AgentStatsVersionMismatch",
+  6169: "EscrowVersionMismatch",
+  6170: "ReceiptProofAlreadySubmitted",
+  6171: "DuplicateReceiptProof",
+  6172: "MissingReceiptSignature",
+  6173: "AgentCapabilityMismatch",
+  6174: "AgentProtocolMismatch",
+  6175: "InvalidToolParameterCount",
+  6176: "ActiveEscrowCounterUnderflow",
+};
+
