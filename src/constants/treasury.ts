@@ -3,7 +3,7 @@
  *
  * Protocol treasury wallet for revenue fee collection.
  * This wallet receives all protocol fees from:
- * - Agent registration (0.1 SOL)
+ * - Agent registration (0.04 SOL, program fee v1.1.1)
  * - Escrow settlement (0.5%)
  * - Featured listings (1 SOL)
  *
@@ -29,7 +29,11 @@ import { PublicKey } from "@solana/web3.js";
 export const TREASURY_WALLET = new PublicKey(
   "J7PyZAGKvprCz4SQ5DKBLAHstJxgVqZcz6kguUoWpP7P",
 );
-export const REGISTRATION_FEE_LAMPORTS = 100_000_000;
+/**
+ * Matches the on-chain SAP program v1.1.1 registration fee
+ * (synapse-sap repo, programs/synapse-agent-sap/src/constants.rs:10 = 40_000_000 lamports).
+ */
+export const REGISTRATION_FEE_LAMPORTS = 40_000_000;
 
 /**
  * Get treasury wallet for current network
