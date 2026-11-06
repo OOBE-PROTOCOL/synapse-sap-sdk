@@ -5,21 +5,26 @@
  * @since v1.0.0
  */
 
-import { PublicKey, Signer, Commitment } from '@solana/web3.js';
+import {
+  PublicKey,
+  Signer,
+  Commitment,
+  type TransactionInstruction,
+} from "@solana/web3.js";
 
 /**
  * SNS Record Map — All possible record types
- * 
+ *
  * Agents choose freely which records to expose.
  * No roles, no requirements, complete freedom.
- * 
+ *
  * @since v1.0.0
  */
 export interface SnsRecordMap {
   // Core (always present)
   SOL: string;
   Pic: string;
-  
+
   // Optional records (agent chooses)
   TXT?: string;
   Url?: string;
@@ -50,10 +55,10 @@ export interface SnsRecordMap {
 
 /**
  * SAP Structured Data — Optional data in TXT record
- * 
+ *
  * Agents can expose SAP-specific data in TXT record.
  * Completely optional and extensible.
- * 
+ *
  * @since v1.0.0
  */
 export interface SapStructuredData {
@@ -81,7 +86,7 @@ export interface SapStructuredData {
 
 /**
  * Social Profiles — Optional social media presence
- * 
+ *
  * @since v1.0.0
  */
 export interface SocialProfiles {
@@ -93,7 +98,7 @@ export interface SocialProfiles {
 
 /**
  * Metadata URLs — Optional metadata locations
- * 
+ *
  * @since v1.0.0
  */
 export interface MetadataUrls {
@@ -106,7 +111,7 @@ export interface MetadataUrls {
 
 /**
  * Contact Info — Optional contact methods
- * 
+ *
  * @since v1.0.0
  */
 export interface ContactInfo {
@@ -115,7 +120,7 @@ export interface ContactInfo {
 
 /**
  * Multi-Chain Addresses — Optional cross-chain identity
- * 
+ *
  * @since v1.0.0
  */
 export interface MultiChainAddresses {
@@ -129,7 +134,7 @@ export interface MultiChainAddresses {
 
 /**
  * DNS Records — Optional DNS configuration
- * 
+ *
  * @since v1.0.0
  */
 export interface DnsRecords {
@@ -140,10 +145,10 @@ export interface DnsRecords {
 
 /**
  * Builder Options — Modular record builder configuration
- * 
+ *
  * All options except core (wallet, agentPda) are optional.
  * Agents choose freely what to expose.
- * 
+ *
  * @since v1.0.0
  */
 export interface SnsRecordBuilderOptions {
@@ -152,7 +157,7 @@ export interface SnsRecordBuilderOptions {
   wallet: PublicKey;
   /** Agent PDA (on-chain identity) */
   agentPda: PublicKey;
-  
+
   // Optional packs (agent chooses)
   /** Include identity pack (social, contact) */
   includeIdentity?: boolean;
@@ -162,7 +167,7 @@ export interface SnsRecordBuilderOptions {
   includeMultiChain?: boolean;
   /** Include DNS pack (A, AAAA, CNAME) */
   includeDns?: boolean;
-  
+
   // Actual data (optional, agent decides)
   /** SAP structured data for TXT record */
   sapData?: SapStructuredData;
@@ -176,7 +181,7 @@ export interface SnsRecordBuilderOptions {
   multiChain?: MultiChainAddresses;
   /** DNS records */
   dns?: DnsRecords;
-  
+
   // Custom records
   /** Custom record overrides */
   customRecords?: Partial<SnsRecordMap>;
@@ -184,7 +189,7 @@ export interface SnsRecordBuilderOptions {
 
 /**
  * SNS Registration Parameters
- * 
+ *
  * @since v1.0.0
  */
 export interface SnsRegistrationParams {
@@ -192,8 +197,8 @@ export interface SnsRegistrationParams {
   agentWallet: PublicKey;
   /** Domain name WITHOUT .sol suffix */
   domainName: string;
-  /** Records to register (built with buildSnsRecords) */
-  records: SnsRecordMap;
+  /** Records to build (omit `SOL` — it is on-chain derived). */
+  records?: Partial<SnsRecordMap>;
   /** Transaction signer (must match agentWallet) */
   signer: Signer;
   /** Registration duration in years (default: 1) */
@@ -208,20 +213,20 @@ export interface SnsRegistrationParams {
 
 /**
  * SNS Registration Result
- * 
+ *
  * @since v1.0.0
  */
 export interface SnsRegistrationResult {
-  /** Full domain with .sol suffix */
+  /** Full lowercase `.sns` domain */
   domain: string;
-  /** Domain account PDA */
+  /** SNS name-account PDA */
   domainPda: PublicKey;
-  /** SAP agent PDA */
+  /** SAP agent PDA derived from the registered wallet */
   agentPda: PublicKey;
-  /** Transaction signature */
-  transactionSignature: string;
-  /** All record PDAs */
-  recordPdas: { [key: string]: PublicKey };
+  /** Buyer's USDC token account (registration fee currency) */
+  buyerTokenAccount: PublicKey;
+  /** Unsigned instructions to sign & submit */
+  instructions: TransactionInstruction[];
   /** Whether set as primary domain */
   setAsPrimary: boolean;
   /** List of created record types */
@@ -230,7 +235,7 @@ export interface SnsRegistrationResult {
 
 /**
  * SNS Resolution Result
- * 
+ *
  * @since v1.0.0
  */
 export interface SnsResolutionResult {
@@ -255,7 +260,7 @@ export interface SnsResolutionResult {
 
 /**
  * SNS Fetch Options — Modular fetching
- * 
+ *
  * @since v1.0.0
  */
 export interface SnsFetchOptions {
@@ -273,7 +278,7 @@ export interface SnsFetchOptions {
 
 /**
  * Fetched SNS Records
- * 
+ *
  * @since v1.0.0
  */
 export interface FetchedSnsRecords {
@@ -298,6 +303,13 @@ export interface FetchedSnsRecords {
  *
  * @deprecated SNS integration is disabled until it is migrated to a current
  * Solana Name Service SDK.
+ */
+/**
+ * Deprecated SNS record labels retained for source compatibility. New code
+ * must use the `Record` enum re-exported from
+ * `@bonfida/spl-name-service` (note: wire values are lowercase there).
+ *
+ * @deprecated SNS moved to the JS SDK v4; see `modules/sns.ts#parseSnsRecordType`.
  */
 export enum Record {
   SOL = "SOL",
