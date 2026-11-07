@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- Release metadata reconciled to IDL **1.1.1** (smoke test + `verify:release` gate):
+  the IDL had been aligned in 94f392c/5b0f1c6 without updating the gates.
+- `REGISTRATION_FEE_LAMPORTS` aligned to the on-chain program v1.1.1 fee
+  (0.1 → 0.04 SOL).
+
 ## [1.0.3] - 2026-08-05
 
 ### Added
