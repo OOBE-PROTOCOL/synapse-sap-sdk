@@ -1,9 +1,13 @@
 # SNS Skill — Solana Name Service Integration for SAP
 
-> **Version:** 1.0.0  
-> **SDK:** `@synapse-sap/sdk@1.0.0+`  
-> **SNS SDK:** `@bonfida/spl-name-service@3.0.9`  
+> **Version:** 1.1.0 (Stage 1, `.sns`)  
+> **SDK:** `@oobe-protocol-labs/synapse-sap-sdk@1.0.4+`  
+> **SNS SDK:** `@bonfida/spl-name-service@4.0.1`  
 > **Principle:** Free choice, strong typing, modularity
+
+> ⚠️ **Stage 1 (post slot 452,825,395):** resolve and display **`.sns`** — legacy `.sol`
+> resolution is paused at the protocol level. SRS-backed `.sol` arrives with SNS
+> Stage 2.
 
 ---
 

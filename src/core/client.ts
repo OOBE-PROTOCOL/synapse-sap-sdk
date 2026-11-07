@@ -48,6 +48,7 @@ import { StakingModule } from "../modules/staking";
 import { SubscriptionModule } from "../modules/subscription";
 import { AttestationModule } from "../modules/attestation";
 import { LedgerModule } from "../modules/ledger";
+import { SnsModule } from "../modules/sns";
 import { EventParser } from "../events";
 import { TransactionParser } from "../parser/client";
 import { DiscoveryRegistry } from "../registries/discovery";
@@ -55,11 +56,16 @@ import { X402Registry } from "../registries/x402";
 import { SessionManager } from "../registries/session";
 import { AgentBuilder } from "../registries/builder";
 import { MetaplexBridge } from "../registries/metaplex-bridge";
-import { FairScaleRegistry, type FairScaleConfig } from "../registries/fairscale";
+import {
+  FairScaleRegistry,
+  type FairScaleConfig,
+} from "../registries/fairscale";
 
 // IDL is embedded inside the SDK — no external workspace dependency.
 const requireJson = createRequire(`${process.cwd()}/package.json`);
-const idl = requireJson("@oobe-protocol-labs/synapse-sap-sdk/idl/synapse_agent_sap.json");
+const idl = requireJson(
+  "@oobe-protocol-labs/synapse-sap-sdk/idl/synapse_agent_sap.json",
+);
 
 /** Re-usable Anchor program type (untyped — SDK provides its own types). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -150,6 +156,7 @@ export class SapClient {
 
   // ── Lazy module singletons ────────────────────────
   #agent?: AgentModule;
+  #sns?: SnsModule;
   #feedback?: FeedbackModule;
   #indexing?: IndexingModule;
   #tools?: ToolsModule;
@@ -266,15 +273,19 @@ export class SapClient {
    * @since v1.0.0
    */
   static fromOptions(opts: SapClientOpts = {}): SapClient {
-    const connection = opts.connection ?? new Connection(
-      opts.rpcUrl ?? "https://api.mainnet-beta.solana.com",
-      opts.commitment ?? "confirmed",
-    );
-    const wallet = opts.wallet ?? {
-      publicKey: SAP_PROGRAM_ID,
-      signTransaction: async <T>(tx: T) => tx,
-      signAllTransactions: async <T>(txs: T[]) => txs,
-    } as AnchorProvider["wallet"];
+    const connection =
+      opts.connection ??
+      new Connection(
+        opts.rpcUrl ?? "https://api.mainnet-beta.solana.com",
+        opts.commitment ?? "confirmed",
+      );
+    const wallet =
+      opts.wallet ??
+      ({
+        publicKey: SAP_PROGRAM_ID,
+        signTransaction: async <T>(tx: T) => tx,
+        signAllTransactions: async <T>(txs: T[]) => txs,
+      } as AnchorProvider["wallet"]);
     const provider = new AnchorProvider(connection, wallet, {
       commitment: opts.commitment ?? "confirmed",
     });
@@ -285,9 +296,15 @@ export class SapClient {
     return this.program.methods;
   }
 
-  async fetchAccount<T = unknown>(name: string, address: PublicKey): Promise<T | null> {
+  async fetchAccount<T = unknown>(
+    name: string,
+    address: PublicKey,
+  ): Promise<T | null> {
     try {
-      const accounts = this.program.account as Record<string, { fetch(address: PublicKey): Promise<T> }>;
+      const accounts = this.program.account as Record<
+        string,
+        { fetch(address: PublicKey): Promise<T> }
+      >;
       return await accounts[name].fetch(address);
     } catch {
       return null;
@@ -303,14 +320,18 @@ export class SapClient {
     const instructions: TransactionInstruction[] = [];
 
     if (priority?.microLamports) {
-      instructions.push(ComputeBudgetProgram.setComputeUnitPrice({
-        microLamports: priority.microLamports,
-      }));
+      instructions.push(
+        ComputeBudgetProgram.setComputeUnitPrice({
+          microLamports: priority.microLamports,
+        }),
+      );
     }
     if (priority?.limit) {
-      instructions.push(ComputeBudgetProgram.setComputeUnitLimit({
-        units: priority.limit,
-      }));
+      instructions.push(
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units: priority.limit,
+        }),
+      );
     }
 
     instructions.push(...ixs);
@@ -349,6 +370,20 @@ export class SapClient {
    */
   get agent(): AgentModule {
     return (this.#agent ??= new AgentModule(this.program));
+  }
+
+  /**
+   * SNS module (JS SDK v4, `.sns` namespace). Lazy singleton.
+   * @returns {SnsModule} The lazily-instantiated `SnsModule` singleton.
+   * @category Modules
+   * @since v1.0.4
+   * @see {@link SnsModule}
+   */
+  get sns(): SnsModule {
+    return (this.#sns ??= new SnsModule({
+      connection: this.program.provider.connection,
+      sapProgramId: this.programId,
+    }));
   }
 
   /**

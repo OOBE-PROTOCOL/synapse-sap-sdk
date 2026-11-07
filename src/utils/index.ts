@@ -6,6 +6,14 @@
 export * from "./validate";
 export { logger } from "./logger";
 
+// ── SNS Stage 1 display rules ──
+export {
+  displayDomain,
+  isSnsDomain,
+  toFullSnsName,
+  SNS_SUFFIX,
+} from "./display-domain";
+
 // ── Merkle helpers for receipt proofs ──
 export { sha256, hashToArray } from "./hash";
 
@@ -14,7 +22,7 @@ export function hashReceipt(
   agent: Uint8Array,
   requestId: Uint8Array,
   callCount: number,
-  amount: bigint
+  amount: bigint,
 ): Uint8Array {
   return new Uint8Array(32); // Stub
 }

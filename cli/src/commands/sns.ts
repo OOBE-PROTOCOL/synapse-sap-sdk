@@ -1,61 +1,113 @@
 /**
  * @module cli/commands/sns
- * @description SNS (Solana Name Service) domain management commands
- * 
+ * @description SNS (Solana Name Service) domain management commands —
+ * Stage 1 (`.sns` namespace, unsigned SDK builders + local signing).
+ *
  * Commands:
  * - sns check <domain> — Check domain availability
- * - sns register <domain> — Register domain for agent
+ * - sns register <domain> — Register domain for agent (signs & sends locally)
  * - sns resolve <domain> — Resolve domain to agent identity
  * - sns validate <domain> — Validate agent records
- * - sns primary <domain> — Set domain as primary
+ * - sns primary <domain> — Set domain as primary (signs & sends locally)
  * - sns records <domain> — Fetch all records
- * 
- * @since v1.0.0
+ * - sns batch-check <domains...> — Availability for multiple domains
+ * - sns pda <domain> — Derive domain and record PDAs
+ *
+ * @since v1.0.4
  */
-import { Command } from "commander";
-import { loadConfig } from "../config.js";
-import { buildContext, parseWallet } from "../context.js";
-import { log, output } from "../logger.js";
+import { Command } from 'commander';
 import {
-  SnsModule,
-  Record,
-} from "@oobe-protocol-labs/synapse-sap-sdk/modules/sns";
-import { Connection, Keypair } from "@solana/web3.js";
-import bs58 from "bs58";
-import * as fs from "fs";
+  Connection,
+  Keypair,
+  Transaction,
+  type TransactionInstruction,
+} from '@solana/web3.js';
+import { loadConfig } from '../config.js';
+import { log, output } from '../logger.js';
+import { SnsModule } from '@oobe-protocol-labs/synapse-sap-sdk/modules/sns';
+import { displayDomain } from '@oobe-protocol-labs/synapse-sap-sdk/utils';
+import * as fs from 'fs';
+
+const DEFAULT_PROGRAM_ID = 'SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ';
+const RECORD_TYPES = [
+  'SOL',
+  'TXT',
+  'Twitter',
+  'Github',
+  'Discord',
+  'Telegram',
+  'Email',
+  'Url',
+  'Pic',
+] as const;
+
+/** Signs the given instructions with the local wallet and sends the tx. */
+async function signAndSend(
+  connection: Connection,
+  instructions: TransactionInstruction[],
+  wallet: Keypair,
+): Promise<string> {
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+  const tx = new Transaction({
+    feePayer: wallet.publicKey,
+    blockhash,
+    lastValidBlockHeight,
+  });
+  tx.add(...instructions);
+  tx.sign(wallet);
+  const signature = await connection.sendRawTransaction(tx.serialize(), {
+    skipPreflight: false,
+  });
+  await connection.confirmTransaction(
+    { signature, blockhash, lastValidBlockHeight },
+    'confirmed',
+  );
+  return signature;
+}
+
+function makeSnsModule(connection: Connection, programId?: string): SnsModule {
+  return new SnsModule({ connection, sapProgramId: programId || DEFAULT_PROGRAM_ID });
+}
+
+function makeConnection(rpc: string | undefined, configRpc?: string): Connection {
+  return new Connection(
+    rpc || configRpc || 'https://api.mainnet-beta.solana.com',
+    'confirmed',
+  );
+}
+
+function loadKeypair(path: string): Keypair {
+  const secretKey = Uint8Array.from(JSON.parse(fs.readFileSync(path, 'utf-8')));
+  return Keypair.fromSecretKey(secretKey);
+}
 
 export function registerSnsCommands(program: Command): void {
-  const sns = program.command("sns").description("SNS domain management");
+  const sns = program.command('sns').description('SNS domain management (.sns)');
 
   // ═══════════════════════════════════════════════════════════════════
   //  sns check <domain>
   // ═══════════════════════════════════════════════════════════════════
   sns
-    .command("check <domain>")
-    .description("Check if a .sol domain is available for registration")
-    .option("--rpc <url>", "Override RPC endpoint")
+    .command('check <domain>')
+    .description('Check if a .sns domain is available for registration')
+    .option('--rpc <url>', 'Override RPC endpoint')
     .action(async (domain: string, opts) => {
       try {
         const config = loadConfig(program.opts());
-        const rpcUrl = opts.rpc || config.rpc || "https://api.mainnet-beta.solana.com";
-        const connection = new Connection(rpcUrl, "confirmed");
-
-        const snsModule = new SnsModule({
-          connection,
-          sapProgramId: config.programId || "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ",
-        });
-
+        const connection = makeConnection(opts.rpc, config.rpc);
+        const snsModule = makeSnsModule(connection, config.programId);
         const available = await snsModule.checkAvailability(domain);
+        const displayed = displayDomain(domain);
 
         output({
-          domain: domain.endsWith(".sol") ? domain : `${domain}.sol`,
+          domain: displayed,
           available,
           message: available
-            ? `Domain ${domain}.sol is available for registration`
-            : `Domain ${domain}.sol is already registered`,
+            ? `Domain ${displayed} is available for registration`
+            : `Domain ${displayed} is already registered`,
         });
       } catch (err) {
-        log.error("check failed", { error: (err as Error).message });
+        log.error('check failed', { error: (err as Error).message });
         process.exit(1);
       }
     });
@@ -64,120 +116,112 @@ export function registerSnsCommands(program: Command): void {
   //  sns register <domain>
   // ═══════════════════════════════════════════════════════════════════
   sns
-    .command("register <domain>")
-    .description("Register a .sol domain for a SAP agent")
-    .requiredOption("--role <merchant|citizen>", "Agent role")
-    .option("--x402-endpoint <url>", "x402 endpoint (required for merchant)")
-    .option("--agent-uri <url>", "Agent verification URI (required for citizen)")
-    .option("--keypair <path>", "Wallet keypair path")
-    .option("--set-primary", "Set as primary domain", false)
-    .option("--space <bytes>", "Space allocation in bytes", "600")
-    .option("--simulate", "Dry run (do not send transaction)")
-    .option("--rpc <url>", "Override RPC endpoint")
+    .command('register <domain>')
+    .description('Register a .sns domain for a SAP agent')
+    .requiredOption('--role <merchant|citizen>', 'Agent role')
+    .option('--x402-endpoint <url>', 'x402 endpoint (required for merchant)')
+    .option('--agent-uri <url>', 'Agent verification URI (required for citizen)')
+    .option('--keypair <path>', 'Wallet keypair path')
+    .option('--set-primary', 'Set as primary domain', false)
+    .option('--space <bytes>', 'Space allocation in bytes', '600')
+    .option(
+      '--simulate',
+      'Dry run: print the unsigned instruction set, do not sign or send',
+    )
+    .option('--rpc <url>', 'Override RPC endpoint')
     .action(async (domain: string, opts) => {
       try {
         const config = loadConfig(program.opts());
-        const rpcUrl = opts.rpc || config.rpc || "https://api.mainnet-beta.solana.com";
-        const connection = new Connection(rpcUrl, "confirmed");
+        const connection = makeConnection(opts.rpc, config.rpc);
+        const snsModule = makeSnsModule(connection, config.programId);
 
-        // Load wallet
         let wallet: Keypair;
         if (opts.keypair) {
-          const secretKey = Uint8Array.from(
-            JSON.parse(fs.readFileSync(opts.keypair, "utf-8"))
-          );
-          wallet = Keypair.fromSecretKey(secretKey);
+          wallet = loadKeypair(opts.keypair);
         } else if (config.walletPath) {
-          const secretKey = Uint8Array.from(
-            JSON.parse(fs.readFileSync(config.walletPath, "utf-8"))
-          );
-          wallet = Keypair.fromSecretKey(secretKey);
+          wallet = loadKeypair(config.walletPath);
         } else {
-          log.error("No wallet configured. Use --keypair or set walletPath in config");
+          log.error('No wallet configured. Use --keypair or set walletPath in config');
           process.exit(1);
+          return;
         }
 
-        const snsModule = new SnsModule({
-          connection,
-          sapProgramId: config.programId || "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ",
-        });
-
-        // Validate role
-        // TODO: Restore role validation when SapAgentRole is exported from SDK
-        const role = opts.role.toLowerCase();
+        const role = String(opts.role).toLowerCase();
         if (role !== 'merchant' && role !== 'citizen') {
           log.error("Invalid role. Must be 'merchant' or 'citizen'");
           process.exit(1);
         }
-
-        // Validate role-specific requirements
         if (role === 'merchant' && !opts.x402Endpoint) {
-          log.error("Merchant role requires --x402-endpoint");
+          log.error('Merchant role requires --x402-endpoint');
           process.exit(1);
         }
-
         if (role === 'citizen' && !opts.agentUri) {
-          log.error("Citizen role requires --agent-uri");
+          log.error('Citizen role requires --agent-uri');
           process.exit(1);
         }
 
-        // Check availability first
-        const available = await snsModule.checkAvailability(domain);
+        const fullName = displayDomain(domain);
+        const available = await snsModule.checkAvailability(fullName);
         if (!available) {
-          log.error(`Domain ${domain}.sol is already registered`);
+          log.error(`Domain ${fullName} is already registered`);
           process.exit(1);
         }
 
-        log.info(`Registering domain: ${domain}.sol`);
+        const sapRecords: Record<string, string> = {
+          txt: JSON.stringify({
+            role,
+            agent_wallet: wallet.publicKey.toBase58(),
+            sap_program_id: config.programId || DEFAULT_PROGRAM_ID,
+            ...(role === 'merchant'
+              ? { x402_endpoint: opts.x402Endpoint }
+              : { agent_uri: opts.agentUri }),
+          }),
+        };
+        const endpoint = opts.x402Endpoint ?? opts.agentUri;
+        if (endpoint) {
+          sapRecords.url = endpoint;
+        }
+
+        log.info(`Registering domain: ${fullName}`);
         log.info(`Role: ${role}`);
         log.info(`Wallet: ${wallet.publicKey.toBase58()}`);
+
+        const result = await snsModule.registerAgentDomain({
+          agentWallet: wallet.publicKey,
+          domainName: fullName,
+          signer: wallet,
+          space: parseInt(opts.space, 10),
+          setAsPrimary: opts.setPrimary,
+          records: sapRecords,
+        });
 
         if (opts.simulate || program.opts().dryRun) {
           output({
             dryRun: true,
-            domain: `${domain}.sol`,
+            domain: result.domain,
             role,
             wallet: wallet.publicKey.toBase58(),
-            message: "Simulation mode - transaction not sent",
+            instructions: result.instructions.length,
+            recordTypes: result.records,
+            message:
+              'Simulation mode — the instruction set was built but not signed or sent.',
           });
           return;
         }
 
-        // Build DNS config based on role
-        // TODO: Restore role-based config when SapAgentRole is exported from SDK
-        const dnsConfig = {
-          x402Endpoint: opts.x402Endpoint,
-          agentUri: opts.agentUri,
-        };
-
-        // Register domain
-        // TODO: Restore full params when SDK types are fixed
-        const result = await snsModule.registerAgentDomain({
-          agentWallet: wallet.publicKey,
-          domainName: domain,
-          signer: wallet,
-          space: parseInt(opts.space),
-          setAsPrimary: opts.setPrimary,
-          // dnsConfig, // TODO: Restore when SDK accepts dnsConfig
-          // x402Endpoint: opts.x402Endpoint,
-          // agentUri: opts.agentUri,
-        });
-
-        log.info("Domain registered successfully!");
+        const signature = await signAndSend(connection, result.instructions, wallet);
+        log.info('Domain registered successfully!');
         output({
           domain: result.domain,
-          signature: result.transactionSignature,
+          signature,
           domainPda: result.domainPda.toBase58(),
           agentPda: result.agentPda.toBase58(),
-          // role: result.role, // TODO: Restore when SDK exports role
-          records: result.records,
-          recordPdas: Object.fromEntries(
-            Object.entries(result.recordPdas).map(([k, v]) => [k, v.toBase58()])
-          ),
+          buyerTokenAccount: result.buyerTokenAccount.toBase58(),
+          recordTypes: result.records,
           setAsPrimary: result.setAsPrimary,
         });
       } catch (err) {
-        log.error("register failed", {
+        log.error('register failed', {
           error: (err as Error).message,
           stack: (err as Error).stack,
         });
@@ -189,27 +233,21 @@ export function registerSnsCommands(program: Command): void {
   //  sns resolve <domain>
   // ═══════════════════════════════════════════════════════════════════
   sns
-    .command("resolve <domain>")
-    .description("Resolve a .sol domain to its SAP agent identity")
-    .option("--rpc <url>", "Override RPC endpoint")
+    .command('resolve <domain>')
+    .description('Resolve a .sns domain to its SAP agent identity')
+    .option('--rpc <url>', 'Override RPC endpoint')
     .action(async (domain: string, opts) => {
       try {
         const config = loadConfig(program.opts());
-        const rpcUrl = opts.rpc || config.rpc || "https://api.mainnet-beta.solana.com";
-        const connection = new Connection(rpcUrl, "confirmed");
-
-        const snsModule = new SnsModule({
-          connection,
-          sapProgramId: config.programId || "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ",
-        });
-
+        const connection = makeConnection(opts.rpc, config.rpc);
+        const snsModule = makeSnsModule(connection, config.programId);
         const result = await snsModule.resolveAgentDomain(domain);
 
         if (!result) {
           output({
-            domain: domain.endsWith(".sol") ? domain : `${domain}.sol`,
+            domain: displayDomain(domain),
             found: false,
-            message: "Domain not found or not linked to SAP agent",
+            message: 'Domain not found',
           });
           return;
         }
@@ -219,12 +257,11 @@ export function registerSnsCommands(program: Command): void {
           found: true,
           wallet: result.wallet.toBase58(),
           agentPda: result.agentPda.toBase58(),
-          // role: result.role, // TODO: Restore when SDK exports role
           metadata: result.metadata,
           records: result.records,
         });
       } catch (err) {
-        log.error("resolve failed", { error: (err as Error).message });
+        log.error('resolve failed', { error: (err as Error).message });
         process.exit(1);
       }
     });
@@ -233,29 +270,24 @@ export function registerSnsCommands(program: Command): void {
   //  sns validate <domain>
   // ═══════════════════════════════════════════════════════════════════
   sns
-    .command("validate <domain>")
-    .description("Validate SNS records for SAP agent compliance")
-    .option("--rpc <url>", "Override RPC endpoint")
+    .command('validate <domain>')
+    .description('Validate SNS records for SAP agent compliance')
+    .option('--rpc <url>', 'Override RPC endpoint')
     .action(async (domain: string, opts) => {
       try {
         const config = loadConfig(program.opts());
-        const rpcUrl = opts.rpc || config.rpc || "https://api.mainnet-beta.solana.com";
-        const connection = new Connection(rpcUrl, "confirmed");
-
-        const snsModule = new SnsModule({
-          connection,
-          sapProgramId: config.programId || "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ",
-        });
-
+        const connection = makeConnection(opts.rpc, config.rpc);
+        const snsModule = makeSnsModule(connection, config.programId);
         const validation = await snsModule.validateAgentRecords(domain);
+        const displayed = displayDomain(domain);
 
         output({
-          domain: domain.endsWith(".sol") ? domain : `${domain}.sol`,
+          domain: displayed,
           valid: validation.valid,
           errors: validation.errors,
           warnings: validation.warnings,
           message: validation.valid
-            ? "Agent records are valid"
+            ? 'Agent records are valid'
             : `Validation failed with ${validation.errors.length} error(s)`,
         });
 
@@ -263,7 +295,7 @@ export function registerSnsCommands(program: Command): void {
           process.exit(1);
         }
       } catch (err) {
-        log.error("validate failed", { error: (err as Error).message });
+        log.error('validate failed', { error: (err as Error).message });
         process.exit(1);
       }
     });
@@ -272,40 +304,32 @@ export function registerSnsCommands(program: Command): void {
   //  sns primary <domain>
   // ═══════════════════════════════════════════════════════════════════
   sns
-    .command("primary <domain>")
-    .description("Set a .sol domain as primary for the wallet")
-    .requiredOption("--keypair <path>", "Wallet keypair path")
-    .option("--rpc <url>", "Override RPC endpoint")
+    .command('primary <domain>')
+    .description('Set a .sns domain as primary for the wallet')
+    .requiredOption('--keypair <path>', 'Wallet keypair path')
+    .option('--rpc <url>', 'Override RPC endpoint')
     .action(async (domain: string, opts) => {
       try {
         const config = loadConfig(program.opts());
-        const rpcUrl = opts.rpc || config.rpc || "https://api.mainnet-beta.solana.com";
-        const connection = new Connection(rpcUrl, "confirmed");
+        const connection = makeConnection(opts.rpc, config.rpc);
+        const wallet = loadKeypair(opts.keypair);
+        const snsModule = makeSnsModule(connection, config.programId);
 
-        // Load wallet
-        const secretKey = Uint8Array.from(
-          JSON.parse(fs.readFileSync(opts.keypair, "utf-8"))
+        const fullName = displayDomain(domain);
+        log.info(`Setting ${fullName} as the wallet primary domain...`);
+        const instructions = await snsModule.buildSetPrimaryDomainInstructions(
+          wallet.publicKey,
+          fullName,
         );
-        const wallet = Keypair.fromSecretKey(secretKey);
+        const signature = await signAndSend(connection, instructions, wallet);
 
-        const snsModule = new SnsModule({
-          connection,
-          sapProgramId: config.programId || "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ",
-        });
-
-        log.info(`Setting ${domain}.sol as primary domain...`);
-
-        // Note: This would require a separate method in SnsModule
-        // For now, we'll use the standalone SDK approach
-        // This is a placeholder - actual implementation depends on SDK
         output({
-          domain: domain.endsWith(".sol") ? domain : `${domain}.sol`,
+          domain: fullName,
           wallet: wallet.publicKey.toBase58(),
-          message: "Primary domain setting not yet implemented in CLI",
-          todo: "Use SnsSdk.buildSetPrimaryDomainTx() and send transaction manually",
+          signature,
         });
       } catch (err) {
-        log.error("primary failed", { error: (err as Error).message });
+        log.error('primary failed', { error: (err as Error).message });
         process.exit(1);
       }
     });
@@ -314,73 +338,36 @@ export function registerSnsCommands(program: Command): void {
   //  sns records <domain>
   // ═══════════════════════════════════════════════════════════════════
   sns
-    .command("records <domain>")
-    .description("Fetch all SNS records for a domain")
-    .option("--rpc <url>", "Override RPC endpoint")
+    .command('records <domain>')
+    .description('Fetch all SNS records for a domain')
+    .option('--rpc <url>', 'Override RPC endpoint')
     .action(async (domain: string, opts) => {
       try {
         const config = loadConfig(program.opts());
-        const rpcUrl = opts.rpc || config.rpc || "https://api.mainnet-beta.solana.com";
-        const connection = new Connection(rpcUrl, "confirmed");
+        const connection = makeConnection(opts.rpc, config.rpc);
+        const snsModule = makeSnsModule(connection, config.programId);
+        const fullName = displayDomain(domain);
 
-        const snsModule = new SnsModule({
-          connection,
-          sapProgramId: config.programId || "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ",
-        });
-
-        // Fetch individual records
-        const domainName = domain.endsWith(".sol") ? domain : `${domain}.sol`;
         const records: { [key: string]: string | null } = {};
-
-        const recordTypes = [
-          "SOL",
-          "TXT",
-          "Twitter",
-          "Github",
-          "Discord",
-          "Telegram",
-          "Email",
-          "Url",
-          "Pic",
-        ];
-
-        for (const recordType of recordTypes) {
+        for (const recordType of RECORD_TYPES) {
           try {
-            const recordPda = snsModule.getRecordPda(
-              domainName,
-              Record[recordType as keyof typeof Record]
-            );
-            const accountInfo = await connection.getAccountInfo(recordPda);
-
-            if (accountInfo && accountInfo.data.length > 0) {
-              // Parse record data (skip header)
-              const headerSize = recordType === "TXT" ? 8 : 10;
-              const rawData = accountInfo.data.slice(headerSize);
-              const nullIndex = rawData.indexOf(0);
-              const trimmedData =
-                nullIndex > 0 ? rawData.slice(0, nullIndex) : rawData;
-              const data = new TextDecoder().decode(trimmedData).trim();
-              records[recordType] = data;
-            } else {
-              records[recordType] = null;
-            }
+            records[recordType] = await snsModule.getRecordValue(fullName, recordType);
           } catch {
             records[recordType] = null;
           }
         }
 
-        // Filter out nulls for cleaner output
         const existingRecords = Object.fromEntries(
-          Object.entries(records).filter(([_, v]) => v !== null)
+          Object.entries(records).filter(([, v]) => v !== null),
         );
 
         output({
-          domain: domainName,
+          domain: fullName,
           totalRecords: Object.keys(existingRecords).length,
           records: existingRecords,
         });
       } catch (err) {
-        log.error("records failed", { error: (err as Error).message });
+        log.error('records failed', { error: (err as Error).message });
         process.exit(1);
       }
     });
@@ -389,42 +376,31 @@ export function registerSnsCommands(program: Command): void {
   //  sns batch-check <domains...>
   // ═══════════════════════════════════════════════════════════════════
   sns
-    .command("batch-check <domains...>")
-    .description("Check availability for multiple domains")
-    .option("--rpc <url>", "Override RPC endpoint")
+    .command('batch-check <domains...>')
+    .description('Check availability for multiple domains (max 25)')
+    .option('--rpc <url>', 'Override RPC endpoint')
     .action(async (domains: string[], opts) => {
       try {
         const config = loadConfig(program.opts());
-        const rpcUrl = opts.rpc || config.rpc || "https://api.mainnet-beta.solana.com";
-        const connection = new Connection(rpcUrl, "confirmed");
-
-        const snsModule = new SnsModule({
-          connection,
-          sapProgramId: config.programId || "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ",
-        });
+        const connection = makeConnection(opts.rpc, config.rpc);
+        const snsModule = makeSnsModule(connection, config.programId);
 
         const results = await snsModule.batchCheckAvailability(domains);
-
-        const outputData = Array.from(results.entries()).map(
-          ([domain, available]) => ({
-            domain,
-            available,
-            status: available ? "AVAILABLE" : "TAKEN",
-          })
-        );
-
-        // Summary
+        const outputData = Array.from(results.entries()).map(([domain, available]) => ({
+          domain,
+          available,
+          status: available ? 'AVAILABLE' : 'TAKEN',
+        }));
         const availableCount = outputData.filter((r) => r.available).length;
-        const takenCount = outputData.filter((r) => !r.available).length;
 
         output({
           total: domains.length,
           available: availableCount,
-          taken: takenCount,
+          taken: outputData.length - availableCount,
           results: outputData,
         });
       } catch (err) {
-        log.error("batch-check failed", { error: (err as Error).message });
+        log.error('batch-check failed', { error: (err as Error).message });
         process.exit(1);
       }
     });
@@ -433,56 +409,49 @@ export function registerSnsCommands(program: Command): void {
   //  sns pda <domain>
   // ═══════════════════════════════════════════════════════════════════
   sns
-    .command("pda <domain>")
-    .description("Derive domain and record PDAs")
-    .option("--record <type>", "Specific record type (optional)")
-    .option("--rpc <url>", "Override RPC endpoint")
+    .command('pda <domain>')
+    .description('Derive domain and record PDAs')
+    .option('--record <type>', 'Show only this record type (e.g. Pic, Url, TXT)')
     .action(async (domain: string, opts) => {
       try {
-        const config = loadConfig(program.opts());
-        const rpcUrl = opts.rpc || config.rpc || "https://api.mainnet-beta.solana.com";
-        const connection = new Connection(rpcUrl, "confirmed");
-
-        const snsModule = new SnsModule({
-          connection,
-          sapProgramId: config.programId || "SAPpUhsWLJG1FfkGRcXagEDMrMsWGjbky7AyhGpFETZ",
-        });
-
-        const domainName = domain.endsWith(".sol") ? domain : `${domain}.sol`;
-        const domainPda = snsModule.getDomainPda(domainName);
+        const fullName = displayDomain(domain);
 
         if (opts.record) {
-          const recordPda = snsModule.getRecordPda(
-            domainName,
-            Record[opts.record as keyof typeof Record]
+          const snsModule = makeSnsModule(
+            new Connection('https://api.mainnet-beta.solana.com', 'confirmed'),
           );
+          const recordType = String(opts.record);
           output({
-            domain: domainName,
-            recordType: opts.record,
-            recordPda: recordPda.toBase58(),
+            domain: fullName,
+            recordType,
+            recordPda: snsModule.getRecordPda(fullName, recordType).toBase58(),
           });
-        } else {
-          // Show all common record PDAs
-          const recordPdas: { [key: string]: string } = {};
-          const recordTypes = ["SOL", "TXT", "Twitter", "Github", "Url"];
-
-          for (const recordType of recordTypes) {
-            const pda = snsModule.getRecordPda(
-              domainName,
-              Record[recordType as keyof typeof Record]
-            );
-            recordPdas[recordType] = pda.toBase58();
-          }
-
-          output({
-            domain: domainName,
-            domainPda: domainPda.toBase58(),
-            recordPdas,
-          });
+          return;
         }
+
+        const snsModule = makeSnsModule(
+          new Connection('https://api.mainnet-beta.solana.com', 'confirmed'),
+        );
+        const domainPda = snsModule.getDomainPda(fullName).toBase58();
+        const recordTypes = ['SOL', 'TXT', 'Twitter', 'Github', 'Url', 'Pic'];
+        const recordPdas: { [key: string]: string } = {};
+        for (const recordType of recordTypes) {
+          recordPdas[recordType] = snsModule
+            .getRecordPda(fullName, recordType)
+            .toBase58();
+        }
+
+        output({ domain: fullName, domainPda, recordPdas });
       } catch (err) {
-        log.error("pda failed", { error: (err as Error).message });
+        log.error('pda failed', { error: (err as Error).message });
         process.exit(1);
       }
     });
+}
+
+/** Local helper for pure (non-network) derivations. */
+function require_sns(): SnsModule {
+  return makeSnsModule(
+    new Connection('https://api.mainnet-beta.solana.com', 'confirmed'),
+  );
 }

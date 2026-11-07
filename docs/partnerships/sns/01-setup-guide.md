@@ -1,5 +1,12 @@
 # SNS Integration Setup Guide
 
+> ⚠️ **Stage 1 update (05-11-2026):** SNS è ora implementato sull'**SNS JS SDK v4**
+> (`@bonfida/spl-name-service@4.0.1`), namespace **`.sns`**. Il vecchio pacchetto
+> `@bonfida/spl-name-service@3.x` è sostituito e la risoluzione legacy `.sol` è
+> sospesa al slot `452,825,395` — in questo documento i riferimenti `.sol` e alle
+> API v3 rimangono per contesto storico, ma il codice attuale usa le API v4 con
+> nomi dominio completi `.sns`.
+
 ## Overview
 
 This guide provides complete setup instructions for integrating Solana Name Service (SNS) with the Synapse Agent Protocol (SAP) SDK. The SNS integration enables SAP agents to register `.sol` domains that link to their on-chain identity, payment endpoints, and verification URIs.
