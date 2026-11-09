@@ -16,20 +16,20 @@
  * @requires @oobe-protocol-labs/synapse-sap-sdk@^1.0.3
  */
 
-import { Command } from "commander";
-import { loadConfig } from "./config.js";
-import { configureLogger } from "./logger.js";
+import { Command } from 'commander';
+import { loadConfig } from './config.js';
+import { configureLogger } from './logger.js';
 
 // ── Command imports ──────────────────────────────────
-import { registerAgentCommands } from "./commands/agent.js";
-import { registerEscrowCommands } from "./commands/escrow.js";
-import { registerX402Commands } from "./commands/x402.js";
-import { registerMerchantCommands } from "./commands/merchant.js";
-import { registerMemoryCommands } from "./commands/memory.js";
-// import { registerSnsCommands } from "./commands/sns.js"; // TODO: Fix SNS integration errors
-import { registerSkillsCommands } from "./commands/skills.js";
-import { registerWizardCommands } from "./commands/wizard.js";
-import { registerConfigCommands } from "./commands/config-cmd.js";
+import { registerAgentCommands } from './commands/agent.js';
+import { registerEscrowCommands } from './commands/escrow.js';
+import { registerX402Commands } from './commands/x402.js';
+import { registerMerchantCommands } from './commands/merchant.js';
+import { registerMemoryCommands } from './commands/memory.js';
+import { registerSnsCommands } from './commands/sns.js';
+import { registerSkillsCommands } from './commands/skills.js';
+import { registerWizardCommands } from './commands/wizard.js';
+import { registerConfigCommands } from './commands/config-cmd.js';
 
 // ═══════════════════════════════════════════════════════════════════
 //  Program
@@ -38,10 +38,14 @@ import { registerConfigCommands } from "./commands/config-cmd.js";
 const program = new Command();
 
 program
-  .name("synapse-sap")
-  .description("synapse-sap CLI — v1.0.3 Edition\nComplete toolbox for the Synapse Agent Protocol (SAP v2) on Solana")
-  .version("1.0.3")
-  .addHelpText("after", `
+  .name('synapse-sap')
+  .description(
+    'synapse-sap CLI — v1.0.3 Edition\nComplete toolbox for the Synapse Agent Protocol (SAP v2) on Solana',
+  )
+  .version('1.0.3')
+  .addHelpText(
+    'after',
+    `
 Quick Start:
   $ synapse-sap wizard                        # Interactive MCP setup (recommended)
   $ synapse-sap agent register --name "My Agent"
@@ -62,16 +66,17 @@ Command Groups:
 Documentation:
   SDK:      https://github.com/OOBE-PROTOCOL/synapse-sap-sdk
   RPC:      https://oobeprotocol.ai
-`)
-  .option("--rpc <url>", "Override primary RPC")
-  .option("--cluster <cluster>", "Cluster (mainnet-beta|devnet|localnet)")
-  .option("--json", "JSON output", false)
-  .option("--silent", "Suppress logs (only JSON)", false)
-  .option("--config <path>", "Config file path")
-  .option("--dry-run", "Preview without sending", false)
-  .option("--keypair <path>", "Wallet keypair path")
-  .option("--api-key <key>", "OOBE API key")
-  .hook("preAction", (cmd: Command) => {
+`,
+  )
+  .option('--rpc <url>', 'Override primary RPC')
+  .option('--cluster <cluster>', 'Cluster (mainnet-beta|devnet|localnet)')
+  .option('--json', 'JSON output', false)
+  .option('--silent', 'Suppress logs (only JSON)', false)
+  .option('--config <path>', 'Config file path')
+  .option('--dry-run', 'Preview without sending', false)
+  .option('--keypair <path>', 'Wallet keypair path')
+  .option('--api-key <key>', 'OOBE API key')
+  .hook('preAction', (cmd: Command) => {
     const opts = cmd.opts();
     configureLogger({ json: opts.json, silent: opts.silent });
   });
@@ -83,7 +88,7 @@ registerX402Commands(program);
 registerMerchantCommands(program);
 registerMemoryCommands(program);
 registerSkillsCommands(program);
-// registerSnsCommands(program); // TODO: Fix SNS integration errors
+registerSnsCommands(program);
 registerWizardCommands(program);
 registerConfigCommands(program);
 

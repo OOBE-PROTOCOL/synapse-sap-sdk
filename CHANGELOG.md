@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.4] - 2026-11-09
+
+### Added
+
+- **SNS reintroduced on the SNS JS SDK v4** (`@bonfida/spl-name-service@^4.0.1`,
+  Stage 1 — `.sns` namespace, post slot 452,825,395): real `SnsModule` replacing
+  the v1.0.3 fail-fast stub, `utils/sns-adapter` re-implemented, `client.sns`
+  accessor (lazy), new `utils/display-domain` display rules, 11 unit tests, and
+  the CLI `sns` command group re-enabled (8 subcommands, unsigned builders +
+  local signing). Legacy `.sol` inputs are rejected at the protocol level.
+
+### Fixed
+
+- Release metadata reconciled to IDL **1.1.1** (smoke test + `verify:release` gate):
+  the IDL had been aligned in 94f392c/5b0f1c6 without updating the gates.
+- `REGISTRATION_FEE_LAMPORTS` aligned to the on-chain program v1.1.1 fee
+  (0.1 → 0.04 SOL).
+
 ## [1.0.3] - 2026-08-05
 
 ### Added

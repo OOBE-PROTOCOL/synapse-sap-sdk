@@ -48,7 +48,7 @@
 - **Tree-shakeable** — import only what you need
 - **Embedded IDL** — zero external workspace dependency; npm-ready
 - **Strict TypeScript** — `strict`, `noUncheckedIndexedAccess`, `noUnusedLocals`
-- **SNS Integration** — Optional `.sol` domain registration with SAP agent identity linkage (v0.21.0+)
+- **SNS Integration** — Optional `.sns` domain registration with SAP agent identity linkage (JS SDK v4, Stage 1)
 
 ## Installation
 
@@ -992,11 +992,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full development guidelines.
 
 ## SNS Integration (Optional)
 
-**Available from v0.21.0+** — Optional `.sol` domain registration with SAP agent identity linkage.
+**Available from v1.0.4** — Optional `.sns` domain registration with SAP agent identity linkage (SNS JS SDK v4, Stage 1: post slot 452,825,395 the ecosystem resolves `.sns`).
 
 ### Overview
 
-SNS (Solana Name Service) integration allows SAP agents to register human-readable `.sol` domains that are automatically linked to their SAP agent identity on-chain.
+SNS (Solana Name Service) integration allows SAP agents to register human-readable `.sns` domains that are automatically linked to their SAP agent identity on-chain. Legacy `.sol` inputs are rejected: legacy `.sol` resolution is paused at the protocol level (slot 452,825,395).
 
 **Key Features:**
 - ✅ Optional domain registration during agent setup
