@@ -1,23 +1,36 @@
 /**
  * @module utils/sns-adapter
- * @description Deprecated SNS adapter surface.
+ * @description SNS adapter on the SNS JS SDK v4 (`@bonfida/spl-name-service`
+ * v4, Stage 1 — `.sns` namespace only).
  *
- * This adapter previously imported `@bonfida/spl-name-service`, which is not
- * present in the public npm registry. The functions below intentionally fail
- * fast until SNS is migrated to a current, installable SDK and covered by
- * integration tests.
+ * Preserves the historical surface that consumers deep-imported via
+ * `@oobe-protocol-labs/synapse-sap-sdk/utils` while delegating the actual work
+ * to {@link SnsModule} (modules/sns.ts). Write paths return unsigned
+ * instructions — the caller signs and submits; nothing here holds or submits
+ * signatures.
  */
 
-import { PublicKey, type Connection, type Signer } from "@solana/web3.js";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import {
+  createRecord,
+  getRecordV1Key,
+  getSnsDomainKeySync,
+  registerDomain,
+} from "@bonfida/spl-name-service";
+import {
+  PublicKey,
+  type Connection,
+  type Signer,
+  type TransactionInstruction,
+} from "@solana/web3.js";
+import { SnsModule, parseSnsRecordType } from "../modules/sns.js";
+import { SNS_SUFFIX, toFullSnsName } from "./display-domain.js";
 
+/** Kept for source compatibility with pre-Stage-1 consumers. */
 export const SNS_DEPRECATED_MESSAGE =
-  "SNS adapter is deprecated in @oobe-protocol-labs/synapse-sap-sdk@1.0.3. " +
-  "The previous Bonfida dependency is not installable from npm; migrate to a " +
-  "current Solana Name Service SDK before using SNS flows.";
-
-function unavailable(): never {
-  throw new Error(SNS_DEPRECATED_MESSAGE);
-}
+  "SNS adapter is implemented on the SNS JS SDK v4 as of this module. Legacy " +
+  ".sol inputs are rejected: legacy .sol resolution is paused (slot 452,825,395). " +
+  "Use .sns names.";
 
 export const USDC_MINTS = {
   MAINNET: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
@@ -27,13 +40,6 @@ export const USDC_MINTS = {
 export const NAME_PROGRAM_ID = new PublicKey(
   "namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX",
 );
-
-export enum Record {
-  SOL = "SOL",
-  TXT = "TXT",
-  URL = "URL",
-  Pic = "Pic",
-}
 
 export interface SapAgentSnsRecords {
   agentWallet: string;
@@ -45,19 +51,58 @@ export interface SapAgentSnsRecords {
   agentEndpoint?: string;
 }
 
+/**
+ * Stage-1 registration result — unsigned instruction set plus derived keys.
+ * (The pre-Stage-1 surface returned a tx signature; nothing is submitted on
+ * the caller's behalf anymore.)
+ */
 export interface RegisterDomainResult {
-  signature: string;
+  /** Full lowercase `.sns` domain. */
+  domain: string;
   domainPda: PublicKey;
+  /** Created record type -> V1 record PDA. */
   recordPdas: { [key: string]: PublicKey };
+  /** Buyer's USDC token account used for the registration fee. */
+  buyerTokenAccount: PublicKey;
+  /** Unsigned instructions to sign & submit. */
+  instructions: TransactionInstruction[];
+  /** Was a set-as-primary instruction appended? */
+  setAsPrimary: boolean;
 }
 
 export interface SetPrimaryDomainResult {
-  signature: string;
   domain: string;
-  owner: PublicKey;
+  /** Unsigned set-primary instruction. */
+  instructions: TransactionInstruction[];
 }
 
-export async function registerDomainWithSapRecords(_params: {
+/** Canonical record type the adapter writes SAP identity payloads to. */
+export const SAP_IDENTITY_TXT_RECORD = parseSnsRecordType("txt");
+
+function toModule(
+  connection: Connection,
+  sapProgramId: string | PublicKey,
+): SnsModule {
+  return new SnsModule({ connection, sapProgramId });
+}
+
+export function getDomainKeySync(domain: string): { pubkey: PublicKey } {
+  const full = toFullSnsName(domain);
+  const bare = full.slice(0, -SNS_SUFFIX.length);
+  const { pubkey } = getSnsDomainKeySync(bare);
+  return { pubkey };
+}
+
+export function getRecordKeySync(
+  domain: string,
+  record: string,
+): { pubkey: PublicKey } {
+  const full = toFullSnsName(domain);
+  const parsed = parseSnsRecordType(record);
+  return { pubkey: getRecordV1Key(full, parsed) };
+}
+
+export async function registerDomainWithSapRecords(params: {
   connection: Connection;
   payer: Signer;
   agentWallet: PublicKey;
@@ -66,53 +111,110 @@ export async function registerDomainWithSapRecords(_params: {
   space?: number;
   setAsPrimary?: boolean;
 }): Promise<RegisterDomainResult> {
-  return unavailable();
+  const domain = toFullSnsName(params.domainName);
+  const bare = domain.slice(0, -SNS_SUFFIX.length);
+  const buyer = params.payer.publicKey;
+  const buyerTokenAccount = getAssociatedTokenAddressSync(
+    USDC_MINTS.MAINNET,
+    buyer,
+  );
+
+  const instructions: TransactionInstruction[] = [
+    ...(await registerDomain(
+      domain,
+      params.space ?? 600,
+      buyer,
+      buyerTokenAccount,
+    )),
+  ];
+  const recordPdas: { [key: string]: PublicKey } = {};
+
+  // The SAP identity payload is written as JSON in the TXT record.
+  const txt = parseSnsRecordType("txt");
+  const txtContent = JSON.stringify({
+    agent_wallet: params.records.agentWallet,
+    agent_pda: params.records.agentPda,
+    sap_program_id: params.records.sapProgramId,
+    capabilities: params.records.capabilities,
+    metadata_uri: params.records.metadataUri,
+    web2_domain: params.records.web2Domain,
+    agent_endpoint: params.records.agentEndpoint,
+  });
+  instructions.push(createRecord(domain, txt, txtContent, buyer, buyer));
+  recordPdas[txt] = getRecordV1Key(domain, txt);
+
+  const urlContent = params.records.agentEndpoint ?? params.records.metadataUri;
+  if (urlContent) {
+    const url = parseSnsRecordType("url");
+    instructions.push(createRecord(domain, url, urlContent, buyer, buyer));
+    recordPdas[url] = getRecordV1Key(domain, url);
+  }
+
+  const { pubkey: domainPda } = getSnsDomainKeySync(bare);
+
+  let setAsPrimary = false;
+  if (params.setAsPrimary) {
+    const [primary] = await toModule(
+      params.connection,
+      params.records.sapProgramId,
+    ).buildSetPrimaryDomainInstructions(params.agentWallet, domain);
+    instructions.push(primary);
+    setAsPrimary = true;
+  }
+
+  return {
+    domain,
+    domainPda,
+    recordPdas,
+    buyerTokenAccount,
+    instructions,
+    setAsPrimary,
+  };
 }
 
-export async function setDomainAsPrimary(_params: {
+export async function setDomainAsPrimary(params: {
   connection: Connection;
   owner: Signer;
   domainName: string;
 }): Promise<SetPrimaryDomainResult> {
-  return unavailable();
+  const domain = toFullSnsName(params.domainName);
+  const instructions = await toModule(
+    params.connection,
+    NAME_PROGRAM_ID,
+  ).buildSetPrimaryDomainInstructions(params.owner.publicKey, domain);
+  return { domain, instructions };
 }
 
 export async function getPrimaryDomainForWallet(
-  _connection: Connection,
-  _wallet: PublicKey,
+  connection: Connection,
+  wallet: PublicKey,
 ): Promise<string | null> {
-  return unavailable();
+  return toModule(connection, NAME_PROGRAM_ID).resolveWalletPrimaryDomain(
+    wallet,
+  );
 }
 
 export async function checkDomainAvailability(
-  _connection: Connection,
-  _domainName: string,
+  connection: Connection,
+  domainName: string,
 ): Promise<boolean> {
-  return unavailable();
+  return toModule(connection, NAME_PROGRAM_ID).checkAvailability(domainName);
 }
 
 export async function resolveSnsDomain(
-  _connection: Connection,
-  _domainName: string,
+  connection: Connection,
+  domainName: string,
 ): Promise<PublicKey | null> {
-  return unavailable();
+  return toModule(connection, NAME_PROGRAM_ID).resolve(domainName);
 }
 
 export async function getSnsRecord(
-  _connection: Connection,
-  _domainName: string,
-  _record: Record,
+  connection: Connection,
+  domainName: string,
+  record: string,
 ): Promise<string | null> {
-  return unavailable();
-}
-
-export function getDomainKeySync(_domain: string): { pubkey: PublicKey } {
-  return unavailable();
-}
-
-export function getRecordKeySync(
-  _domain: string,
-  _record: Record,
-): { pubkey: PublicKey } {
-  return unavailable();
+  return toModule(connection, NAME_PROGRAM_ID).getRecordValue(
+    domainName,
+    record,
+  );
 }
